@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">IdleHarbor social preview</title>
+  <desc id="desc">IdleHarbor branding and a summary of its native, visible, bounded Windows design.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111d35"/>
+      <stop offset="0.55" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#07101f"/>
+    </linearGradient>
+    <linearGradient id="wake" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#020617" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" fill="url(#background)"/>
+  <circle cx="1160" cy="-20" r="250" fill="#0ea5e9" opacity="0.07"/>
+  <circle cx="80" cy="650" r="300" fill="#2dd4bf" opacity="0.06"/>
+
+  <g transform="translate(92 112)" filter="url(#shadow)">
+    <rect width="304" height="304" rx="64" fill="#0b1220" stroke="#20304b" stroke-width="3"/>
+    <path d="M66 52v112c0 36 29 65 65 65h42c36 0 65-29 65-65V52h-38v108c0 16-12 28-28 28h-40c-16 0-28-12-28-28V52Z" fill="#f8fafc"/>
+    <circle cx="152" cy="52" r="18" fill="#2dd4bf"/>
+    <path d="M36 207c33-29 70-39 112-30 31 7 52 24 75 41 17 13 33 22 53 26-25 22-56 34-91 34-37 0-65-14-90-32-22-15-40-23-59-25Z" fill="url(#wake)"/>
+  </g>
+
+  <text x="470" y="215" fill="#f8fafc" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="1">IdleHarbor</text>
+  <text x="474" y="272" fill="#b8c7d9" font-family="Segoe UI, Arial, sans-serif" font-size="30">Transparent, configurable idle prevention for Windows.</text>
+
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="600">
+    <g transform="translate(474 330)">
+      <rect width="196" height="54" rx="27" fill="#12333b" stroke="#2dd4bf" stroke-opacity="0.55"/>
+      <circle cx="31" cy="27" r="8" fill="#2dd4bf"/>
+      <text x="52" y="34" fill="#d7fff8">Native C++20</text>
+    </g>
+    <g transform="translate(690 330)">
+      <rect width="194" height="54" rx="27" fill="#112c43" stroke="#38bdf8" stroke-opacity="0.55"/>
+      <circle cx="31" cy="27" r="8" fill="#38bdf8"/>
+      <text x="52" y="34" fill="#e0f5ff">No runtime</text>
+    </g>
+    <g transform="translate(904 330)">
+      <rect width="214" height="54" rx="27" fill="#1b2740" stroke="#8b9db8" stroke-opacity="0.5"/>
+      <circle cx="31" cy="27" r="8" fill="#a7b7cc"/>
+      <text x="52" y="34" fill="#e8eef7">Visible controls</text>
+    </g>
+  </g>
+
+  <line x1="474" y1="433" x2="1122" y2="433" stroke="#2b3b55" stroke-width="2"/>
+  <text x="474" y="485" fill="#8fa5bd" font-family="Segoe UI, Arial, sans-serif" font-size="23" letter-spacing="3">POWER REQUESTS  ·  INPUT MODES  ·  INTELLIGENT PAUSE</text>
+  <text x="474" y="540" fill="#5f7895" font-family="Segoe UI, Arial, sans-serif" font-size="20">Portable x64 / ARM64 • tray UI • local-only settings • immediate stop</text>
+</svg>
