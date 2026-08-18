@@ -10,8 +10,8 @@ using idleharbor::core::ActiveHours;
 using idleharbor::core::DecisionAction;
 using idleharbor::core::EngineState;
 using idleharbor::core::IntervalSampler;
-using idleharbor::core::KeepAwakeMode;
 using idleharbor::core::MotionMode;
+using idleharbor::core::PowerMode;
 using idleharbor::core::Point;
 using idleharbor::core::PolicyEngine;
 using idleharbor::core::PolicyInput;
@@ -35,8 +35,9 @@ bool test_default_settings_validate() {
     CHECK(result.valid);
     CHECK(result.errors.empty());
     CHECK(idleharbor::core::motion_mode_name(MotionMode::Circle) == "circle");
-    CHECK(idleharbor::core::keep_awake_mode_name(KeepAwakeMode::Hybrid) == "hybrid");
-    CHECK(idleharbor::core::profile_kind_name(ProfileKind::LongOperation) == "long-operation");
+    CHECK(idleharbor::core::motion_mode_name(MotionMode::Off) == "off");
+    CHECK(idleharbor::core::power_mode_name(PowerMode::Display) == "display");
+    CHECK(idleharbor::core::profile_kind_name(ProfileKind::LongTask) == "long-task");
     CHECK(idleharbor::core::engine_state_name(EngineState::Paused) == "paused");
     return true;
 }
@@ -50,14 +51,19 @@ bool test_invalid_settings_report_errors() {
     settings.low_battery_threshold = 101;
     settings.active_hours = ActiveHours{true, 1440, 10};
     settings.max_duration = -1s;
+    settings.motion = MotionMode::Off;
+    settings.power = PowerMode::None;
 
     const auto result = idleharbor::core::validate(settings);
     CHECK(!result.valid);
-    CHECK(result.errors.size() == 7);
+    CHECK(result.errors.size() == 8);
     return true;
 }
 
 bool test_motion_plans_are_deterministic_and_return_home() {
+    const auto off = idleharbor::core::make_motion_plan(MotionMode::Off, 12);
+    CHECK(off.relative_offsets.empty());
+
     for (const auto mode : {MotionMode::Normal, MotionMode::Linear, MotionMode::Circle, MotionMode::Zen}) {
         const auto first = idleharbor::core::make_motion_plan(mode, 12);
         const auto second = idleharbor::core::make_motion_plan(mode, 12);
@@ -95,6 +101,49 @@ bool test_interval_sampler_is_seeded_and_bounded() {
     CHECK(fixed.next() == 10s);
     IntervalSampler equal(7, 10s, 10s, true);
     CHECK(equal.next() == 10s);
+    return true;
+}
+
+bool test_profile_defaults_are_named_and_safe() {
+    const auto balanced = idleharbor::core::settings_for_profile(ProfileKind::Balanced);
+    CHECK(balanced.profile == ProfileKind::Balanced);
+    CHECK(balanced.motion == MotionMode::Normal);
+    CHECK(balanced.power == PowerMode::System);
+    CHECK(idleharbor::core::validate(balanced).valid);
+
+    const auto long_task = idleharbor::core::settings_for_profile(ProfileKind::LongTask);
+    CHECK(long_task.profile == ProfileKind::LongTask);
+    CHECK(long_task.motion == MotionMode::Zen);
+    CHECK(long_task.power == PowerMode::System);
+    CHECK(long_task.max_duration == 4h);
+    CHECK(idleharbor::core::validate(long_task).valid);
+
+    const auto presentation = idleharbor::core::settings_for_profile(ProfileKind::Presentation);
+    CHECK(presentation.motion == MotionMode::Off);
+    CHECK(presentation.power == PowerMode::Display);
+    CHECK(idleharbor::core::validate(presentation).valid);
+
+    const auto compatibility = idleharbor::core::settings_for_profile(ProfileKind::Compatibility);
+    CHECK(compatibility.motion == MotionMode::Normal);
+    CHECK(compatibility.power == PowerMode::None);
+    CHECK(idleharbor::core::validate(compatibility).valid);
+
+    const auto visible = idleharbor::core::settings_for_profile(ProfileKind::Visible);
+    CHECK(visible.motion == MotionMode::Circle);
+    CHECK(visible.power == PowerMode::None);
+    CHECK(idleharbor::core::validate(visible).valid);
+
+    const auto battery = idleharbor::core::settings_for_profile(ProfileKind::BatterySaver);
+    CHECK(battery.motion == MotionMode::Zen);
+    CHECK(battery.power == PowerMode::None);
+    CHECK(battery.pause_on_battery);
+    CHECK(idleharbor::core::validate(battery).valid);
+
+    const auto custom = idleharbor::core::settings_for_profile(ProfileKind::Custom);
+    CHECK(custom.profile == ProfileKind::Custom);
+    CHECK(custom.motion == MotionMode::Normal);
+    CHECK(custom.power == PowerMode::System);
+    CHECK(idleharbor::core::validate(custom).valid);
     return true;
 }
 
@@ -249,6 +298,7 @@ int main() {
         test_invalid_settings_report_errors(),
         test_motion_plans_are_deterministic_and_return_home(),
         test_interval_sampler_is_seeded_and_bounded(),
+        test_profile_defaults_are_named_and_safe(),
         test_active_hours_support_disabled_normal_and_cross_midnight(),
         test_policy_starts_and_stops_explicitly(),
         test_user_activity_cooldown_resumes(),

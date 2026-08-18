@@ -11,9 +11,17 @@ namespace idleharbor::core {
 
 using Seconds = std::chrono::seconds;
 
-enum class MotionMode { Normal, Zen, Circle, Linear };
-enum class KeepAwakeMode { None, System, Display, Hybrid };
-enum class ProfileKind { Balanced, Presentation, LongOperation, Custom };
+enum class MotionMode { Off, Normal, Zen, Circle, Linear };
+enum class PowerMode { None, System, Display };
+enum class ProfileKind {
+    Balanced,
+    LongTask,
+    Presentation,
+    Compatibility,
+    Visible,
+    BatterySaver,
+    Custom,
+};
 enum class EngineState { Stopped, Running, Paused };
 enum class DecisionAction { Stop, Run, Pause };
 enum class PolicyReason {
@@ -58,7 +66,7 @@ struct Settings {
 
     ProfileKind profile{ProfileKind::Balanced};
     MotionMode motion{MotionMode::Normal};
-    KeepAwakeMode keep_awake{KeepAwakeMode::System};
+    PowerMode power{PowerMode::System};
     Seconds interval{60};
     Seconds random_minimum{1};
     std::uint32_t distance{1};
@@ -83,8 +91,12 @@ struct ValidationResult {
 
 [[nodiscard]] ValidationResult validate(const Settings& settings);
 
+// Returns a complete, conservative preset. Profiles only select defaults; callers may
+// override individual fields and validate the resulting settings before starting.
+[[nodiscard]] Settings settings_for_profile(ProfileKind profile);
+
 [[nodiscard]] std::string_view motion_mode_name(MotionMode mode) noexcept;
-[[nodiscard]] std::string_view keep_awake_mode_name(KeepAwakeMode mode) noexcept;
+[[nodiscard]] std::string_view power_mode_name(PowerMode mode) noexcept;
 [[nodiscard]] std::string_view profile_kind_name(ProfileKind profile) noexcept;
 [[nodiscard]] std::string_view engine_state_name(EngineState state) noexcept;
 [[nodiscard]] std::string_view policy_reason_name(PolicyReason reason) noexcept;

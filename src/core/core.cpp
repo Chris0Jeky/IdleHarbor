@@ -43,6 +43,9 @@ bool ActiveHours::contains(std::uint16_t minute_of_day) const noexcept {
 ValidationResult validate(const Settings& settings) {
     ValidationResult result{};
 
+    if (settings.motion == MotionMode::Off && settings.power == PowerMode::None) {
+        add_error(result, "motion Off with power None cannot keep the system awake");
+    }
     if (settings.interval < Settings::kMinimumInterval || settings.interval > Settings::kMaximumInterval) {
         add_error(result, "interval must be between 1 second and 24 hours");
     }
@@ -70,8 +73,62 @@ ValidationResult validate(const Settings& settings) {
     return result;
 }
 
+Settings settings_for_profile(ProfileKind profile) {
+    Settings settings{};
+    settings.profile = profile;
+
+    switch (profile) {
+    case ProfileKind::Balanced:
+        // Normal/System at 60 seconds; user, lock, disconnect, and low-battery safeguards stay on.
+        break;
+    case ProfileKind::LongTask:
+        // Zen/System is quiet, samples every two minutes, and stops after four hours by default.
+        settings.motion = MotionMode::Zen;
+        settings.interval = Seconds{120};
+        settings.random_minimum = Seconds{30};
+        settings.randomize = true;
+        settings.max_duration = Seconds{4 * 60 * 60};
+        break;
+    case ProfileKind::Presentation:
+        // Do not move the pointer, but keep the display on for a presentation.
+        settings.motion = MotionMode::Off;
+        settings.power = PowerMode::Display;
+        settings.pause_on_user_activity = false;
+        break;
+    case ProfileKind::Compatibility:
+        // Use visible Normal input without a power request for restrictive environments.
+        settings.motion = MotionMode::Normal;
+        settings.power = PowerMode::None;
+        settings.interval = Seconds{60};
+        break;
+    case ProfileKind::Visible:
+        // Circle movement makes activity obvious; it does not request display power.
+        settings.motion = MotionMode::Circle;
+        settings.power = PowerMode::None;
+        break;
+    case ProfileKind::BatterySaver:
+        // Zen input is less distracting and avoids a continuous display power request.
+        settings.motion = MotionMode::Zen;
+        settings.power = PowerMode::None;
+        settings.interval = Seconds{120};
+        settings.random_minimum = Seconds{30};
+        settings.randomize = true;
+        settings.pause_on_battery = true;
+        break;
+    case ProfileKind::Custom:
+        // Custom starts from the balanced preset and is intended for caller overrides.
+        settings = Settings{};
+        settings.profile = ProfileKind::Custom;
+        break;
+    }
+
+    return settings;
+}
+
 std::string_view motion_mode_name(MotionMode mode) noexcept {
     switch (mode) {
+    case MotionMode::Off:
+        return "off";
     case MotionMode::Normal:
         return "normal";
     case MotionMode::Zen:
@@ -84,16 +141,14 @@ std::string_view motion_mode_name(MotionMode mode) noexcept {
     return "unknown";
 }
 
-std::string_view keep_awake_mode_name(KeepAwakeMode mode) noexcept {
+std::string_view power_mode_name(PowerMode mode) noexcept {
     switch (mode) {
-    case KeepAwakeMode::None:
+    case PowerMode::None:
         return "none";
-    case KeepAwakeMode::System:
+    case PowerMode::System:
         return "system";
-    case KeepAwakeMode::Display:
+    case PowerMode::Display:
         return "display";
-    case KeepAwakeMode::Hybrid:
-        return "hybrid";
     }
     return "unknown";
 }
@@ -102,10 +157,16 @@ std::string_view profile_kind_name(ProfileKind profile) noexcept {
     switch (profile) {
     case ProfileKind::Balanced:
         return "balanced";
+    case ProfileKind::LongTask:
+        return "long-task";
     case ProfileKind::Presentation:
         return "presentation";
-    case ProfileKind::LongOperation:
-        return "long-operation";
+    case ProfileKind::Compatibility:
+        return "compatibility";
+    case ProfileKind::Visible:
+        return "visible";
+    case ProfileKind::BatterySaver:
+        return "battery-saver";
     case ProfileKind::Custom:
         return "custom";
     }
@@ -182,6 +243,9 @@ MotionPlan make_motion_plan(MotionMode mode, std::uint32_t distance) {
     MotionPlan plan{mode, bounded_distance, {}};
 
     switch (mode) {
+    case MotionMode::Off:
+        plan.relative_offsets = {};
+        break;
     case MotionMode::Normal:
         plan.relative_offsets = {{d, d}, {-d, -d}, {0, 0}};
         break;

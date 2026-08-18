@@ -5,8 +5,8 @@ Last updated: 2026-08-18
 ## Current milestone
 
 IdleHarbor v0.1.0 is in active development. The current slice adds the platform-neutral motion,
-interval, settings-validation, and intelligent-stop policy core. Win32 input, power-state, tray,
-and distribution integration have not landed yet.
+power, profile, interval, settings-validation, and intelligent-stop policy core. Win32 input,
+power-state, tray, and distribution integration have not landed yet.
 
 ## Authority and publication
 

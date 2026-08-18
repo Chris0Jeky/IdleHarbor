@@ -29,6 +29,12 @@ covered by dependency-free tests. Win32 input, power-state integration, tray UI,
 remain in progress. See [`PROJECT_STATE.md`](PROJECT_STATE.md) for the live milestone and proving
 commands.
 
+The core keeps motion and power requests independent. Profiles currently provide conservative
+starting points: `balanced` (Normal/System), `long-task` (quiet Zen/System with a four-hour limit),
+`presentation` (no pointer motion/display request), `compatibility` (Normal input only), `visible`
+(Circle input only), `battery-saver` (quiet Zen input with battery pause), and `custom` (balanced
+values for explicit overrides). `Off` motion with `None` power is rejected as non-runnable.
+
 ## Build the foundation
 
 Use a Visual Studio developer PowerShell with CMake and Ninja available:
