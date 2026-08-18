@@ -18,7 +18,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        include:
+          - arch: x64
+            platform: x64
+          - arch: arm64
+            platform: ARM64
 
     steps:
       - name: Check out source
@@ -37,7 +41,7 @@ jobs:
         run: >-
           cmake -S . -B build/${{ matrix.arch }}
           -G "Visual Studio 17 2022"
-          -A ${{ matrix.arch }}
+          -A ${{ matrix.platform }}
           -DIDLEHARBOR_BUILD_TESTS=ON
 
       - name: Build Release
