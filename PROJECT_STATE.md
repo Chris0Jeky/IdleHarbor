@@ -5,9 +5,9 @@ Last updated: 2026-08-18
 ## Current milestone
 
 IdleHarbor v0.1.0 is in active development. The platform-neutral policy core, strict command-line
-model, atomic settings store, bounded motion emitter, genuine-input observer, power request, and
-battery/fullscreen adapters have landed with direct tests. The visible tray application has not
-yet replaced the foundation window.
+model, atomic settings store, bounded motion emitter, genuine-input observer, power request,
+battery/fullscreen adapters, and visible tray-controlled application have landed with direct tests.
+Packaging, installer/startup helpers, and release QA remain.
 
 ## Authority and publication
 
@@ -26,4 +26,4 @@ ctest --test-dir build --output-on-failure
 
 ## Next slice
 
-Integrate the landed core and Win32 adapters into the visible tray-controlled application.
+Complete packaging/startup distribution and release QA against the visible application.

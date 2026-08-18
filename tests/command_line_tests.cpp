@@ -57,6 +57,7 @@ int main() {
          L"--battery-threshold",
          L"25",
          L"--pause-on-fullscreen",
+         L"--no-close-to-tray",
          L"--portable"});
     Expect(comprehensive.ok(), "comprehensive options parse");
     Expect(comprehensive.options.interval == 5min, "minutes parse");
@@ -64,6 +65,7 @@ int main() {
     Expect(comprehensive.options.stop_after == 2h, "hours parse");
     Expect(comprehensive.options.battery_threshold == std::uint32_t{25}, "battery threshold parses");
     Expect(comprehensive.options.pause_on_fullscreen == true, "fullscreen pause parses");
+    Expect(comprehensive.options.close_to_tray == false, "close-to-tray option parses");
     Expect(comprehensive.options.portable, "portable mode parses");
 
     const auto balanced = Parse({L"--profile", L"balanced"});
@@ -80,6 +82,7 @@ int main() {
 
     Expect(!Parse({L"--start", L"--stop"}).ok(), "conflicting commands fail");
     Expect(!Parse({L"--profile", L"stealth"}).ok(), "unknown profile fails");
+    Expect(Parse({L"--profile", L"balanced"}).ok(), "balanced profile parses");
     Expect(!Parse({L"--motion", L"random-walk"}).ok(), "unknown motion fails");
     Expect(!Parse({L"--power", L"away"}).ok(), "unsupported away mode fails");
     Expect(!Parse({L"--interval", L"0"}).ok(), "zero interval fails");
