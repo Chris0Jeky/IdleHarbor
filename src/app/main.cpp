@@ -278,6 +278,7 @@ class Application final {
 
     void HandleCommand(const CommandLineOptions& options) {
         ApplyCommandLineOptions(options);
+        RefreshControls();
         switch (options.command) {
         case RequestedCommand::Launch:
             if (options.minimized) {
