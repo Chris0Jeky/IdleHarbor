@@ -24,8 +24,10 @@ person is present. Check the rules that apply to any managed device before insta
 
 ## Current status
 
-The repository foundation is present, but keep-awake behavior is not implemented in this initial
-slice. See [`PROJECT_STATE.md`](PROJECT_STATE.md) for the live milestone and proving commands.
+The platform-neutral motion, interval, validation, and safety-policy core is now implemented and
+covered by dependency-free tests. Win32 input, power-state integration, tray UI, and installers
+remain in progress. See [`PROJECT_STATE.md`](PROJECT_STATE.md) for the live milestone and proving
+commands.
 
 ## Build the foundation
 

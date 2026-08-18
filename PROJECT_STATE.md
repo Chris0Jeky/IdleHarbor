@@ -4,8 +4,9 @@ Last updated: 2026-08-18
 
 ## Current milestone
 
-IdleHarbor v0.1.0 is in active development. The current slice establishes a compilable native
-Win32 project and contributor guardrails; keep-awake behavior has not landed yet.
+IdleHarbor v0.1.0 is in active development. The current slice adds the platform-neutral motion,
+interval, settings-validation, and intelligent-stop policy core. Win32 input, power-state, tray,
+and distribution integration have not landed yet.
 
 ## Authority and publication
 
@@ -24,4 +25,4 @@ ctest --test-dir build --output-on-failure
 
 ## Next slice
 
-Implement the dependency-free policy engine, movement patterns, command-line model, and unit tests.
+Integrate the core with Win32 input/power adapters and the visible tray-controlled application.
