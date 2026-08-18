@@ -18,8 +18,9 @@ From an extracted release directory, run:
 ```
 
 The default destination is `%LOCALAPPDATA%\Programs\IdleHarbor`. Installation is per-user and does
-not require elevation. Supported startup modes are `TaskScheduler` (recommended), `StartupFolder`,
-`RunKey`, and `None`. The scheduled task runs only for the signed-in user with least privilege.
+not require elevation. Startup is disabled by default. To opt in to the recommended least-privilege
+scheduled task, use `-Startup TaskScheduler` as shown above. Other supported modes are `StartupFolder`,
+`RunKey`, and `None`. The scheduled task runs only for the signed-in user.
 
 Use `-WhatIf` to preview changes. Uninstall with:
 

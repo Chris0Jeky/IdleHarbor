@@ -32,12 +32,16 @@ try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x00, 0x01, 0x02, 0x03))
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch -WhatIf | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer -WhatIf created files.'
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -NoLaunch -WhatIf | Out-Null
+    Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
 
@@ -45,7 +49,8 @@ try {
         -BuildDirectory $buildRoot `
         -OutputDirectory $outputRoot `
         -Version '0.1.0-test' `
-        -Architecture x64
+        -Architecture x64 `
+        -SourceRevision 'test-revision'
     Assert-True (Test-Path -LiteralPath ([string]$archive) -PathType Leaf) 'Portable archive was not created.'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead([string]$archive)
@@ -54,6 +59,16 @@ try {
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
+        $manifestEntry = $zip.GetEntry('IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json')
+        Assert-True ($null -ne $manifestEntry) 'Archive lacks its package manifest.'
+        $reader = New-Object IO.StreamReader($manifestEntry.Open())
+        try { $packageManifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+        $manifestProperties = @($packageManifest.PSObject.Properties.Name)
+        Assert-True ($manifestProperties -notcontains 'builtFrom') 'Package manifest contains a legacy local builtFrom path.'
+        Assert-True ($manifestProperties -contains 'sourceRevision') 'Package manifest lacks its supplied source revision.'
+        Assert-True ($packageManifest.sourceRevision -eq 'test-revision') 'Package manifest source revision is incorrect.'
+        $manifestJson = $packageManifest | ConvertTo-Json -Depth 5 -Compress
+        Assert-True (-not ($manifestJson -match '([A-Za-z]:\\|/Users/|/home/)')) 'Package manifest contains a local path.'
     }
     finally {
         $zip.Dispose()

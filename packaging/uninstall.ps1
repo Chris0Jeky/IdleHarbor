@@ -14,12 +14,17 @@ $TaskName = 'IdleHarbor'
 $RunValueName = 'IdleHarbor'
 $MarkerName = '.idleharbor-managed.json'
 
-function Test-ShouldProcess([string]$Target, [string]$Action) {
-    if ($WhatIfPreference) {
-        Write-Output "What if: Performing the operation '$Action' on target '$Target'."
-        return $false
-    }
-    return $true
+function Confirm-Change {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Target,
+
+        [Parameter(Mandatory)]
+        [string]$Action
+    )
+
+    return $PSCmdlet.ShouldProcess($Target, $Action)
 }
 
 function Get-FullPath([string]$Path) {
@@ -64,12 +69,18 @@ function Test-RunCommandOwned([string]$Command, [string]$Executable) {
     return (Test-SamePath $candidate $Executable)
 }
 
-function Remove-OwnedStartup([string]$Executable) {
+function Remove-OwnedStartup {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable
+    )
+
     $task = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($null -ne $task) {
         $action = @($task.Actions) | Select-Object -First 1
         if ($null -ne $action -and (Test-SamePath $action.Execute $Executable)) {
-            if (Test-ShouldProcess "scheduled task $TaskPath$TaskName" 'Remove') {
+            if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Remove')) {
                 Unregister-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Confirm:$false
             }
         }
@@ -80,7 +91,7 @@ function Remove-OwnedStartup([string]$Executable) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($link)
         if (Test-SamePath $shortcut.TargetPath $Executable) {
-            if (Test-ShouldProcess $link 'Remove startup shortcut') {
+            if ($PSCmdlet.ShouldProcess($link, 'Remove startup shortcut')) {
                 Remove-Item -LiteralPath $link -Force
             }
         }
@@ -88,7 +99,7 @@ function Remove-OwnedStartup([string]$Executable) {
 
     $command = Get-RunCommand
     if (Test-RunCommandOwned $command $Executable) {
-        if (Test-ShouldProcess "HKCU Run value $RunValueName" 'Remove') {
+        if ($PSCmdlet.ShouldProcess("HKCU Run value $RunValueName", 'Remove')) {
             Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $RunValueName -Force
         }
     }
@@ -118,14 +129,14 @@ foreach ($file in @($marker.managedFiles)) {
         throw "Ownership marker contains a path outside the installation directory: $file"
     }
     if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-        if (Test-ShouldProcess $candidate 'Remove installed file') {
+        if (Confirm-Change $candidate 'Remove installed file') {
             Remove-Item -LiteralPath $candidate -Force
         }
     }
 }
 
 if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
-    if (Test-ShouldProcess $markerPath 'Remove ownership marker') {
+    if (Confirm-Change $markerPath 'Remove ownership marker') {
         Remove-Item -LiteralPath $markerPath -Force
     }
 }
@@ -133,7 +144,7 @@ if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
 if (Test-Path -LiteralPath $safeRoot -PathType Container) {
     $remaining = @(Get-ChildItem -LiteralPath $safeRoot -Force)
     if ($remaining.Count -eq 0) {
-        if (Test-ShouldProcess $safeRoot 'Remove empty installation directory') {
+        if (Confirm-Change $safeRoot 'Remove empty installation directory') {
             Remove-Item -LiteralPath $safeRoot -Force
         }
     }
@@ -152,7 +163,7 @@ if ($PurgeData) {
             if (($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw "Refusing to purge a reparse-point data directory: $dataRoot"
             }
-            if (Test-ShouldProcess $dataRoot 'Purge user data') {
+            if (Confirm-Change $dataRoot 'Purge user data') {
                 Remove-Item -LiteralPath $dataRoot -Recurse -Force
             }
         }

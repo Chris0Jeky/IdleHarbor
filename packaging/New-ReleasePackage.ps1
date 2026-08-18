@@ -13,7 +13,9 @@ param(
     [ValidateSet('x64', 'arm64', 'x86')]
     [string]$Architecture = 'x64',
 
-    [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
+
+    [string]$SourceRevision
 )
 
 Set-StrictMode -Version Latest
@@ -57,8 +59,10 @@ try {
         architecture = $Architecture
         packageType = 'portable'
         executable = 'IdleHarbor.exe'
-        builtFrom = (Get-FullPath $binary.FullName)
         createdUtc = [DateTime]::UtcNow.ToString('o')
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SourceRevision)) {
+        $manifest.sourceRevision = $SourceRevision
     }
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $stagePackage 'package-manifest.json') -Encoding UTF8
 

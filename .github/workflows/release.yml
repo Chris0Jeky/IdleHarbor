@@ -55,7 +55,8 @@ jobs:
             -BuildDirectory build/${{ matrix.arch }}/Release `
             -OutputDirectory dist `
             -Version '${{ steps.version.outputs.version }}' `
-            -Architecture '${{ matrix.arch }}'
+            -Architecture '${{ matrix.arch }}' `
+            -SourceRevision '${{ github.sha }}'
           .\packaging\New-Sbom.ps1 `
             -InputPath build/${{ matrix.arch }}/Release/IdleHarbor.exe `
             -OutputPath dist/IdleHarbor-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.spdx.json `
@@ -66,7 +67,7 @@ jobs:
       - name: Attest portable archive
         uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
         with:
-          subject-path: dist/*.zip
+          subject-path: dist/*
 
       - name: Upload architecture package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

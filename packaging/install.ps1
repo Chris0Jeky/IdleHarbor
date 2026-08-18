@@ -6,7 +6,7 @@ param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'Programs\IdleHarbor'),
 
     [ValidateSet('TaskScheduler', 'StartupFolder', 'RunKey', 'None')]
-    [string]$Startup = 'TaskScheduler',
+    [string]$Startup = 'None',
 
     [switch]$NoLaunch
 )
@@ -31,12 +31,17 @@ $KnownFiles = @(
     'sbom.spdx.json'
 )
 
-function Test-ShouldProcess([string]$Target, [string]$Action) {
-    if ($WhatIfPreference) {
-        Write-Output "What if: Performing the operation '$Action' on target '$Target'."
-        return $false
-    }
-    return $true
+function Confirm-Change {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Target,
+
+        [Parameter(Mandatory)]
+        [string]$Action
+    )
+
+    return $PSCmdlet.ShouldProcess($Target, $Action)
 }
 
 function Get-FullPath([string]$Path) {
@@ -108,12 +113,18 @@ function Get-OwnedTask([string]$Executable) {
     return $task
 }
 
-function Remove-OwnedStartup([string]$Executable) {
+function Remove-OwnedStartup {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable
+    )
+
     $task = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($null -ne $task) {
         $action = @($task.Actions) | Select-Object -First 1
         if ($null -ne $action -and (Test-SamePath $action.Execute $Executable)) {
-            if (Test-ShouldProcess "scheduled task $TaskPath$TaskName" 'Remove') {
+            if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Remove')) {
                 Unregister-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Confirm:$false
             }
         }
@@ -124,7 +135,7 @@ function Remove-OwnedStartup([string]$Executable) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($link)
         if (Test-SamePath $shortcut.TargetPath $Executable) {
-            if (Test-ShouldProcess $link 'Remove startup shortcut') {
+            if ($PSCmdlet.ShouldProcess($link, 'Remove startup shortcut')) {
                 Remove-Item -LiteralPath $link -Force
             }
         }
@@ -132,42 +143,51 @@ function Remove-OwnedStartup([string]$Executable) {
 
     $command = Get-RunCommand
     if (Test-RunCommandOwned $command $Executable) {
-        if (Test-ShouldProcess "HKCU Run value $RunValueName" 'Remove') {
+        if ($PSCmdlet.ShouldProcess("HKCU Run value $RunValueName", 'Remove')) {
             Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $RunValueName -Force
         }
     }
 }
 
-function Set-Startup([string]$Executable, [string]$Mode) {
+function Set-Startup {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [string]$Mode
+    )
+
     Remove-OwnedStartup $Executable
     if ($Mode -eq 'None') { return }
 
     switch ($Mode) {
         'TaskScheduler' {
             $null = Get-OwnedTask $Executable
-            $action = New-ScheduledTaskAction -Execute $Executable -Argument '--start-minimized' -WorkingDirectory (Split-Path -Parent $Executable)
+            $action = New-ScheduledTaskAction -Execute $Executable -Argument '--start --minimized' -WorkingDirectory (Split-Path -Parent $Executable)
             $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
             $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel LeastPrivilege
             $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-            if (Test-ShouldProcess "scheduled task $TaskPath$TaskName" 'Register') {
+            if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Register')) {
                 Register-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Starts IdleHarbor for the signed-in user.' -Force | Out-Null
             }
         }
         'StartupFolder' {
             $link = Get-StartupLinkPath
-            if (Test-ShouldProcess $link 'Create startup shortcut') {
+            if ($PSCmdlet.ShouldProcess($link, 'Create startup shortcut')) {
                 $shell = New-Object -ComObject WScript.Shell
                 $shortcut = $shell.CreateShortcut($link)
                 $shortcut.TargetPath = $Executable
-                $shortcut.Arguments = '--start-minimized'
+                $shortcut.Arguments = '--start --minimized'
                 $shortcut.WorkingDirectory = Split-Path -Parent $Executable
                 $shortcut.Description = 'Starts IdleHarbor for the signed-in user.'
                 $shortcut.Save()
             }
         }
         'RunKey' {
-            $command = '"{0}" --start-minimized' -f $Executable
-            if (Test-ShouldProcess "HKCU Run value $RunValueName" 'Set') {
+            $command = '"{0}" --start --minimized' -f $Executable
+            if ($PSCmdlet.ShouldProcess("HKCU Run value $RunValueName", 'Set')) {
                 New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Force | Out-Null
                 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $RunValueName -Value $command -Type String
             }
@@ -183,21 +203,22 @@ $parent = Split-Path -Parent $safeRoot
 $markerPath = Join-Path $safeRoot $MarkerName
 
 if (-not (Test-SamePath $sourceRoot $safeRoot)) {
-    if (Test-ShouldProcess $safeRoot 'Create installation directory') {
+    if (Confirm-Change $safeRoot 'Create installation directory') {
         New-Item -ItemType Directory -Path $safeRoot -Force | Out-Null
     }
 }
 
 foreach ($fileName in $KnownFiles) {
+    if (Test-SamePath $sourceRoot $safeRoot) { continue }
     $sourceFile = Join-Path $sourceRoot $fileName
     if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }
     $destinationFile = Join-Path $safeRoot $fileName
-    if (Test-ShouldProcess $destinationFile 'Install package file') {
+    if (Confirm-Change $destinationFile 'Install package file') {
         Copy-Item -LiteralPath $sourceFile -Destination $destinationFile -Force
     }
 }
 
-if (Test-ShouldProcess $markerPath 'Write ownership marker') {
+if (Confirm-Change $markerPath 'Write ownership marker') {
     $installedFiles = @($KnownFiles | Where-Object { Test-Path -LiteralPath (Join-Path $safeRoot $_) -PathType Leaf })
     $marker = [ordered]@{
         product = $ProductName
@@ -209,12 +230,10 @@ if (Test-ShouldProcess $markerPath 'Write ownership marker') {
     $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
 }
 
-if (-not (Test-SamePath $sourceRoot $safeRoot)) {
-    Set-Startup $destinationExecutable $Startup
-}
+Set-Startup $destinationExecutable $Startup
 
 Write-Output "Installed $ProductName to $safeRoot"
 Write-Output "Startup mode: $Startup"
 if (-not $NoLaunch -and -not $WhatIfPreference -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
-    Start-Process -FilePath $destinationExecutable -ArgumentList '--start-minimized' -WorkingDirectory $safeRoot
+    Start-Process -FilePath $destinationExecutable -ArgumentList '--start', '--minimized' -WorkingDirectory $safeRoot
 }

@@ -1,4 +1,4 @@
 @echo off
 setlocal
-PowerShell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" %*
+PowerShell.exe -NoLogo -NoProfile -File "%~dp0install.ps1" %*
 exit /b %ERRORLEVEL%
