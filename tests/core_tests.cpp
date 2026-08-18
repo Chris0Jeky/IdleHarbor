@@ -107,13 +107,13 @@ bool test_interval_sampler_is_seeded_and_bounded() {
 bool test_profile_defaults_are_named_and_safe() {
     const auto balanced = idleharbor::core::settings_for_profile(ProfileKind::Balanced);
     CHECK(balanced.profile == ProfileKind::Balanced);
-    CHECK(balanced.motion == MotionMode::Normal);
+    CHECK(balanced.motion == MotionMode::Zen);
     CHECK(balanced.power == PowerMode::System);
     CHECK(idleharbor::core::validate(balanced).valid);
 
     const auto long_task = idleharbor::core::settings_for_profile(ProfileKind::LongTask);
     CHECK(long_task.profile == ProfileKind::LongTask);
-    CHECK(long_task.motion == MotionMode::Zen);
+    CHECK(long_task.motion == MotionMode::Off);
     CHECK(long_task.power == PowerMode::System);
     CHECK(long_task.max_duration == 4h);
     CHECK(idleharbor::core::validate(long_task).valid);
@@ -136,12 +136,13 @@ bool test_profile_defaults_are_named_and_safe() {
     const auto battery = idleharbor::core::settings_for_profile(ProfileKind::BatterySaver);
     CHECK(battery.motion == MotionMode::Zen);
     CHECK(battery.power == PowerMode::None);
-    CHECK(battery.pause_on_battery);
+    CHECK(!battery.pause_on_battery);
+    CHECK(battery.low_battery_threshold == std::uint8_t{30});
     CHECK(idleharbor::core::validate(battery).valid);
 
     const auto custom = idleharbor::core::settings_for_profile(ProfileKind::Custom);
     CHECK(custom.profile == ProfileKind::Custom);
-    CHECK(custom.motion == MotionMode::Normal);
+    CHECK(custom.motion == MotionMode::Zen);
     CHECK(custom.power == PowerMode::System);
     CHECK(idleharbor::core::validate(custom).valid);
     return true;

@@ -65,7 +65,7 @@ struct Settings {
     static constexpr Seconds kMaximumInterval{24 * 60 * 60};
 
     ProfileKind profile{ProfileKind::Balanced};
-    MotionMode motion{MotionMode::Normal};
+    MotionMode motion{MotionMode::Zen};
     PowerMode power{PowerMode::System};
     Seconds interval{60};
     Seconds random_minimum{1};

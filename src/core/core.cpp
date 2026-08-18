@@ -79,14 +79,12 @@ Settings settings_for_profile(ProfileKind profile) {
 
     switch (profile) {
     case ProfileKind::Balanced:
-        // Normal/System at 60 seconds; user, lock, disconnect, and low-battery safeguards stay on.
+        // Zen/System at 60 seconds; user, lock, disconnect, and low-battery safeguards stay on.
         break;
     case ProfileKind::LongTask:
-        // Zen/System is quiet, samples every two minutes, and stops after four hours by default.
-        settings.motion = MotionMode::Zen;
+        // A bounded system-only request avoids synthetic input during a long local operation.
+        settings.motion = MotionMode::Off;
         settings.interval = Seconds{120};
-        settings.random_minimum = Seconds{30};
-        settings.randomize = true;
         settings.max_duration = Seconds{4 * 60 * 60};
         break;
     case ProfileKind::Presentation:
@@ -96,7 +94,7 @@ Settings settings_for_profile(ProfileKind profile) {
         settings.pause_on_user_activity = false;
         break;
     case ProfileKind::Compatibility:
-        // Use visible Normal input without a power request for restrictive environments.
+        // Use visible Normal input for applications that implement their own idle detection.
         settings.motion = MotionMode::Normal;
         settings.power = PowerMode::None;
         settings.interval = Seconds{60};
@@ -107,13 +105,13 @@ Settings settings_for_profile(ProfileKind profile) {
         settings.power = PowerMode::None;
         break;
     case ProfileKind::BatterySaver:
-        // Zen input is less distracting and avoids a continuous display power request.
+        // Zen input avoids a continuous power request and pauses before the battery becomes critical.
         settings.motion = MotionMode::Zen;
         settings.power = PowerMode::None;
         settings.interval = Seconds{120};
         settings.random_minimum = Seconds{30};
         settings.randomize = true;
-        settings.pause_on_battery = true;
+        settings.low_battery_threshold = 30;
         break;
     case ProfileKind::Custom:
         // Custom starts from the balanced preset and is intended for caller overrides.
