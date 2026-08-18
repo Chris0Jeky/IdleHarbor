@@ -61,7 +61,7 @@ add_executable(
 
 target_include_directories(IdleHarbor PRIVATE include)
 target_compile_features(IdleHarbor PRIVATE cxx_std_20)
-target_link_libraries(IdleHarbor PRIVATE idleharbor_core idleharbor_app_support idleharbor_windows)
+target_link_libraries(IdleHarbor PRIVATE idleharbor_core idleharbor_app_support idleharbor_windows Shell32 Wtsapi32)
 target_compile_definitions(
   IdleHarbor
   PRIVATE

@@ -32,6 +32,7 @@ struct CommandLineOptions {
     std::optional<std::uint32_t> battery_threshold;
     std::optional<bool> randomize;
     std::optional<bool> pause_on_fullscreen;
+    std::optional<bool> close_to_tray;
     bool minimized = false;
     bool portable = false;
     bool show_help = false;

@@ -163,6 +163,10 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
             result.options.pause_on_fullscreen = true;
         } else if (option == L"--no-pause-on-fullscreen") {
             result.options.pause_on_fullscreen = false;
+        } else if (option == L"--close-to-tray") {
+            result.options.close_to_tray = true;
+        } else if (option == L"--no-close-to-tray") {
+            result.options.close_to_tray = false;
         } else if (option == L"--profile") {
             const auto value = TakeValue(result, arguments, index);
             if (value.has_value()) {
@@ -280,6 +284,8 @@ Session options:
   --battery-threshold N       Pause at or below N percent; 0 disables
   --pause-on-fullscreen       Pause while a full-screen app is foreground
   --no-pause-on-fullscreen    Disable that safeguard
+  --close-to-tray              Hide the close button to the notification area
+  --no-close-to-tray           Close the application when the window is closed
 
 Launch and storage:
   --minimized, -m             Start in the notification area
