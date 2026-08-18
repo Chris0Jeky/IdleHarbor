@@ -47,6 +47,17 @@ try {
         -Version '0.1.0-test' `
         -Architecture x64
     Assert-True (Test-Path -LiteralPath ([string]$archive) -PathType Leaf) 'Portable archive was not created.'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead([string]$archive)
+    try {
+        $entryNames = @($zip.Entries | ForEach-Object FullName)
+        Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
+        Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
+        Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
+    }
+    finally {
+        $zip.Dispose()
+    }
 
     $sbom = Join-Path $outputRoot 'test.spdx.json'
     & (Join-Path $packagingRoot 'New-Sbom.ps1') -InputPath $fakeExecutable -OutputPath $sbom -Version '0.1.0-test' -Architecture x64 | Out-Null
