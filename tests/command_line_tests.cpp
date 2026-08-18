@@ -1,0 +1,95 @@
+#include <chrono>
+#include <iostream>
+#include <string_view>
+#include <vector>
+
+#include "idleharbor/app/command_line.hpp"
+
+namespace {
+
+int failures = 0;
+
+void Expect(const bool condition, std::string_view description) {
+    if (!condition) {
+        std::cerr << "FAIL: " << description << '\n';
+        ++failures;
+    }
+}
+
+idleharbor::app::CommandLineParseResult Parse(
+    const std::initializer_list<std::wstring_view>& arguments) {
+    return idleharbor::app::ParseCommandLine(std::vector<std::wstring_view>(arguments));
+}
+
+}  // namespace
+
+int main() {
+    using namespace std::chrono_literals;
+    using idleharbor::app::RequestedCommand;
+
+    const auto empty = Parse({});
+    Expect(empty.ok(), "no arguments are valid");
+    Expect(empty.options.command == RequestedCommand::Launch, "no arguments launch normally");
+
+    const auto upstream = Parse({L"-j", L"-m", L"-o", L"Normal", L"-r", L"-s", L"60", L"-d", L"2"});
+    Expect(upstream.ok(), "upstream-compatible flags parse");
+    Expect(upstream.options.command == RequestedCommand::Start, "-j starts");
+    Expect(upstream.options.minimized, "-m minimizes");
+    Expect(upstream.options.motion_mode == L"diagonal", "Normal aliases diagonal");
+    Expect(upstream.options.randomize == true, "-r randomizes");
+    Expect(upstream.options.interval == 60s, "-s parses seconds");
+    Expect(upstream.options.distance == std::uint32_t{2}, "-d parses distance");
+
+    const auto comprehensive = Parse(
+        {L"--start",
+         L"--profile",
+         L"battery-saver",
+         L"--motion",
+         L"circle",
+         L"--power",
+         L"system",
+         L"--interval",
+         L"5m",
+         L"--pause-on-input",
+         L"30s",
+         L"--stop-after",
+         L"2h",
+         L"--battery-threshold",
+         L"25",
+         L"--pause-on-fullscreen",
+         L"--portable"});
+    Expect(comprehensive.ok(), "comprehensive options parse");
+    Expect(comprehensive.options.interval == 5min, "minutes parse");
+    Expect(comprehensive.options.pause_on_input == 30s, "pause duration parses");
+    Expect(comprehensive.options.stop_after == 2h, "hours parse");
+    Expect(comprehensive.options.battery_threshold == std::uint32_t{25}, "battery threshold parses");
+    Expect(comprehensive.options.pause_on_fullscreen == true, "fullscreen pause parses");
+    Expect(comprehensive.options.portable, "portable mode parses");
+
+    const auto disabled = Parse(
+        {L"--no-random", L"--pause-on-input", L"0", L"--stop-after", L"0s", L"--battery-threshold", L"0"});
+    Expect(disabled.ok(), "zero disables optional safeguards");
+    Expect(disabled.options.randomize == false, "randomization disables");
+    Expect(disabled.options.pause_on_input == 0s, "input pause disables");
+    Expect(disabled.options.stop_after == 0s, "maximum runtime disables");
+    Expect(disabled.options.battery_threshold == std::uint32_t{0}, "battery safeguard disables");
+
+    Expect(!Parse({L"--start", L"--stop"}).ok(), "conflicting commands fail");
+    Expect(!Parse({L"--profile", L"stealth"}).ok(), "unknown profile fails");
+    Expect(!Parse({L"--motion", L"random-walk"}).ok(), "unknown motion fails");
+    Expect(!Parse({L"--power", L"away"}).ok(), "unsupported away mode fails");
+    Expect(!Parse({L"--interval", L"0"}).ok(), "zero interval fails");
+    Expect(!Parse({L"--interval", L"25h"}).ok(), "oversized interval fails");
+    Expect(!Parse({L"--distance", L"121"}).ok(), "oversized distance fails");
+    Expect(!Parse({L"--battery-threshold", L"101"}).ok(), "oversized threshold fails");
+    Expect(!Parse({L"--stop-after", L"169h"}).ok(), "oversized stop duration fails");
+    Expect(!Parse({L"--config"}).ok(), "missing value fails");
+    Expect(!Parse({L"--wat"}).ok(), "unknown option fails");
+    Expect(!idleharbor::app::CommandLineHelp().empty(), "help text is available");
+
+    if (failures != 0) {
+        std::cerr << failures << " command-line test(s) failed\n";
+        return 1;
+    }
+    return 0;
+}
