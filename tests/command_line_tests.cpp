@@ -66,6 +66,10 @@ int main() {
     Expect(comprehensive.options.pause_on_fullscreen == true, "fullscreen pause parses");
     Expect(comprehensive.options.portable, "portable mode parses");
 
+    const auto balanced = Parse({L"--profile", L"balanced"});
+    Expect(balanced.ok(), "balanced profile parses");
+    Expect(balanced.options.profile == L"balanced", "balanced profile is preserved");
+
     const auto disabled = Parse(
         {L"--no-random", L"--pause-on-input", L"0", L"--stop-after", L"0s", L"--battery-threshold", L"0"});
     Expect(disabled.ok(), "zero disables optional safeguards");

@@ -170,7 +170,7 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
                     result,
                     option,
                     *value,
-                    {L"long-task", L"presentation", L"compatibility", L"visible", L"battery-saver", L"custom"},
+                    {L"balanced", L"long-task", L"presentation", L"compatibility", L"visible", L"battery-saver", L"custom"},
                     result.options.profile);
             }
         } else if (option == L"--motion" || option == L"--mode" || option == L"-o") {
@@ -266,7 +266,7 @@ Commands (choose at most one):
   --exit                      Stop and exit the running instance
 
 Session options:
-  --profile NAME              long-task, presentation, compatibility,
+  --profile NAME              balanced, long-task, presentation, compatibility,
                               visible, battery-saver, or custom
   --motion MODE, --mode, -o   off, zen, diagonal (normal), linear, or circle
   --power MODE                none, system, or display
