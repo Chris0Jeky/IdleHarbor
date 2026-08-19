@@ -218,7 +218,7 @@ function Set-Startup {
             $null = Get-OwnedTask $Executable
             $action = New-ScheduledTaskAction -Execute $Executable -Argument '--start --minimized' -WorkingDirectory (Split-Path -Parent $Executable)
             $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-            $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel LeastPrivilege
+            $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
             $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
             if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Register')) {
                 Register-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Starts IdleHarbor for the signed-in user.' -Force | Out-Null
