@@ -173,6 +173,37 @@ std::string BoolText(const bool value) {
     return value ? "true" : "false";
 }
 
+bool WriteDataOwnershipMarker(const std::filesystem::path& directory, std::string& error) {
+    const auto marker = directory / L".idleharbor-data.json";
+    std::error_code filesystem_error;
+    if (std::filesystem::exists(marker, filesystem_error)) {
+        if (filesystem_error) {
+            error = "Settings were saved, but the data ownership marker could not be inspected.";
+        }
+        return !filesystem_error;
+    }
+
+    auto temporary = marker;
+    temporary += L".tmp";
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        error = "Settings were saved, but the data ownership marker could not be created.";
+        return false;
+    }
+    output << "{\n"
+           << "  \"product\": \"IdleHarbor\",\n"
+           << "  \"markerVersion\": 1,\n"
+           << "  \"settingsFile\": \"settings.ini\"\n"
+           << "}\n";
+    output.close();
+    if (!output || MoveFileExW(temporary.c_str(), marker.c_str(), MOVEFILE_WRITE_THROUGH) == FALSE) {
+        error = "Settings were saved, but the data ownership marker could not be created.";
+        std::filesystem::remove(temporary, filesystem_error);
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 std::filesystem::path ResolveSettingsPath(
@@ -348,6 +379,12 @@ bool SaveSettings(
     }
 
     std::error_code filesystem_error;
+    const bool parent_existed =
+        path.parent_path().empty() || std::filesystem::exists(path.parent_path(), filesystem_error);
+    if (filesystem_error) {
+        error = "Could not inspect the settings directory: " + filesystem_error.message();
+        return false;
+    }
     if (!path.parent_path().empty()) {
         std::filesystem::create_directories(path.parent_path(), filesystem_error);
         if (filesystem_error) {
@@ -403,6 +440,9 @@ bool SaveSettings(
             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == FALSE) {
         error = "Could not replace the settings file (Windows error " + std::to_string(GetLastError()) + ").";
         std::filesystem::remove(temporary, filesystem_error);
+        return false;
+    }
+    if (!parent_existed && !WriteDataOwnershipMarker(path.parent_path(), error)) {
         return false;
     }
     return true;

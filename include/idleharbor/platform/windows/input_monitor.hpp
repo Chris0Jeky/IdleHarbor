@@ -27,6 +27,9 @@ class InputMonitor final {
     InputMonitor& operator=(InputMonitor&&) = delete;
 
     [[nodiscard]] InputMonitorCapabilities Start(HWND notification_window, UINT notification_message) noexcept;
+    // Reinstall both low-level hooks so silent OS removal is detected within one
+    // application timer interval. A failed refresh is a capability loss.
+    [[nodiscard]] InputMonitorCapabilities Refresh() noexcept;
     void Stop() noexcept;
     void AcknowledgeNotification() noexcept;
 

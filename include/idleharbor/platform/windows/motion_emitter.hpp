@@ -8,7 +8,10 @@ namespace idleharbor::platform::windows {
 
 struct MotionEmissionResult {
     bool succeeded = false;
+    bool cleanup_attempted = false;
+    bool cleanup_succeeded = true;
     DWORD error = ERROR_SUCCESS;
+    DWORD cleanup_error = ERROR_SUCCESS;
     UINT requested_events = 0;
     UINT emitted_events = 0;
 };

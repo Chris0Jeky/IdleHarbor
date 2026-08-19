@@ -51,6 +51,9 @@ int main() {
     std::string error;
     Expect(idleharbor::app::SaveSettings(path, settings, error), "settings save succeeds");
     Expect(error.empty(), "successful save has no error");
+    Expect(
+        fs::exists(path.parent_path() / L".idleharbor-data.json"),
+        "first save writes the data ownership marker");
 
     const auto loaded = idleharbor::app::LoadSettings(path);
     Expect(loaded.file_found, "saved file is found");

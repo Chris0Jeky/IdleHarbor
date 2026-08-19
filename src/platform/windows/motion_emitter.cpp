@@ -152,7 +152,12 @@ MotionEmissionResult EmitMotionPulse(const std::span<const POINT> offsets) noexc
         // SendInput can theoretically accept only a prefix. Make one bounded cleanup
         // attempt so an accepted anchor/path event does not leave the pointer displaced.
         std::vector<INPUT> restoration{AbsoluteMove(origin, virtual_screen)};
-        static_cast<void>(Send(restoration));
+        result.cleanup_attempted = true;
+        const auto cleanup = Send(restoration);
+        result.cleanup_succeeded = cleanup.succeeded;
+        if (!cleanup.succeeded) {
+            result.cleanup_error = cleanup.error;
+        }
     }
     return result;
 }

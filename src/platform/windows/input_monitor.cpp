@@ -22,12 +22,40 @@ InputMonitorCapabilities InputMonitor::Start(
     notification_message_ = notification_message;
     notification_pending_.store(false, std::memory_order_relaxed);
 
-    const HINSTANCE module = GetModuleHandleW(nullptr);
-    mouse_hook_ = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, module, 0);
-    keyboard_hook_ = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, module, 0);
-
-    if (mouse_hook_ == nullptr && keyboard_hook_ == nullptr) {
+    if (!Refresh().any()) {
         Stop();
+    }
+    return capabilities();
+}
+
+InputMonitorCapabilities InputMonitor::Refresh() noexcept {
+    if (active_monitor_.load(std::memory_order_acquire) != this) {
+        return {};
+    }
+
+    const HINSTANCE module = GetModuleHandleW(nullptr);
+    const HHOOK replacement_mouse = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, module, 0);
+    const HHOOK replacement_keyboard = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, module, 0);
+    if (replacement_mouse == nullptr || replacement_keyboard == nullptr) {
+        if (replacement_mouse != nullptr) {
+            UnhookWindowsHookEx(replacement_mouse);
+        }
+        if (replacement_keyboard != nullptr) {
+            UnhookWindowsHookEx(replacement_keyboard);
+        }
+        Stop();
+        return {};
+    }
+
+    const HHOOK old_mouse = mouse_hook_;
+    const HHOOK old_keyboard = keyboard_hook_;
+    mouse_hook_ = replacement_mouse;
+    keyboard_hook_ = replacement_keyboard;
+    if (old_mouse != nullptr) {
+        UnhookWindowsHookEx(old_mouse);
+    }
+    if (old_keyboard != nullptr) {
+        UnhookWindowsHookEx(old_keyboard);
     }
     return capabilities();
 }

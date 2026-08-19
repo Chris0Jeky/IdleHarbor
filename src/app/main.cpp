@@ -53,6 +53,7 @@ constexpr int kIconResourceId = 101;
 
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
+constexpr UINT kDeferredStatusMessage = WM_APP + 3;
 constexpr UINT kTimerId = 1;
 constexpr int kEmergencyHotkeyId = 1;
 
@@ -316,13 +317,13 @@ class Application final {
         return true;
     }
 
-    void HandleCommand(const CommandLineOptions& options) {
+    void HandleCommand(const CommandLineOptions& options, const bool forwarded = false) {
         const bool restart_for_overrides = session_active_ && HasRuntimeOverrides(options);
         ApplyCommandLineOptions(options);
         RefreshControls();
         switch (options.command) {
         case RequestedCommand::Launch:
-            if (options.minimized) {
+            if (options.minimized && tray_added_) {
                 ShowWindow(window_, SW_HIDE);
             } else {
                 ShowWindow(window_, SW_SHOW);
@@ -347,7 +348,13 @@ class Application final {
             }
             break;
         case RequestedCommand::Status:
-            MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
+            if (forwarded) {
+                // WM_COPYDATA is synchronous. Defer the modal local status dialog so a
+                // second-instance --status request cannot hold the sender past its timeout.
+                PostMessageW(window_, kDeferredStatusMessage, 0, 0);
+            } else {
+                MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
+            }
             break;
         case RequestedCommand::Show:
             ShowWindow(window_, SW_SHOW);
@@ -595,11 +602,28 @@ class Application final {
         icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         icon.uCallbackMessage = kTrayMessage;
         icon.hIcon = tray_icon_;
-        wcscpy_s(icon.szTip, L"IdleHarbor");
+        wcsncpy_s(icon.szTip, (L"IdleHarbor - " + status_text_).c_str(), _TRUNCATE);
         tray_added_ = Shell_NotifyIconW(NIM_ADD, &icon) != FALSE;
         if (tray_added_) {
             icon.uVersion = NOTIFYICON_VERSION_4;
             Shell_NotifyIconW(NIM_SETVERSION, &icon);
+        }
+    }
+
+    void MarkTrayUnavailable() {
+        ShowWindow(window_, SW_SHOW);
+        status_text_ = session_active_ ? L"Running: notification icon unavailable; window kept visible"
+                                       : L"Stopped: notification icon unavailable; window kept visible";
+        if (status_ != nullptr) {
+            SetControlText(status_, status_text_);
+        }
+    }
+
+    void RecoverTrayIcon() {
+        RemoveTrayIcon();
+        InitializeTrayIcon();
+        if (!tray_added_) {
+            MarkTrayUnavailable();
         }
     }
 
@@ -624,7 +648,9 @@ class Application final {
         icon.uFlags = NIF_TIP;
         const std::wstring tooltip = L"IdleHarbor - " + status_text_;
         wcsncpy_s(icon.szTip, tooltip.c_str(), _TRUNCATE);
-        Shell_NotifyIconW(NIM_MODIFY, &icon);
+        if (Shell_NotifyIconW(NIM_MODIFY, &icon) == FALSE) {
+            RecoverTrayIcon();
+        }
     }
 
     void ShowSafetyNotification(const wchar_t* title, const std::wstring& message) {
@@ -638,7 +664,9 @@ class Application final {
         wcsncpy_s(icon.szInfoTitle, title, _TRUNCATE);
         wcsncpy_s(icon.szInfo, message.c_str(), _TRUNCATE);
         icon.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;
-        Shell_NotifyIconW(NIM_MODIFY, &icon);
+        if (Shell_NotifyIconW(NIM_MODIFY, &icon) == FALSE) {
+            RecoverTrayIcon();
+        }
     }
 
     void SetStatus(const std::wstring& status) {
@@ -1004,7 +1032,11 @@ class Application final {
             result = idleharbor::platform::windows::EmitMotionPulse(offsets);
         }
         if (!result.succeeded) {
-            FailSession(L"input emission failed (" + WindowsErrorText(result.error) + L")");
+            std::wstring message = L"input emission failed (" + WindowsErrorText(result.error) + L")";
+            if (result.cleanup_attempted && !result.cleanup_succeeded) {
+                message += L"; pointer restoration failed (" + WindowsErrorText(result.cleanup_error) + L")";
+            }
+            FailSession(message);
             return false;
         }
         return true;
@@ -1143,7 +1175,7 @@ class Application final {
             LocalFree(arguments);
             return true;
         }
-        HandleCommand(parsed.options);
+        HandleCommand(parsed.options, true);
         LocalFree(arguments);
         return true;
     }
@@ -1179,12 +1211,22 @@ class Application final {
             return 0;
         case WM_TIMER:
             if (w_param == kTimerId) {
+                if (input_observer_requested_) {
+                    const auto capabilities = input_monitor_.Refresh();
+                    if (!capabilities.mouse || !capabilities.keyboard) {
+                        FailSession(L"genuine-input observer lost; session stopped for safety");
+                        return 0;
+                    }
+                }
                 Evaluate(false);
             }
             return 0;
         case kGenuineInputMessage:
             input_monitor_.AcknowledgeNotification();
             Evaluate(true);
+            return 0;
+        case kDeferredStatusMessage:
+            MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
             return 0;
         case WM_HOTKEY:
             if (w_param == kEmergencyHotkeyId) {
