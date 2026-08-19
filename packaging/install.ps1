@@ -288,6 +288,7 @@ $destinationExecutable = Join-Path $safeRoot 'IdleHarbor.exe'
 $parent = Split-Path -Parent $safeRoot
 $markerPath = Join-Path $safeRoot $MarkerName
 Assert-OwnedOrEmptyDestination $safeRoot $sourceRoot
+Assert-StartupEntriesOwned $destinationExecutable
 
 if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Stop-OwnedApplicationIfRunning $destinationExecutable

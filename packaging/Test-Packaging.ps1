@@ -83,6 +83,18 @@ function Assert-StartupOwnershipPredicates([string]$ScriptPath, [string]$TestRoo
         'Customized Run command was recognized as owned.'
 }
 
+function Assert-InstallerOwnershipPreflight([string]$ScriptPath) {
+    $contents = Get-Content -Raw -LiteralPath $ScriptPath
+    $preflight = $contents.IndexOf('Assert-StartupEntriesOwned $destinationExecutable', [StringComparison]::Ordinal)
+    $stop = $contents.IndexOf('Stop-OwnedApplicationIfRunning $destinationExecutable', [StringComparison]::Ordinal)
+    $copy = $contents.IndexOf('foreach ($fileName in $KnownFiles)', [StringComparison]::Ordinal)
+    $marker = $contents.IndexOf("if (Confirm-Change `$markerPath 'Write ownership marker')", [StringComparison]::Ordinal)
+    Assert-True ($preflight -ge 0) 'Installer lacks its startup ownership preflight.'
+    Assert-True ($preflight -lt $stop) 'Installer stops the application before its startup ownership preflight.'
+    Assert-True ($preflight -lt $copy) 'Installer copies files before its startup ownership preflight.'
+    Assert-True ($preflight -lt $marker) 'Installer rewrites its marker before its startup ownership preflight.'
+}
+
 $packagingRoot = $PSScriptRoot
 foreach ($script in Get-ChildItem -LiteralPath $packagingRoot -Filter '*.ps1' -File) {
     $tokens = $null
@@ -105,6 +117,7 @@ $installRoot = Join-Path $tempRoot 'IdleHarbor'
 $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
+Assert-InstallerOwnershipPreflight (Join-Path $packagingRoot 'install.ps1')
 New-Item -ItemType Directory -Path $sourceRoot, $buildRoot, $outputRoot -Force | Out-Null
 try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
