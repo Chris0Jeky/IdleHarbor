@@ -145,8 +145,8 @@ Active-hours controls are intentionally advanced and use minutes from midnight:
 
 ```ini
 active_hours_enabled=true
-active_hours_start_minute=540       ; 09:00
-active_hours_end_minute=1080        ; 18:00
+active_hours_start_minute=540
+active_hours_end_minute=1080
 ```
 
 An end earlier than the start represents an overnight window. The complete key names are documented
