@@ -34,6 +34,7 @@ jobs:
         run: |
           $version = '${{ github.ref_name }}' -replace '^v', ''
           if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') { throw "Tag is not a SemVer version: $version" }
+          .\packaging\Test-ReleaseVersion.ps1 -Tag '${{ github.ref_name }}'
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Configure
