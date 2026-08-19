@@ -164,6 +164,24 @@ function Get-OwnedTask([string]$Executable) {
     return $task
 }
 
+function Assert-StartupEntriesOwned([string]$Executable) {
+    $null = Get-OwnedTask $Executable
+
+    $link = Get-StartupLinkPath
+    if (Test-Path -LiteralPath $link -PathType Leaf) {
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($link)
+        if (-not (Test-SamePath $shortcut.TargetPath $Executable)) {
+            throw "A different startup shortcut already owns ${link}; refusing to overwrite it."
+        }
+    }
+
+    $command = Get-RunCommand
+    if ($null -ne $command -and -not (Test-RunCommandOwned $command $Executable)) {
+        throw "A different HKCU Run value already owns ${RunValueName}; refusing to overwrite it."
+    }
+}
+
 function Remove-OwnedStartup {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -210,6 +228,7 @@ function Set-Startup {
         [string]$Mode
     )
 
+    Assert-StartupEntriesOwned $Executable
     Remove-OwnedStartup $Executable
     if ($Mode -eq 'None') { return }
 
