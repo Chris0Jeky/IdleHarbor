@@ -85,6 +85,30 @@ function Test-SamePath([string]$Left, [string]$Right) {
     catch { return $false }
 }
 
+function Assert-OwnedOrEmptyDestination([string]$Root, [string]$SourceRoot) {
+    if (Test-SamePath $Root $SourceRoot) { return }
+    if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return }
+
+    $markerPath = Join-Path $Root $MarkerName
+    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+        $entries = @(Get-ChildItem -LiteralPath $Root -Force)
+        if ($entries.Count -ne 0) {
+            throw "InstallRoot contains files but no IdleHarbor ownership marker; refusing to overwrite it: $Root"
+        }
+        return
+    }
+
+    try { $marker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json }
+    catch { throw "InstallRoot has an unreadable ownership marker; refusing to overwrite it: $markerPath" }
+    if ($marker.product -ne $ProductName -or -not (Test-SamePath ([string]$marker.installRoot) $Root)) {
+        throw "InstallRoot ownership marker does not match this destination: $markerPath"
+    }
+    $ownedExecutable = Get-FullPath ([string]$marker.executable)
+    if (-not (Test-SamePath (Split-Path -Parent $ownedExecutable) $Root)) {
+        throw "InstallRoot ownership marker points outside the destination: $markerPath"
+    }
+}
+
 function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
 }
@@ -201,6 +225,7 @@ $safeRoot = Assert-SafeInstallRoot $InstallRoot
 $destinationExecutable = Join-Path $safeRoot 'IdleHarbor.exe'
 $parent = Split-Path -Parent $safeRoot
 $markerPath = Join-Path $safeRoot $MarkerName
+Assert-OwnedOrEmptyDestination $safeRoot $sourceRoot
 
 if (-not (Test-SamePath $sourceRoot $safeRoot)) {
     if (Confirm-Change $safeRoot 'Create installation directory') {

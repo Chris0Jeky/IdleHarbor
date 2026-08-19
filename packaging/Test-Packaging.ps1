@@ -42,8 +42,25 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
+
+    $foreignRoot = Join-Path $tempRoot 'foreign\IdleHarbor'
+    New-Item -ItemType Directory -Path $foreignRoot -Force | Out-Null
+    $foreignExecutable = Join-Path $foreignRoot 'IdleHarbor.exe'
+    [IO.File]::WriteAllBytes($foreignExecutable, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
+    $foreignRejected = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $foreignRoot -NoLaunch | Out-Null
+    }
+    catch { $foreignRejected = $true }
+    Assert-True $foreignRejected 'Installer accepted a non-empty destination without an ownership marker.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($foreignExecutable))) -eq 'foreign') `
+        'Installer overwrote a foreign executable.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $foreignRoot '.idleharbor-managed.json'))) `
+        'Installer marked a foreign destination as owned.'
 
     $archive = & (Join-Path $packagingRoot 'New-ReleasePackage.ps1') `
         -BuildDirectory $buildRoot `
