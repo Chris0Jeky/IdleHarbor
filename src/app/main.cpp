@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cwctype>
+#include <deque>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -53,10 +54,11 @@ constexpr int kIconResourceId = 101;
 
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
-constexpr UINT kDeferredStatusMessage = WM_APP + 3;
+constexpr UINT kDeferredCommandMessage = WM_APP + 3;
 constexpr UINT kTimerId = 1;
 constexpr int kEmergencyHotkeyId = 1;
 constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
+constexpr std::size_t kMaximumDeferredCommands = 32;
 
 enum ControlId : int {
     kStatus = 100,
@@ -329,7 +331,7 @@ class Application final {
         return true;
     }
 
-    void HandleCommand(const CommandLineOptions& options, const bool forwarded = false) {
+    void HandleCommand(const CommandLineOptions& options) {
         const bool restart_for_overrides = session_active_ && HasRuntimeOverrides(options);
         ApplyCommandLineOptions(options);
         RefreshControls();
@@ -360,13 +362,7 @@ class Application final {
             }
             break;
         case RequestedCommand::Status:
-            if (forwarded) {
-                // WM_COPYDATA is synchronous. Defer the modal local status dialog so a
-                // second-instance --status request cannot hold the sender past its timeout.
-                PostMessageW(window_, kDeferredStatusMessage, 0, 0);
-            } else {
-                MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
-            }
+            MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
             break;
         case RequestedCommand::Show:
             ShowWindow(window_, SW_SHOW);
@@ -1170,6 +1166,45 @@ class Application final {
         }
     }
 
+    void ProcessDeferredCommand() {
+        if (deferred_commands_.empty()) {
+            return;
+        }
+        std::wstring command_line = std::move(deferred_commands_.front());
+        deferred_commands_.pop_front();
+
+        int argument_count = 0;
+        LPWSTR* arguments = CommandLineToArgvW(command_line.c_str(), &argument_count);
+        if (arguments == nullptr) {
+            MessageBoxW(
+                window_,
+                L"The forwarded IdleHarbor command could not be parsed.",
+                L"IdleHarbor command",
+                MB_OK | MB_ICONWARNING);
+            return;
+        }
+        std::vector<std::wstring_view> views;
+        for (int index = 1; index < argument_count; ++index) {
+            views.emplace_back(arguments[index]);
+        }
+        const auto parsed = idleharbor::app::ParseCommandLine(views);
+        LocalFree(arguments);
+        if (!parsed.ok()) {
+            MessageBoxW(window_, parsed.errors.front().c_str(), L"IdleHarbor command", MB_OK | MB_ICONWARNING);
+            return;
+        }
+        if (parsed.options.portable || parsed.options.config_path.has_value()) {
+            MessageBoxW(
+                window_,
+                L"--portable and --config select storage only when the first IdleHarbor instance starts. "
+                L"Exit the running instance before changing storage.",
+                L"IdleHarbor command",
+                MB_OK | MB_ICONWARNING);
+            return;
+        }
+        HandleCommand(parsed.options);
+    }
+
     bool HandleCopyData(const COPYDATASTRUCT* data) {
         if (data == nullptr || data->dwData != kCopyDataCommand || data->lpData == nullptr || data->cbData == 0 ||
             data->cbData > 64 * 1024 || data->cbData % sizeof(wchar_t) != 0) {
@@ -1180,24 +1215,18 @@ class Application final {
         if (characters[count - 1] != L'\0') {
             return false;
         }
-        std::wstring command_line(characters, count - 1);
-        int argument_count = 0;
-        LPWSTR* arguments = CommandLineToArgvW(command_line.c_str(), &argument_count);
-        if (arguments == nullptr) {
+        if (deferred_commands_.size() >= kMaximumDeferredCommands) {
             return false;
         }
-        std::vector<std::wstring_view> views;
-        for (int index = 1; index < argument_count; ++index) {
-            views.emplace_back(arguments[index]);
+        try {
+            deferred_commands_.emplace_back(characters, count - 1);
+        } catch (...) {
+            return false;
         }
-        const auto parsed = idleharbor::app::ParseCommandLine(views);
-        if (!parsed.ok()) {
-            MessageBoxW(window_, parsed.errors.front().c_str(), L"IdleHarbor command", MB_OK | MB_ICONWARNING);
-            LocalFree(arguments);
-            return true;
+        if (PostMessageW(window_, kDeferredCommandMessage, 0, 0) == FALSE) {
+            deferred_commands_.pop_back();
+            return false;
         }
-        HandleCommand(parsed.options, true);
-        LocalFree(arguments);
         return true;
     }
 
@@ -1247,8 +1276,8 @@ class Application final {
             input_monitor_.AcknowledgeNotification();
             Evaluate(true);
             return 0;
-        case kDeferredStatusMessage:
-            MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
+        case kDeferredCommandMessage:
+            ProcessDeferredCommand();
             return 0;
         case WM_HOTKEY:
             if (w_param == kEmergencyHotkeyId) {
@@ -1367,6 +1396,7 @@ class Application final {
     ULONGLONG next_input_hook_refresh_tick_ = 0;
     std::wstring status_text_ = L"Stopped: ready";
     std::filesystem::path settings_path_;
+    std::deque<std::wstring> deferred_commands_;
     idleharbor::app::AppSettings settings_{};
     Settings runtime_settings_{};
     InputMonitor input_monitor_{};
