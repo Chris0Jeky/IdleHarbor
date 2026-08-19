@@ -198,7 +198,29 @@ try {
     & (Join-Path $packagingRoot 'New-Sbom.ps1') -InputPath $fakeExecutable -OutputPath $sbom -Version '0.1.0-test' -Architecture x64 | Out-Null
     $sbomDocument = Get-Content -Raw -LiteralPath $sbom | ConvertFrom-Json
     Assert-True ($sbomDocument.spdxVersion -eq 'SPDX-2.3') 'SBOM is not SPDX 2.3.'
-    Assert-True ($sbomDocument.files[0].checksums[0].algorithm -eq 'SHA256') 'SBOM lacks a SHA-256 file checksum.'
+    Assert-True ($sbomDocument.packages[0].filesAnalyzed -eq $true) 'SBOM package must declare filesAnalyzed=true.'
+    $fileSha1 = (Get-FileHash -LiteralPath $fakeExecutable -Algorithm SHA1).Hash.ToLowerInvariant()
+    $sha1Algorithm = [Security.Cryptography.SHA1]::Create()
+    try {
+        $expectedVerificationCode = [BitConverter]::ToString(
+            $sha1Algorithm.ComputeHash([Text.Encoding]::ASCII.GetBytes($fileSha1))).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $sha1Algorithm.Dispose()
+    }
+    $sha1Checksum = @($sbomDocument.files[0].checksums | Where-Object algorithm -eq 'SHA1')
+    $sha256Checksum = @($sbomDocument.files[0].checksums | Where-Object algorithm -eq 'SHA256')
+    Assert-True ($sha1Checksum.Count -eq 1 -and $sha1Checksum[0].checksum -eq $fileSha1) `
+        'SBOM lacks the executable SHA-1 file checksum.'
+    Assert-True ($sha256Checksum.Count -eq 1) 'SBOM lacks a SHA-256 file checksum.'
+    Assert-True ($sbomDocument.packages[0].packageVerificationCode.value -eq $expectedVerificationCode) `
+        'SBOM package verification code is not the SPDX 2.3 SHA-1 code.'
+
+    & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.0' | Out-Null
+    $versionMismatchRejected = $false
+    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.1' | Out-Null }
+    catch { $versionMismatchRejected = $true }
+    Assert-True $versionMismatchRejected 'Release version validator accepted a mismatched tag.'
 
     $checksums = Join-Path $outputRoot 'SHA256SUMS.txt'
     & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $outputRoot -OutputPath $checksums | Out-Null

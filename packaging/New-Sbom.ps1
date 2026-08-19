@@ -16,11 +16,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $inputFile = (Resolve-Path -LiteralPath $InputPath).Path
+$fileSha1 = (Get-FileHash -LiteralPath $inputFile -Algorithm SHA1).Hash.ToLowerInvariant()
 $hash = (Get-FileHash -LiteralPath $inputFile -Algorithm SHA256).Hash.ToUpperInvariant()
 $fileName = Split-Path -Leaf $inputFile
 $packageId = "SPDXRef-Package-IdleHarbor-$Architecture"
 $fileId = "SPDXRef-File-$($fileName -replace '[^A-Za-z0-9.-]', '-')"
 $documentName = "IdleHarbor-$Version-windows-$Architecture"
+$sha1 = [Security.Cryptography.SHA1]::Create()
+try {
+    $packageVerificationCode = [BitConverter]::ToString(
+        $sha1.ComputeHash([Text.Encoding]::ASCII.GetBytes($fileSha1))).Replace('-', '').ToLowerInvariant()
+}
+finally {
+    $sha1.Dispose()
+}
 
 $document = [ordered]@{
     spdxVersion = 'SPDX-2.3'
@@ -39,6 +48,7 @@ $document = [ordered]@{
             versionInfo = $Version
             downloadLocation = 'NOASSERTION'
             filesAnalyzed = $true
+            packageVerificationCode = [ordered]@{ value = $packageVerificationCode }
             licenseConcluded = 'NOASSERTION'
             licenseDeclared = 'NOASSERTION'
             copyrightText = 'NOASSERTION'
@@ -48,7 +58,10 @@ $document = [ordered]@{
         [ordered]@{
             SPDXID = $fileId
             fileName = $fileName
-            checksums = @([ordered]@{ algorithm = 'SHA256'; checksum = $hash })
+            checksums = @(
+                [ordered]@{ algorithm = 'SHA1'; checksum = $fileSha1 }
+                [ordered]@{ algorithm = 'SHA256'; checksum = $hash }
+            )
             licenseConcluded = 'NOASSERTION'
             copyrightText = 'NOASSERTION'
         }
