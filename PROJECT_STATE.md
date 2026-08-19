@@ -4,17 +4,17 @@ Last updated: 2026-08-19
 
 ## Current milestone
 
-IdleHarbor `0.1.0-dev` has a landed native Win32 runtime, platform-neutral policy core, validated
-INI settings store, strict command-line model, bounded motion emitter, genuine-input observer, power
-request, battery/fullscreen/session safeguards, visible tray-controlled application, and emergency
-stop path.
+IdleHarbor `0.1.0` is a release candidate with a landed native Win32 runtime, platform-neutral
+policy core, validated INI settings store, strict command-line model, bounded motion emitter,
+genuine-input observer, power request, battery/fullscreen/session safeguards, visible
+tray-controlled application, and emergency stop path.
 
 The distribution lane has also landed portable archive generation, per-user installation and
 uninstallation scripts, ownership checks, opt-in Task Scheduler/Startup-folder/HKCU Run startup
 choices, checksums, SPDX SBOM generation, pinned CI, CodeQL, and GitHub attestation workflows.
 
-No release has been published. Release QA, measured performance evidence, human licence approval,
-and optional Authenticode signing remain open.
+No release has been published. Local release QA and measured performance evidence are recorded;
+hosted exact-head CI, human licence approval, and optional Authenticode signing remain open.
 
 ## Authority and publication
 

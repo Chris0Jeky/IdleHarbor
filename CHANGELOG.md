@@ -21,6 +21,17 @@ where practical.
 
 - Documentation now describes the landed integration branch rather than the original foundation stub.
 
+### Fixed
+
+- Stop safely if the requested genuine-input observer cannot be refreshed, and bound its watchdog
+  cadence to avoid unnecessary hook churn.
+- Recover a lost notification-area icon or keep the settings window visible.
+- Preserve unowned settings directories during `-PurgeData` and validate the least-privilege Task
+  Scheduler principal on a non-mutating packaging test path.
+- Refuse to overwrite foreign scheduled tasks, Startup-folder shortcuts, or HKCU Run values that
+  happen to use the IdleHarbor name.
+- Report partial input cleanup failures and keep forwarded status/minimize commands bounded and visible.
+
 ### Release boundary
 
 - No version has been published. Download links, signing status, and downstream licence rights remain intentionally unclaimed.

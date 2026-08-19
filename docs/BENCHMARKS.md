@@ -1,54 +1,68 @@
-# Benchmark methodology
+# Benchmark evidence
 
-No performance number is claimed in this repository yet. The integration branch contains the
-runtime and release tooling, but a benchmark result belongs to a pinned binary, controlled Windows
-environment, and retained raw evidence.
+IdleHarbor includes a reproducible local measurement script rather than telemetry. Results below
+are a release-candidate baseline for one Windows machine, not a universal resource guarantee.
 
-## Measure
+## v0.1.0 x64 local baseline
 
-- executable and portable archive size, compressed and extracted;
-- resident set size while stopped, paused, and active;
-- CPU time and wakeups over fixed windows;
-- timer behavior while stopped, paused, and active;
-- clean release of hooks, timer, tray icon, power request, and mutex;
-- x64 versus ARM64 results when both release artifacts exist.
+Measured on 2026-08-19 from native source commit `fc9a0e3` (the following commit changed packaging
+only). The exact executable is identified by SHA-256 so the result remains auditable.
 
-## Controlled procedure
+| Property | Value |
+| --- | --- |
+| Windows | NT 10.0.26100.0, x64 |
+| Logical processors | 18 |
+| Build | MSVC 19.29 / Visual Studio Build Tools 2019, CMake Release, static MSVC runtime |
+| Executable | 493,056 bytes (481.5 KiB) |
+| Executable SHA-256 | `2db24a680c7fa9b3ed4133ab1b79ea1865e90dc56619d01b22a598b5488c4ef0` |
+| Repeats | 3 |
+| Window per phase | 60 seconds, sampled every 500 ms |
 
-Record commit/tag, Windows edition/build, architecture, compiler/configuration, power mode, monitor
-layout, endpoint-protection state, selected profile, and all session settings. Use the same machine
-for comparisons where possible, repeat each run at least three times, and report median plus range.
+The stopped phase left the window hidden in the notification area. The active phase used the Long
+Task profile with motion **Off**, a **System** power request, genuine-input pause disabled, battery
+threshold disabled, and fullscreen pause disabled. It therefore measured the lowest-disruption
+active path and emitted no pointer input.
 
-1. Build a clean Release configuration from a pinned commit.
-2. Record executable/archive sizes and SHA-256 hashes.
-3. Measure five minutes stopped and five minutes paused.
-4. Measure fifteen minutes active for each motion/power combination that is supported by the test plan.
-5. Repeat start/stop, lock/unlock, disconnect/connect, and close paths to check cleanup.
-6. Retain raw captures and tool versions with the release evidence.
+| Metric | Stopped median (range) | Active median (range) |
+| --- | ---: | ---: |
+| CPU time per 60-second window | 0 ms (0-0) | 15.625 ms (15.625-31.250) |
+| CPU, normalized across 18 logical processors | 0% (0-0) | 0.0014% (0.0014-0.0029) |
+| Average working set | 13.261 MiB (13.243-13.280) | 13.250 MiB (13.238-13.250) |
+| Average private bytes | 1.838 MiB (1.818-1.870) | 1.781 MiB (1.766-1.781) |
+| Maximum handle count | 158 (158-158) | 158 (158-158) |
 
-Windows Performance Recorder/Analyzer, Process Explorer, or PowerShell process counters are
-acceptable if the exact tool and command are recorded. Do not add telemetry to measure a local app.
+The binary imports only Windows system libraries (`SHELL32`, `WTSAPI32`, `ole32`, `USER32`,
+`KERNEL32`, and `GDI32`); it has no .NET, Qt, Electron, or separately installed Visual C++ runtime
+dependency.
 
-## Goals, not results
+## Reproduce
 
-The engineering goals are a small native artifact, no busy loop, bounded timer-driven work, and
-near-zero work while stopped. These are goals, not measured claims. Do not put a number in the README
-until the procedure has been run against the actual release binary.
+Build Release, close other IdleHarbor instances, then run:
 
-## Result template
-
-```text
-Commit/tag:
-Windows/build:
-Architecture:
-Compiler/configuration:
-Profile and settings:
-Tooling and versions:
-Artifact size (zip / extracted):
-Stopped CPU / working set / wakeups:
-Paused CPU / working set / wakeups:
-Active CPU / working set / wakeups:
-Cleanup checks:
-Runs and spread:
-Known confounders:
+```powershell
+.\tools\Measure-IdleHarbor.ps1 `
+  -Executable .\build\x64\Release\IdleHarbor.exe `
+  -DurationSeconds 60 `
+  -Runs 3 `
+  -OutputPath .\build\idleharbor-benchmark.json
 ```
+
+The script records the executable hash and version, Windows version, architecture, logical processor
+count, per-run CPU time, normalized CPU percentage, working/private memory, handles, and threads. It
+uses a temporary explicit settings file and exits only the process it started.
+
+## Interpretation and limitations
+
+- Windows CPU accounting is quantized; 15.625 ms is one observed accounting interval, so values at
+  this scale should be read as effectively idle rather than as a precise continuous rate.
+- This sample covers stopped and power-request-only operation. Visible/Zen motion, genuine-input
+  hooks, pause states, mixed-DPI movement, and ARM64 release artifacts need separate measurements.
+- Endpoint protection, shell extensions, monitor topology, and other machine conditions can change
+  memory and timing. Repeat the command on the target machine instead of treating this baseline as a
+  promise.
+- A 60-second window is useful release smoke evidence, not a substitute for long-duration soak or
+  Windows Performance Recorder analysis.
+
+For deeper release work, retain raw output outside the repository, record the exact tag and artifact
+hash, measure stopped/paused/active paths for longer windows, and report median plus range rather
+than a single best run.

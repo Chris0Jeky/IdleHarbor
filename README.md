@@ -9,9 +9,13 @@
 
 ## Screenshot
 
-The release-QA window capture is maintained at [`docs/assets/idleharbor-window.png`](docs/assets/idleharbor-window.png).
-It is intentionally kept as a repository asset so the README remains useful offline and the image
-can be refreshed when the visible UI changes.
+<p align="center">
+  <img src="docs/assets/idleharbor-window.png"
+       alt="IdleHarbor settings window at 200 percent Windows display scaling"
+       width="594">
+</p>
+
+This is a real Release-QA capture at 200% Windows display scaling, not a mock-up.
 
 IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
 presentations, installations, and local dashboards. It combines optional motion input with Windows
@@ -20,7 +24,7 @@ provide concealment, monitoring bypasses, or claims of undetectability.
 
 ## Status
 
-The project is in pre-release `0.1.0-dev` development. The visible runtime, policy core, settings
+The project is a pre-release `0.1.0` release candidate. The visible runtime, policy core, settings
 store, CLI, portable packaging scripts, per-user installer, startup choices, CI, CodeQL, SBOM, and
 attestation workflow are present on the integration branch. No GitHub release artifact has been
 published yet.
@@ -48,10 +52,13 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
+The measured x64 Release executable is 493,056 bytes (481.5 KiB). A reproducible three-run local
+resource baseline and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+
 ## Build and test from source
 
-Use a Windows developer PowerShell with Visual Studio 2022, CMake, and Ninja available. For a
-Visual Studio generator build:
+Use a Windows developer PowerShell with Visual Studio 2022 and CMake. For a Visual Studio generator
+build:
 
 ```powershell
 cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
