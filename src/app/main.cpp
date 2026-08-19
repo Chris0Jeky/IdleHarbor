@@ -56,6 +56,7 @@ constexpr UINT kGenuineInputMessage = WM_APP + 2;
 constexpr UINT kDeferredStatusMessage = WM_APP + 3;
 constexpr UINT kTimerId = 1;
 constexpr int kEmergencyHotkeyId = 1;
+constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
 
 enum ControlId : int {
     kStatus = 100,
@@ -949,6 +950,7 @@ class Application final {
                     MB_OK | MB_ICONWARNING);
                 return;
             }
+            next_input_hook_refresh_tick_ = GetTickCount64() + kInputHookRefreshIntervalMs;
         }
         policy_ = std::make_unique<PolicyEngine>(runtime_settings_);
         policy_->start(NowSeconds());
@@ -985,6 +987,7 @@ class Application final {
         input_observer_requested_ = false;
         input_observer_available_ = false;
         input_observer_complete_ = false;
+        next_input_hook_refresh_tick_ = 0;
         const auto text = idleharbor::core::status_text(decision);
         SetStatus(std::wstring(text.begin(), text.end()));
         if (decision.reason == PolicyReason::MaxDuration) {
@@ -1211,12 +1214,13 @@ class Application final {
             return 0;
         case WM_TIMER:
             if (w_param == kTimerId) {
-                if (input_observer_requested_) {
+                if (input_observer_requested_ && GetTickCount64() >= next_input_hook_refresh_tick_) {
                     const auto capabilities = input_monitor_.Refresh();
                     if (!capabilities.mouse || !capabilities.keyboard) {
                         FailSession(L"genuine-input observer lost; session stopped for safety");
                         return 0;
                     }
+                    next_input_hook_refresh_tick_ = GetTickCount64() + kInputHookRefreshIntervalMs;
                 }
                 Evaluate(false);
             }
@@ -1340,6 +1344,7 @@ class Application final {
     bool disconnected_ = false;
     bool exiting_ = false;
     std::uint64_t next_pulse_tick_ = 0;
+    ULONGLONG next_input_hook_refresh_tick_ = 0;
     std::wstring status_text_ = L"Stopped: ready";
     std::filesystem::path settings_path_;
     idleharbor::app::AppSettings settings_{};
