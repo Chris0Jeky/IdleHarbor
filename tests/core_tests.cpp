@@ -259,6 +259,30 @@ bool test_optional_safeguards_are_opt_in() {
     return true;
 }
 
+bool test_unknown_battery_fails_closed_for_requested_safeguards() {
+    Settings settings{};
+    settings.pause_on_user_activity = false;
+    settings.pause_on_battery = true;
+    settings.pause_on_low_battery = true;
+    settings.low_battery_threshold = 20;
+    PolicyEngine policy(settings);
+    policy.start(0s);
+
+    // The platform maps an unavailable power query to unknown battery state:
+    // on_battery=true and percent=0. Neither safeguard may interpret that as AC.
+    auto decision = policy.evaluate(PolicyInput{1s, false, false, false, true, 0});
+    CHECK(decision.state == EngineState::Paused);
+    CHECK(decision.reason == PolicyReason::LowBattery);
+
+    settings.pause_on_low_battery = false;
+    PolicyEngine any_battery_policy(settings);
+    any_battery_policy.start(0s);
+    decision = any_battery_policy.evaluate(PolicyInput{1s, false, false, false, true, 0});
+    CHECK(decision.state == EngineState::Paused);
+    CHECK(decision.reason == PolicyReason::OnBattery);
+    return true;
+}
+
 bool test_max_duration_stops_and_remains_stopped() {
     Settings settings{};
     settings.max_duration = 30s;
@@ -305,6 +329,7 @@ int main() {
         test_user_activity_cooldown_resumes(),
         test_policy_reason_priority_is_explicit(),
         test_optional_safeguards_are_opt_in(),
+        test_unknown_battery_fails_closed_for_requested_safeguards(),
         test_max_duration_stops_and_remains_stopped(),
         test_policy_can_resume_after_transient_safeguard(),
     };

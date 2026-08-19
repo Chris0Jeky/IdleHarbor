@@ -296,6 +296,14 @@ class Application final {
         InitializeTrayIcon();
         session_notifications_available_ =
             WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
+        if (session_notifications_available_) {
+            const auto session = idleharbor::platform::windows::QuerySessionSnapshot();
+            session_state_available_ = session.available;
+            if (session_state_available_) {
+                locked_ = session.locked;
+                disconnected_ = session.disconnected;
+            }
+        }
         ApplyEmergencyHotkeySetting();
 
         RefreshControls();
@@ -304,9 +312,12 @@ class Application final {
             initial_status = L"Stopped: notification icon unavailable; window kept visible";
         } else if (settings_.emergency_hotkey && !hotkey_registered_) {
             initial_status = L"Stopped: emergency hotkey unavailable";
-        } else if ((settings_.session.pause_when_locked || settings_.session.pause_when_disconnected) &&
-                   !session_notifications_available_) {
-            initial_status = L"Stopped: session-change observer unavailable";
+        } else if (settings_.session.pause_when_locked || settings_.session.pause_when_disconnected) {
+            if (!session_notifications_available_) {
+                initial_status = L"Stopped: session-change observer unavailable";
+            } else if (!session_state_available_) {
+                initial_status = L"Stopped: current session state unavailable";
+            }
         }
         SetStatus(initial_status);
         if ((options.minimized || settings_.start_minimized) && tray_added_) {
@@ -921,13 +932,20 @@ class Application final {
 
         ApplyEmergencyHotkeySetting();
         runtime_settings_ = settings_.session;
-        if ((runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected) &&
-            !session_notifications_available_) {
-            SetStatus(L"Stopped: session-change observer unavailable");
+        const bool session_safeguards_requested =
+            runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected;
+        if (session_safeguards_requested &&
+            (!session_notifications_available_ || !session_state_available_)) {
+            const bool observer_unavailable = !session_notifications_available_;
+            SetStatus(observer_unavailable ? L"Stopped: session-change observer unavailable"
+                                           : L"Stopped: current session state unavailable");
             MessageBoxW(
                 window_,
-                L"Windows session-change notifications are unavailable. Disable the lock/disconnect safeguard "
-                L"explicitly or resolve the Windows error before starting.",
+                observer_unavailable
+                    ? L"Windows session-change notifications are unavailable. Disable the lock/disconnect safeguard "
+                      L"explicitly or resolve the Windows error before starting."
+                    : L"IdleHarbor could not establish the current lock/disconnect state. Disable the "
+                      L"lock/disconnect safeguard explicitly or resolve the Windows error before starting.",
                 L"IdleHarbor safeguard",
                 MB_OK | MB_ICONWARNING);
             return;
@@ -1293,6 +1311,7 @@ class Application final {
                 WTSUnRegisterSessionNotification(window_);
                 session_notifications_available_ = false;
             }
+            session_state_available_ = false;
             RemoveTrayIcon();
             if (ui_font_ != nullptr) {
                 DeleteObject(ui_font_);
@@ -1336,6 +1355,7 @@ class Application final {
     bool tray_added_ = false;
     bool hotkey_registered_ = false;
     bool session_notifications_available_ = false;
+    bool session_state_available_ = false;
     bool session_active_ = false;
     bool input_observer_requested_ = false;
     bool input_observer_available_ = false;

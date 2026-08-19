@@ -48,7 +48,7 @@ add_library(
 target_include_directories(idleharbor_windows PUBLIC include)
 target_compile_features(idleharbor_windows PUBLIC cxx_std_20)
 target_compile_definitions(idleharbor_windows PUBLIC UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(idleharbor_windows PUBLIC User32)
+target_link_libraries(idleharbor_windows PUBLIC User32 Wtsapi32)
 idleharbor_configure_msvc(idleharbor_windows)
 
 add_executable(
