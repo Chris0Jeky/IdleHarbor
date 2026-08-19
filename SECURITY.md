@@ -1,22 +1,14 @@
 # Security policy
 
-IdleHarbor is pre-release and currently has no release artifact. Security fixes are still welcome,
-especially for unsafe input handling, unintended privilege requirements, persistence, packaging,
-and data exposure.
-
-## Supported versions
-
-| Version | Support |
-| --- | --- |
-| Development branch | Best effort while the feature is being developed |
-| Released versions | Security fixes according to the release notes |
+IdleHarbor is pre-release. The development branch and any future tagged release are handled on a
+best-effort basis until a support window is published.
 
 ## Reporting a vulnerability
 
-Please do not open a public issue for an undisclosed vulnerability. Use GitHub's private
-vulnerability reporting channel for this repository if it is enabled. If it is not enabled, open a
-minimal private maintainer contact through the repository's available GitHub contact path and ask
-for a secure channel before sending sensitive details.
+Please do not open a public issue for an undisclosed vulnerability. Submit it through GitHub's
+private advisory form:
+
+[Report a private vulnerability](https://github.com/Chris0Jeky/IdleHarbor/security/advisories/new)
 
 Include:
 
@@ -24,15 +16,21 @@ Include:
 - Windows edition/build and architecture;
 - a minimal reproducible sequence or proof of concept;
 - expected versus observed behavior;
-- any required privilege, policy, or session conditions.
+- required privilege, policy, or session conditions.
 
-Do not include credentials, private work data, or third-party personal information.
+Do not include credentials, private work data, or third-party personal information. If the advisory
+form is unavailable, contact the maintainer privately through GitHub and request a secure channel
+before sending sensitive details.
 
-## Scope and response
+## Scope
 
-Maintainers will acknowledge a report when they can access it, reproduce or classify the concern,
-and coordinate a fix or mitigation. Timelines depend on the evidence and the pre-release status.
-Please do not publish exploit details until a fix and release communication are available.
+Reports involving unsafe input handling, unintended privilege requirements, settings persistence,
+installer ownership, startup entries, release artifacts, or data exposure are in scope. A security
+tool detecting or blocking simulated input is expected behavior, not a vulnerability. IdleHarbor
+does not promise to bypass monitoring or security software.
 
-IdleHarbor does not promise to bypass monitoring or security software. A tool detecting or blocking
-simulated input is expected behavior, not a vulnerability.
+## Response
+
+Maintainers will acknowledge accessible reports, reproduce or classify the concern, and coordinate a
+fix or mitigation. Timelines depend on evidence and the pre-release status. Please do not publish
+exploit details until a fix and release communication are available.
