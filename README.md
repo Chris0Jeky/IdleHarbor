@@ -1,114 +1,184 @@
 # IdleHarbor
 
-> A tiny native Windows utility for transparent, configurable idle prevention.
+> Transparent, configurable idle prevention for Windows, built as a small native application.
 
-[![Status: pre-release](https://img.shields.io/badge/status-pre--release-orange.svg)](PROJECT_STATE.md)
-[![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078d4.svg)](docs/USER_GUIDE.md)
+[![CI](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
 
-IdleHarbor is an independent C++20/Win32 application for keeping a legitimate, long-running
-work session active without shipping a managed runtime. It is designed to be small, observable,
-and easy to stop. It is not a concealment tool and does not promise to defeat monitoring or
-security controls.
+![IdleHarbor social preview](docs/assets/idleharbor-social.svg)
 
-![IdleHarbor mark](docs/assets/idleharbor-mark.svg)
+## Screenshot
 
-## Project status
+The release-QA window capture is maintained at [`docs/assets/idleharbor-window.png`](docs/assets/idleharbor-window.png).
+It is intentionally kept as a repository asset so the README remains useful offline and the image
+can be refreshed when the visible UI changes.
 
-This repository is in active pre-release development. There is no v0.1.0 release or download
-package yet.
+IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
+presentations, installations, and local dashboards. It combines optional motion input with Windows
+power requests, visible controls, conservative safeguards, and an immediate stop path. It does not
+provide concealment, monitoring bypasses, or claims of undetectability.
 
-| Area | Current repository | v0.1.0 release target |
+## Status
+
+The project is in pre-release `0.1.0-dev` development. The visible runtime, policy core, settings
+store, CLI, portable packaging scripts, per-user installer, startup choices, CI, CodeQL, SBOM, and
+attestation workflow are present on the integration branch. No GitHub release artifact has been
+published yet.
+
+| Area | Landed now | Release boundary |
 | --- | --- | --- |
-| Native build | CMake foundation, C++20, Unicode Win32 executable | Keep the dependency-free x64/ARM64 build |
-| Application | Foundation message box only | Tray application with visible running/paused/stopped state |
-| Idle prevention | Not implemented | User-controlled Normal, Zen, Circle, and Linear modes |
-| Safeguards | Not implemented | Real-input pause, lock/session handling, time limits, and emergency stop |
-| Configuration | Version metadata only | Persisted settings with validation and reset-to-defaults |
-| Distribution | Source only | Portable archives, checksums, and package-manager metadata when verified |
-| Automation | None | Opt-in per-user Task Scheduler helper scripts |
+| Runtime | Native Win32 window and notification-area controls | Windows release artifacts must pass release QA |
+| Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
+| Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
+| Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
+| Distribution | Portable archive and per-user installation scripts | No download link until a tagged release exists |
+| Trust evidence | CI, CodeQL, SHA-256, SPDX SBOM, GitHub attestations are wired into workflows | Signing and licence decisions remain human-owned |
 
-The authoritative milestone and proving commands are in [`PROJECT_STATE.md`](PROJECT_STATE.md).
-Planned behavior is deliberately labelled as a target throughout the documentation; it should
-not be read as a claim that the current executable already provides it.
+Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
 
 ## Why IdleHarbor?
 
-- **Native footprint:** use Windows system libraries rather than bundling a managed runtime.
-- **Observable by design:** the window, notification-area state, logs, and stop controls are
-  intended to make the program's behavior clear.
-- **Conservative safeguards:** real user input, session changes, power policy, and time limits
-  are first-class controls rather than afterthoughts.
-- **Portable delivery:** the release target is a small, architecture-specific executable with
-  reproducible build and checksum evidence.
+- **Native footprint:** C++20 and Windows system libraries, without bundling an application runtime.
+- **Visible by design:** the window, tray state, status reason, settings, and stop controls remain
+  available to the user.
+- **Two complementary mechanisms:** motion modes address applications that observe input; power
+  requests address Windows idle transitions. They can be configured independently.
+- **Conservative automation:** startup is opt-in, per-user, least-privilege, and paired with an
+  ownership-aware uninstall path.
+- **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
+  the release workflow rather than marketing claims.
 
-## Build the current foundation
+## Build and test from source
 
-The current project is Windows-only and expects a Visual Studio developer PowerShell with CMake
-and Ninja available:
+Use a Windows developer PowerShell with Visual Studio 2022, CMake, and Ninja available. For a
+Visual Studio generator build:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake --build build/x64 --config Release --parallel
+ctest --test-dir build/x64 -C Release --output-on-failure
 ```
 
-The application currently displays a foundation message and exits. Keep-awake behavior is not
-implemented in this checkout. Release downloads, installer commands, and scheduler commands will
-be added only when their artifacts and scripts have been built and verified.
+The project is Windows-only. CI also builds ARM64 and Win32; release packaging currently produces
+x64 and ARM64 archives. The packaging parser and ownership tests can be run independently:
 
-## Planned v0.1.0 experience
+```powershell
+.\packaging\Test-Packaging.ps1
+```
 
-The following is the agreed release shape, not a list of currently landed features:
+## Runtime at a glance
 
-| Capability | Intended behavior |
+1. Launch IdleHarbor and confirm the visible state is **Stopped**.
+2. Choose a profile or configure motion, power, and safeguard settings.
+3. Press **Start** for the specific session that needs idle prevention.
+4. Watch the status reason; genuine input, lock/session changes, battery policy, fullscreen policy,
+   active hours, and maximum duration can pause or stop the session.
+5. Press **Stop**, use the tray menu, or use the emergency hotkey when finished.
+
+IdleHarbor stores local settings only. It has no network service or telemetry path.
+
+## Modes and profiles
+
+Motion modes are selectable independently of power requests:
+
+| Motion | Behavior |
 | --- | --- |
-| Normal | Small, visible diagonal movement when a session is active |
-| Zen | Virtual input intended to refresh compatible Windows idle state without moving the pointer |
-| Circle | Small circular movement pattern |
-| Linear | Horizontal back-and-forth movement |
-| Interval | Configurable interval with an optional bounded random interval |
-| Distance | Validated movement multiplier with a safe default |
-| Intelligent stop | Pause for real user input; stop or pause on lock/session change; optional end time and maximum duration |
-| Power policy | User-selectable behavior for AC and battery, with conservative defaults |
-| Visibility | Window/tray state, explicit start/stop, pause reason, and emergency hotkey |
-| Launching | Normal launch plus an opt-in, per-user Task Scheduler helper with a matching uninstall path |
-| CLI | Validated startup options and `--help`/`--version` output once the command-line model lands |
+| Off | No pointer/input pulse; useful with a power request |
+| Normal | Small visible diagonal path |
+| Zen | Virtual mouse input intended not to move the visible pointer |
+| Circle | Bounded circular path |
+| Linear | Horizontal back-and-forth path |
 
-No feature will be implemented to hide the process, misrepresent a user's presence, bypass an
-employer's controls, or defeat security software.
+Profiles provide named starting points and can be refined before saving:
+
+| Profile | Starting point |
+| --- | --- |
+| Balanced | Zen input, system power request, 60-second interval, user/lock/disconnect/low-battery safeguards |
+| Long task | No motion, system power request, 120-second interval, four-hour maximum duration |
+| Presentation | No motion, display-and-system power request, no pause on genuine input |
+| Compatibility | Visible Normal input, no power request, 60-second interval |
+| Visible | Circle input, no power request |
+| Battery saver | Zen input, no power request, randomized 30–120-second interval, 30% low-battery threshold |
+| Custom | Balanced starting values for explicit user overrides |
+
+Power modes are `none`, `system`, and `display`. A power request is not input simulation: it asks
+Windows to keep the system or display available while the session is active.
+
+## Command line
+
+The GUI executable accepts one command and validated options. `--help` and `--version` open visible
+information dialogs; `--status` opens a visible status dialog rather than writing to a console.
+
+```text
+Commands: --start (-j, --jiggle), --stop, --toggle, --status,
+          --show (--settings, -g), --exit
+
+Profiles: --profile balanced|long-task|presentation|compatibility|visible|battery-saver|custom
+Motion:   --motion off|zen|diagonal|linear|circle
+Power:    --power none|system|display
+Timing:   --interval DURATION, --random, --no-random, --pause-on-input DURATION,
+          --stop-after DURATION
+Safety:   --distance 1..120, --battery-threshold 0..100,
+          --pause-on-fullscreen, --no-pause-on-fullscreen
+Window:   --minimized, --close-to-tray, --no-close-to-tray
+Storage:  --portable, --config PATH
+```
+
+Durations accept seconds by default or `s`, `m`, and `h` suffixes. Storage-path options apply when
+the owning instance is launched; an already-running instance remains bound to its existing settings
+path. The complete help text in the shipped executable is authoritative.
+
+## Advanced INI settings
+
+The settings store is a local, validated INI-style file. Portable mode places it beside the
+executable; normal mode uses the user's local application-data directory; `--config PATH` selects an
+explicit file. Unknown keys are ignored and invalid values fall back conservatively.
+
+Active-hours controls are intentionally advanced and use minutes from midnight:
+
+```ini
+active_hours_enabled=true
+active_hours_start_minute=540       ; 09:00
+active_hours_end_minute=1080        ; 18:00
+```
+
+An end earlier than the start represents an overnight window. The complete key names are documented
+in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+
+## Distribution
+
+There is no published release yet, so this repository intentionally contains no guessed download
+URL. The release workflow is prepared to produce architecture-labelled portable archives such as
+`IdleHarbor-<version>-windows-x64-portable.zip` and the corresponding ARM64 archive, plus:
+
+- `SHA256SUMS.txt` checksum manifest;
+- SPDX 2.3 SBOM JSON for each executable;
+- GitHub artifact attestations;
+- package manifest with source revision and architecture.
+
+The optional per-user installer and startup helpers are documented in
+[`packaging/README.md`](packaging/README.md). Signing is not claimed until a human-owned
+Authenticode decision is made; the licence is also still pending in [`HUMAN_TODO.md`](HUMAN_TODO.md).
+
+## Safety boundary
+
+IdleHarbor is not an employee-monitoring bypass and must not be used to misrepresent presence or
+evade a device policy. Simulated input may be detected, blocked, logged, or ignored. Check the rules
+for a managed device before installing or running it. See [`docs/SAFETY.md`](docs/SAFETY.md).
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md) — planned controls, modes, safeguards, and launch paths.
-- [Architecture](docs/ARCHITECTURE.md) — current foundation and intended native design.
-- [Safety and acceptable use](docs/SAFETY.md) — boundaries, privacy, and trust assumptions.
-- [Troubleshooting](docs/TROUBLESHOOTING.md) — build and runtime diagnosis.
-- [Benchmark methodology](docs/BENCHMARKS.md) — how footprint and idle cost will be measured.
-- [Contributing](CONTRIBUTING.md) — development workflow and quality bar.
-- [Security policy](SECURITY.md) — responsible vulnerability reporting.
-- [Changelog](CHANGELOG.md) — user-visible changes by release.
-
-## Distribution and trust
-
-The first release will not claim a download location until a verified artifact exists. A complete
-release should include architecture labels, SHA-256 checksums, build provenance, and clear signing
-status. See the [human decisions](HUMAN_TODO.md) for the licence and optional Authenticode signing
-choices that cannot be inferred by an agent.
-
-IdleHarbor is intended for legitimate personal workflows such as long installations, local
-presentations, or dashboards where Windows idle behavior is an inconvenience. On a managed device,
-read and follow the applicable policy before installing or running it. Simulated input may be
-blocked, logged, or interpreted differently by other software; it is never proof that a person is
-present.
-
-## Roadmap
-
-1. Land and test the policy engine, motion patterns, and command-line model.
-2. Add the visible tray UI, persisted configuration, and intelligent-stop signals.
-3. Add Windows smoke tests, performance measurements, and packaging scripts.
-4. Publish a reviewed v0.1.0 only after artifacts, checksums, and release notes are verified.
+- [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — controls, profiles, CLI, INI, and startup workflows.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — landed runtime boundaries and release flow.
+- [`docs/SAFETY.md`](docs/SAFETY.md) — acceptable use, privacy, and trust assumptions.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — build, runtime, install, and verification diagnosis.
+- [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) — reproducible footprint and idle-cost methodology.
+- [`packaging/README.md`](packaging/README.md) — portable archives, installation, and startup choices.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and review expectations.
+- [`SECURITY.md`](SECURITY.md) — private vulnerability reporting.
+- [`CHANGELOG.md`](CHANGELOG.md) — pre-release user-visible changes.
 
 ## Licence
 
-The licence decision is still open. See [`HUMAN_TODO.md`](HUMAN_TODO.md); do not assume that this
-pre-release repository grants downstream rights until a licence is committed.
+No licence is committed yet. See [`HUMAN_TODO.md`](HUMAN_TODO.md); do not infer downstream rights
+from this pre-release repository.
