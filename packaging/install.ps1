@@ -85,6 +85,33 @@ function Test-SamePath([string]$Left, [string]$Right) {
     catch { return $false }
 }
 
+function Get-OwnedProcesses([string]$Executable) {
+    $matches = @()
+    foreach ($process in @(Get-Process -Name 'IdleHarbor' -ErrorAction SilentlyContinue)) {
+        try {
+            if (Test-SamePath $process.Path $Executable) { $matches += $process }
+        }
+        catch { }
+    }
+    return $matches
+}
+
+function Stop-OwnedApplicationIfRunning([string]$Executable) {
+    $running = @(Get-OwnedProcesses $Executable)
+    if ($running.Count -eq 0) { return }
+    if (-not (Confirm-Change $Executable 'Ask the running IdleHarbor instance to exit for update')) { return }
+
+    Start-Process -FilePath $Executable -ArgumentList '--exit' -WindowStyle Hidden -Wait
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        Start-Sleep -Milliseconds 100
+        $running = @(Get-OwnedProcesses $Executable)
+    } while ($running.Count -ne 0 -and [DateTime]::UtcNow -lt $deadline)
+    if ($running.Count -ne 0) {
+        throw 'The running IdleHarbor instance did not exit; no installed files were overwritten.'
+    }
+}
+
 function Assert-OwnedOrEmptyDestination([string]$Root, [string]$SourceRoot) {
     if (Test-SamePath $Root $SourceRoot) { return }
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return }
@@ -226,6 +253,10 @@ $destinationExecutable = Join-Path $safeRoot 'IdleHarbor.exe'
 $parent = Split-Path -Parent $safeRoot
 $markerPath = Join-Path $safeRoot $MarkerName
 Assert-OwnedOrEmptyDestination $safeRoot $sourceRoot
+
+if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
+    Stop-OwnedApplicationIfRunning $destinationExecutable
+}
 
 if (-not (Test-SamePath $sourceRoot $safeRoot)) {
     if (Confirm-Change $safeRoot 'Create installation directory') {

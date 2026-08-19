@@ -52,6 +52,33 @@ function Test-SamePath([string]$Left, [string]$Right) {
     catch { return $false }
 }
 
+function Get-OwnedProcesses([string]$Executable) {
+    $matches = @()
+    foreach ($process in @(Get-Process -Name 'IdleHarbor' -ErrorAction SilentlyContinue)) {
+        try {
+            if (Test-SamePath $process.Path $Executable) { $matches += $process }
+        }
+        catch { }
+    }
+    return $matches
+}
+
+function Stop-OwnedApplicationIfRunning([string]$Executable) {
+    $running = @(Get-OwnedProcesses $Executable)
+    if ($running.Count -eq 0) { return }
+    if (-not (Confirm-Change $Executable 'Ask the running IdleHarbor instance to exit for uninstall')) { return }
+
+    Start-Process -FilePath $Executable -ArgumentList '--exit' -WindowStyle Hidden -Wait
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        Start-Sleep -Milliseconds 100
+        $running = @(Get-OwnedProcesses $Executable)
+    } while ($running.Count -ne 0 -and [DateTime]::UtcNow -lt $deadline)
+    if ($running.Count -ne 0) {
+        throw 'The running IdleHarbor instance did not exit; no installed files were removed.'
+    }
+}
+
 function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
 }
@@ -121,6 +148,7 @@ if (-not (Test-SamePath (Split-Path -Parent $executable) $safeRoot)) {
     throw "Ownership marker points outside the installation directory; refusing to continue."
 }
 
+Stop-OwnedApplicationIfRunning $executable
 Remove-OwnedStartup $executable
 
 foreach ($file in @($marker.managedFiles)) {
