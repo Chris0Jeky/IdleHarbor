@@ -1,28 +1,25 @@
 # Safety and acceptable use
 
-IdleHarbor is intended to make legitimate, user-observed work sessions less vulnerable to an
-unwanted Windows idle transition. It is not a way to defeat security controls, conceal activity,
-or misrepresent a person's presence.
+IdleHarbor is a visible, user-controlled utility for legitimate work sessions where Windows idle
+behavior is inconvenient. It is not a way to defeat security controls, conceal activity, or
+misrepresent a person's presence.
 
-## Non-negotiable boundaries
+## Boundaries
 
-IdleHarbor will not provide:
+IdleHarbor does not provide stealth, process hiding, misleading identity, monitoring bypasses,
+undetectability claims, elevation without consent, network telemetry, or remote control. Simulated
+input can be detected, blocked, logged, or ignored by Windows and other software. It is never proof
+that a person is working or present.
 
-- stealth or concealment modes;
-- process hiding, identity spoofing, or misleading window names;
-- monitoring bypasses or claims of being undetectable;
-- elevation or a service installed without explicit consent;
-- network telemetry or remote control as part of idle prevention.
+## User-visible controls
 
-Simulated input can be detected, blocked, logged, or ignored by Windows and other software. It is
-never evidence that a person is working or present.
+The application exposes Running, Paused, and Stopped states, pause reasons, a tray menu, a visible
+window, and immediate Stop actions. The emergency hotkey is an additional escape path. Minimize to
+the notification area is a visibility choice, not concealment.
 
-## User controls
-
-The target release keeps the state visible and supplies an immediate stop path. Intelligent-stop
-signals should be conservative: real user activity, lock/session changes, explicit end times, and
-power policy can pause or stop the session. A user should be able to see why the state changed and
-resume it intentionally.
+Safeguards include genuine-input cooldown, lock/session pause, low-battery and battery policy,
+fullscreen policy, active hours, and maximum duration. They are conservative compatibility features,
+not security guarantees; test them in the actual Windows session where the utility will run.
 
 ## Managed devices
 
@@ -30,22 +27,24 @@ Read the rules for the device, account, network, and work environment before ins
 IdleHarbor. If a policy prohibits simulated input or third-party utilities, do not run it. The
 project cannot determine or approve an employer's policy on a user's behalf.
 
-## Privacy and data
+## Privacy and privilege
 
-The current foundation has no network access or telemetry. The target design stores only validated
-local preferences needed to reproduce a user's chosen configuration. It should not collect input
-content, screenshots, window titles, or browsing history. Any future change to that boundary needs
-separate documentation and review.
+The current application has no network service or telemetry path. It stores validated local
+preferences and does not need an elevated process or Windows service. It should not collect input
+content, screenshots, window titles, or browsing history.
 
-## Privilege and supply chain
+Low-level hooks and injected input are Windows compatibility mechanisms. They may be unavailable at
+some integrity boundaries or under endpoint policy; IdleHarbor must not be treated as a guarantee
+that a safeguard or pulse will work in every application.
 
-The target application should run per-user without elevation. Release artifacts should be labelled
-by architecture and accompanied by SHA-256 checksums, build provenance, and clear signing status.
-Do not treat an unsigned binary as trusted merely because it came from a public repository; build
-from source or verify the release evidence appropriate to your environment.
+## Distribution trust
 
-## Reporting a concern
+There is no published release yet. When artifacts are published, verify the architecture, SHA-256
+manifest, SPDX SBOM, and GitHub attestation before running them. Authenticode signing is not claimed
+until the human signing decision is made. Do not disable endpoint protection to run an unverified
+build.
 
-Do not open a public issue for an undisclosed vulnerability. Follow [`SECURITY.md`](../SECURITY.md)
-and include the smallest reproducible details that allow maintainers to validate the concern without
-receiving private data or credentials.
+## Vulnerabilities
+
+Do not post undisclosed security issues publicly. Use the private advisory form described in
+[`SECURITY.md`](../SECURITY.md).

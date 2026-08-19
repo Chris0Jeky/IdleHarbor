@@ -1,56 +1,76 @@
 # Troubleshooting
 
-This project is pre-release. The first section applies to the current foundation; later sections
-describe checks for the v0.1.0 target once those components land.
+IdleHarbor is pre-release. Record the commit or package version, Windows edition/build, architecture,
+selected profile, relevant settings, and the smallest reproducible sequence. Remove credentials,
+private work data, and managed-device details before sharing diagnostics.
 
-## Build problems
+## Build and test
 
-### CMake cannot find a generator
-
-Use a Visual Studio developer PowerShell and confirm that both `cmake` and `ninja` are on `PATH`:
-
-```powershell
-cmake --version
-ninja --version
-```
-
-Then configure from the repository root:
+Use a Windows developer PowerShell with Visual Studio 2022:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake --build build/x64 --config Release --parallel
+ctest --test-dir build/x64 -C Release --output-on-failure
+.\packaging\Test-Packaging.ps1
 ```
 
-### CMake rejects the platform
+The project is Windows-only. CI additionally builds ARM64 and Win32; release packaging currently
+targets x64 and ARM64.
 
-IdleHarbor is Windows-only. The project intentionally stops configuration on non-Windows hosts.
-Use a Windows build environment or cross-compile only after a documented toolchain is added.
+## The application does not appear
 
-### Tests fail to configure or build
+- Start without `--minimized` and confirm the process is not already running.
+- If a previous instance owns the single-instance mutex, use `IdleHarbor.exe --show`.
+- If Explorer has restarted, the tray icon may not be present; use `--show` or restart the owner.
+- Check that the executable is not blocked by endpoint policy. Do not weaken security controls to
+  force an unverified binary to run.
 
-Start from a fresh build directory only after preserving any diagnostics you need. Re-run the
-commands in [`PROJECT_STATE.md`](../PROJECT_STATE.md), then attach the complete CMake and test
-output to a bug report. Do not include credentials, private paths, or workplace data.
+## It does not keep the intended state active
 
-## Current application behavior
+Read the visible pause reason first. Check genuine-input cooldown, lock/disconnect state, battery
+threshold, fullscreen policy, active hours, and maximum duration. Motion and power are separate:
 
-The foundation executable shows a message box and exits. That is expected at this milestone. If
-you are looking for a tray icon, movement mode, scheduler helper, or idle prevention, those are
-release targets and are not yet available in the current checkout.
+- `motion=off` with `power=system` or `power=display` uses a Windows power request without pointer movement;
+- `motion=normal`, `circle`, or `linear` with `power=none` relies on visible input for applications
+  with their own idle detection;
+- `motion=zen` uses marked virtual input and is not guaranteed to work everywhere.
 
-## Target runtime checks
+If a power request or input pulse fails, IdleHarbor should show a stopped error. The failure may be
+caused by Windows integrity boundaries, endpoint policy, or an application that ignores injected
+input.
 
-When v0.1.0 lands, collect:
+## Genuine input and session safeguards
 
-1. Windows edition/build and architecture.
-2. IdleHarbor version and package type.
-3. Selected mode, interval, power policy, and pause reason.
-4. Whether the app is stopped, paused, or running.
-5. The smallest reproducible sequence and relevant event-log message.
+The input observer uses Windows low-level hooks and ignores IdleHarbor-marked input. A hook may be
+unavailable in a restricted environment; the status identifies observer availability. Lock and
+connect/disconnect handling depends on Windows session notifications. Test these transitions in a
+non-critical session before relying on them.
 
-First try the visible **Stop**, reset settings to defaults, and relaunch. Do not disable endpoint
-protection or change workplace policy to work around a compatibility issue.
+## Settings and INI
 
-## Reporting a bug
+Normal settings live under the user's local application-data directory. Portable mode stores
+`IdleHarbor.ini` beside the executable; `--config PATH` takes precedence at owner-instance launch.
+Settings are validated, unknown keys are ignored, and writes use a temporary file followed by an
+atomic replacement. If an INI value is invalid, restore the profile defaults or remove the offending
+key and relaunch.
 
-Use the repository bug-report form and redact private or managed-environment details. Security
-issues belong in [`SECURITY.md`](../SECURITY.md), not a public issue.
+For active hours, use minutes from midnight:
+
+```ini
+active_hours_enabled=true
+active_hours_start_minute=540
+active_hours_end_minute=1080
+```
+
+## Installation and startup
+
+Run the installer with `-WhatIf` first. Startup is disabled by default; if enabled, the installer
+creates only the selected per-user Task Scheduler, Startup-folder, or HKCU Run entry. A matching
+uninstaller removes entries and files only when its ownership marker proves they belong to
+IdleHarbor. Settings are preserved unless `-PurgeData` is explicitly supplied.
+
+## Report a bug
+
+Use the repository bug form with diagnostics and reproduction steps. Security concerns belong in the
+private advisory flow in [`SECURITY.md`](../SECURITY.md), not a public issue.
