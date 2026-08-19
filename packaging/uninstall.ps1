@@ -90,11 +90,31 @@ function Get-RunCommand() {
     return [string]$property.$RunValueName
 }
 
+function Get-ExpectedRunCommand([string]$Executable) {
+    return '"{0}" --start --minimized' -f $Executable
+}
+
 function Test-RunCommandOwned([string]$Command, [string]$Executable) {
     if ([string]::IsNullOrWhiteSpace($Command)) { return $false }
-    $candidate = $Command -replace '^\s*"([^"]+)".*$', '$1'
-    if ($candidate -eq $Command) { $candidate = ($Command -split '\s+', 2)[0] }
-    return (Test-SamePath $candidate $Executable)
+    return ($Command -ieq (Get-ExpectedRunCommand $Executable))
+}
+
+function Test-TaskActionsOwned([object[]]$Actions, [string]$Executable) {
+    if ($Actions.Count -ne 1) { return $false }
+    $action = $Actions[0]
+    return (
+        (Test-SamePath ([string]$action.Execute) $Executable) -and
+        ([string]$action.Arguments -ceq '--start --minimized') -and
+        (Test-SamePath ([string]$action.WorkingDirectory) (Split-Path -Parent $Executable))
+    )
+}
+
+function Test-StartupShortcutOwned([object]$Shortcut, [string]$Executable) {
+    return (
+        (Test-SamePath ([string]$Shortcut.TargetPath) $Executable) -and
+        ([string]$Shortcut.Arguments -ceq '--start --minimized') -and
+        (Test-SamePath ([string]$Shortcut.WorkingDirectory) (Split-Path -Parent $Executable))
+    )
 }
 
 function Get-OwnedDataMarker([string]$DataRoot) {
@@ -123,12 +143,9 @@ function Remove-OwnedStartup {
     )
 
     $task = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($null -ne $task) {
-        $action = @($task.Actions) | Select-Object -First 1
-        if ($null -ne $action -and (Test-SamePath $action.Execute $Executable)) {
-            if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Remove')) {
-                Unregister-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Confirm:$false
-            }
+    if ($null -ne $task -and (Test-TaskActionsOwned -Actions @($task.Actions) -Executable $Executable)) {
+        if ($PSCmdlet.ShouldProcess("scheduled task $TaskPath$TaskName", 'Remove')) {
+            Unregister-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Confirm:$false
         }
     }
 
@@ -136,7 +153,7 @@ function Remove-OwnedStartup {
     if (Test-Path -LiteralPath $link -PathType Leaf) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($link)
-        if (Test-SamePath $shortcut.TargetPath $Executable) {
+        if (Test-StartupShortcutOwned -Shortcut $shortcut -Executable $Executable) {
             if ($PSCmdlet.ShouldProcess($link, 'Remove startup shortcut')) {
                 Remove-Item -LiteralPath $link -Force
             }

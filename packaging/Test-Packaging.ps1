@@ -8,6 +8,81 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-ScriptFunctionDefinition([string]$ScriptPath, [string]$Name) {
+    $tokens = $null
+    $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        $ScriptPath,
+        [ref]$tokens,
+        [ref]$errors)
+    Assert-True ($errors.Count -eq 0) "PowerShell parse failed while loading ${Name}: $($errors -join '; ')"
+    $definition = $ast.Find(
+        {
+            param($node)
+            return ($node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq $Name)
+        },
+        $true)
+    Assert-True ($null -ne $definition) "Function ${Name} was not found in ${ScriptPath}."
+    return [scriptblock]::Create($definition.Extent.Text)
+}
+
+function Assert-StartupOwnershipPredicates([string]$ScriptPath, [string]$TestRoot) {
+    foreach ($name in @(
+        'Get-FullPath',
+        'Test-SamePath',
+        'Get-ExpectedRunCommand',
+        'Test-RunCommandOwned',
+        'Test-TaskActionsOwned',
+        'Test-StartupShortcutOwned'
+    )) {
+        . (Get-ScriptFunctionDefinition $ScriptPath $name)
+    }
+
+    $executable = Join-Path $TestRoot 'IdleHarbor\IdleHarbor.exe'
+    $workingDirectory = Split-Path -Parent $executable
+    $ownedAction = [pscustomobject]@{
+        Execute = $executable
+        Arguments = '--start --minimized'
+        WorkingDirectory = $workingDirectory
+    }
+    $foreignAction = [pscustomobject]@{
+        Execute = (Join-Path $env:WINDIR 'System32\notepad.exe')
+        Arguments = ''
+        WorkingDirectory = (Join-Path $env:WINDIR 'System32')
+    }
+    Assert-True (Test-TaskActionsOwned @($ownedAction) $executable) 'Exact single task action was not recognized as owned.'
+    Assert-True (-not (Test-TaskActionsOwned @($ownedAction, $foreignAction) $executable)) `
+        'Task with an additional foreign action was recognized as owned.'
+
+    $changedArguments = $ownedAction.PSObject.Copy()
+    $changedArguments.Arguments = '--start'
+    Assert-True (-not (Test-TaskActionsOwned @($changedArguments) $executable)) `
+        'Task with changed arguments was recognized as owned.'
+
+    $changedDirectory = $ownedAction.PSObject.Copy()
+    $changedDirectory.WorkingDirectory = $TestRoot
+    Assert-True (-not (Test-TaskActionsOwned @($changedDirectory) $executable)) `
+        'Task with a changed working directory was recognized as owned.'
+
+    $ownedShortcut = [pscustomobject]@{
+        TargetPath = $executable
+        Arguments = '--start --minimized'
+        WorkingDirectory = $workingDirectory
+    }
+    Assert-True (Test-StartupShortcutOwned $ownedShortcut $executable) `
+        'Exact startup shortcut was not recognized as owned.'
+    $changedShortcut = $ownedShortcut.PSObject.Copy()
+    $changedShortcut.Arguments = '--start --minimized --custom'
+    Assert-True (-not (Test-StartupShortcutOwned $changedShortcut $executable)) `
+        'Customized startup shortcut was recognized as owned.'
+
+    $runCommand = Get-ExpectedRunCommand $executable
+    Assert-True (Test-RunCommandOwned $runCommand $executable) 'Exact Run command was not recognized as owned.'
+    Assert-True (-not (Test-RunCommandOwned "$runCommand --custom" $executable)) `
+        'Customized Run command was recognized as owned.'
+}
+
 $packagingRoot = $PSScriptRoot
 foreach ($script in Get-ChildItem -LiteralPath $packagingRoot -Filter '*.ps1' -File) {
     $tokens = $null
@@ -28,6 +103,8 @@ $buildRoot = Join-Path $tempRoot 'build'
 $outputRoot = Join-Path $tempRoot 'dist'
 $installRoot = Join-Path $tempRoot 'IdleHarbor'
 $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
+Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
+Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
 New-Item -ItemType Directory -Path $sourceRoot, $buildRoot, $outputRoot -Force | Out-Null
 try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
