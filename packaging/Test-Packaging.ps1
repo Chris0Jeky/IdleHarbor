@@ -27,6 +27,7 @@ $sourceRoot = Join-Path $tempRoot 'source'
 $buildRoot = Join-Path $tempRoot 'build'
 $outputRoot = Join-Path $tempRoot 'dist'
 $installRoot = Join-Path $tempRoot 'IdleHarbor'
+$purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
 New-Item -ItemType Directory -Path $sourceRoot, $buildRoot, $outputRoot -Force | Out-Null
 try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
@@ -46,6 +47,29 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
+
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -NoLaunch | Out-Null
+    $savedAppData = $env:APPDATA
+    $savedLocalAppData = $env:LOCALAPPDATA
+    $testAppData = Join-Path $tempRoot 'appdata'
+    $testLocalAppData = Join-Path $tempRoot 'localappdata'
+    $foreignData = Join-Path $testAppData 'IdleHarbor'
+    $ownedData = Join-Path $testLocalAppData 'IdleHarbor'
+    New-Item -ItemType Directory -Path $foreignData, $ownedData -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $foreignData 'foreign.txt') -Value 'preserve'
+    Set-Content -LiteralPath (Join-Path $ownedData 'settings.ini') -Value 'owned'
+    Set-Content -LiteralPath (Join-Path $ownedData '.idleharbor-data.json') -Value '{"product":"IdleHarbor","markerVersion":1,"settingsFile":"settings.ini"}'
+    $env:APPDATA = $testAppData
+    $env:LOCALAPPDATA = $testLocalAppData
+    try {
+        & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $purgeInstallRoot -PurgeData | Out-Null
+    }
+    finally {
+        $env:APPDATA = $savedAppData
+        $env:LOCALAPPDATA = $savedLocalAppData
+    }
+    Assert-True (Test-Path -LiteralPath $foreignData) 'Uninstaller purged an unowned data directory.'
+    Assert-True (-not (Test-Path -LiteralPath $ownedData)) 'Uninstaller did not purge marker-owned data.'
 
     $foreignRoot = Join-Path $tempRoot 'foreign\IdleHarbor'
     New-Item -ItemType Directory -Path $foreignRoot -Force | Out-Null

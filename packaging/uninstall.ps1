@@ -13,6 +13,7 @@ $TaskPath = '\IdleHarbor\'
 $TaskName = 'IdleHarbor'
 $RunValueName = 'IdleHarbor'
 $MarkerName = '.idleharbor-managed.json'
+$DataMarkerName = '.idleharbor-data.json'
 
 function Confirm-Change {
     [CmdletBinding(SupportsShouldProcess = $true)]
@@ -94,6 +95,24 @@ function Test-RunCommandOwned([string]$Command, [string]$Executable) {
     $candidate = $Command -replace '^\s*"([^"]+)".*$', '$1'
     if ($candidate -eq $Command) { $candidate = ($Command -split '\s+', 2)[0] }
     return (Test-SamePath $candidate $Executable)
+}
+
+function Get-OwnedDataMarker([string]$DataRoot) {
+    $markerPath = Join-Path $DataRoot $DataMarkerName
+    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) { return $null }
+    try { $marker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json }
+    catch {
+        Write-Warning "Preserving data directory with an unreadable ownership marker: $DataRoot"
+        return $null
+    }
+    $properties = @($marker.PSObject.Properties.Name)
+    if ($properties -notcontains 'product' -or $properties -notcontains 'markerVersion' -or
+        $properties -notcontains 'settingsFile' -or $marker.product -ne $ProductName -or
+        $marker.markerVersion -ne 1 -or $marker.settingsFile -ne 'settings.ini') {
+        Write-Warning "Preserving data directory with a non-IdleHarbor ownership marker: $DataRoot"
+        return $null
+    }
+    return $marker
 }
 
 function Remove-OwnedStartup {
@@ -191,7 +210,12 @@ if ($PurgeData) {
             if (($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw "Refusing to purge a reparse-point data directory: $dataRoot"
             }
-            if (Confirm-Change $dataRoot 'Purge user data') {
+            $dataMarker = Get-OwnedDataMarker $dataRoot
+            if ($null -eq $dataMarker) {
+                Write-Warning "Preserved unowned data directory: $dataRoot"
+                continue
+            }
+            if (Confirm-Change $dataRoot 'Purge IdleHarbor-owned user data') {
                 Remove-Item -LiteralPath $dataRoot -Recurse -Force
             }
         }
