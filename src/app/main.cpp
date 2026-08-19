@@ -112,10 +112,11 @@ std::wstring Widen(const std::string_view value) {
 
 std::wstring ControlText(const HWND control) {
     const int length = GetWindowTextLengthW(control);
-    std::wstring text(static_cast<std::size_t>(std::max(length, 0)), L'\0');
+    std::wstring text(static_cast<std::size_t>(std::max(length, 0)) + 1, L'\0');
     if (length > 0) {
         GetWindowTextW(control, text.data(), length + 1);
     }
+    text.resize(static_cast<std::size_t>(std::max(length, 0)));
     return text;
 }
 
@@ -196,6 +197,28 @@ Seconds NowSeconds() {
     return Seconds{static_cast<std::int64_t>(GetTickCount64() / 1000)};
 }
 
+int ScaleForDpi(const int value, const UINT dpi) noexcept {
+    return MulDiv(value, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+}
+
+HFONT CreateUiFont(const UINT dpi) noexcept {
+    return CreateFontW(
+        -MulDiv(9, static_cast<int>(dpi), 72),
+        0,
+        0,
+        0,
+        FW_NORMAL,
+        FALSE,
+        FALSE,
+        FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE,
+        L"Segoe UI");
+}
+
 PowerRequestMode ToPlatformPowerMode(const PowerMode mode) {
     switch (mode) {
     case PowerMode::None:
@@ -213,6 +236,13 @@ HICON LoadIdleHarborIcon(const HINSTANCE instance) {
     return icon != nullptr ? icon : LoadIconW(nullptr, IDI_APPLICATION);
 }
 
+bool HasRuntimeOverrides(const CommandLineOptions& options) noexcept {
+    return options.profile.has_value() || options.motion_mode.has_value() || options.power_mode.has_value() ||
+           options.interval.has_value() || options.pause_on_input.has_value() || options.stop_after.has_value() ||
+           options.distance.has_value() || options.battery_threshold.has_value() || options.randomize.has_value() ||
+           options.pause_on_fullscreen.has_value();
+}
+
 class Application final {
   public:
     explicit Application(const HINSTANCE instance) : instance_(instance) {}
@@ -225,6 +255,8 @@ class Application final {
         settings_path_ = idleharbor::app::ResolveSettingsPath(options.portable, options.config_path);
         settings_ = idleharbor::app::LoadSettings(settings_path_).settings;
         ApplyCommandLineOptions(options);
+        taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
+        dpi_ = GetDpiForSystem();
 
         WNDCLASSEXW window_class{sizeof(window_class)};
         window_class.hInstance = instance_;
@@ -242,11 +274,11 @@ class Application final {
             0,
             kWindowClassName,
             idleharbor::kProductName.data(),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME,
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            600,
-            665,
+            ScaleForDpi(600, dpi_),
+            ScaleForDpi(665, dpi_),
             nullptr,
             nullptr,
             instance_,
@@ -256,7 +288,8 @@ class Application final {
         }
 
         InitializeTrayIcon();
-        WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION);
+        session_notifications_available_ =
+            WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
         if (settings_.emergency_hotkey) {
             hotkey_registered_ = RegisterHotKey(
                 window_,
@@ -266,8 +299,17 @@ class Application final {
         }
 
         RefreshControls();
-        SetStatus(L"Stopped: ready");
-        if (options.minimized || settings_.start_minimized) {
+        std::wstring initial_status = L"Stopped: ready";
+        if (!tray_added_) {
+            initial_status = L"Stopped: notification icon unavailable; window kept visible";
+        } else if (settings_.emergency_hotkey && !hotkey_registered_) {
+            initial_status = L"Stopped: emergency hotkey unavailable";
+        } else if ((settings_.session.pause_when_locked || settings_.session.pause_when_disconnected) &&
+                   !session_notifications_available_) {
+            initial_status = L"Stopped: session-change observer unavailable";
+        }
+        SetStatus(initial_status);
+        if ((options.minimized || settings_.start_minimized) && tray_added_) {
             ShowWindow(window_, SW_HIDE);
         } else {
             ShowWindow(window_, SW_SHOW);
@@ -277,6 +319,7 @@ class Application final {
     }
 
     void HandleCommand(const CommandLineOptions& options) {
+        const bool restart_for_overrides = session_active_ && HasRuntimeOverrides(options);
         ApplyCommandLineOptions(options);
         RefreshControls();
         switch (options.command) {
@@ -289,7 +332,10 @@ class Application final {
             }
             break;
         case RequestedCommand::Start:
-            ShowWindow(window_, options.minimized ? SW_HIDE : SW_SHOW);
+            ShowWindow(window_, options.minimized && tray_added_ ? SW_HIDE : SW_SHOW);
+            if (restart_for_overrides) {
+                StopSession();
+            }
             StartSession();
             break;
         case RequestedCommand::Stop:
@@ -315,6 +361,8 @@ class Application final {
         }
     }
 
+    [[nodiscard]] HWND window() const noexcept { return window_; }
+
     static LRESULT CALLBACK WindowProc(
         const HWND window,
         const UINT message,
@@ -334,68 +382,125 @@ class Application final {
     }
 
   private:
+    void ApplyDpiChange(const UINT new_dpi, const RECT& suggested) {
+        if (new_dpi == 0 || new_dpi == dpi_) {
+            return;
+        }
+
+        struct ChildPlacement {
+            HWND window{};
+            RECT rectangle{};
+        };
+        std::vector<ChildPlacement> children;
+        for (HWND child = GetWindow(window_, GW_CHILD); child != nullptr; child = GetWindow(child, GW_HWNDNEXT)) {
+            RECT rectangle{};
+            if (GetWindowRect(child, &rectangle) != FALSE) {
+                MapWindowPoints(HWND_DESKTOP, window_, reinterpret_cast<POINT*>(&rectangle), 2);
+                children.push_back({child, rectangle});
+            }
+        }
+
+        const UINT old_dpi = dpi_;
+        SetWindowPos(
+            window_,
+            nullptr,
+            suggested.left,
+            suggested.top,
+            suggested.right - suggested.left,
+            suggested.bottom - suggested.top,
+            SWP_NOACTIVATE | SWP_NOZORDER);
+        dpi_ = new_dpi;
+
+        HFONT replacement_font = CreateUiFont(dpi_);
+        for (const auto& child : children) {
+            const int x = MulDiv(child.rectangle.left, static_cast<int>(new_dpi), static_cast<int>(old_dpi));
+            const int y = MulDiv(child.rectangle.top, static_cast<int>(new_dpi), static_cast<int>(old_dpi));
+            const int width = MulDiv(
+                child.rectangle.right - child.rectangle.left,
+                static_cast<int>(new_dpi),
+                static_cast<int>(old_dpi));
+            const int height = MulDiv(
+                child.rectangle.bottom - child.rectangle.top,
+                static_cast<int>(new_dpi),
+                static_cast<int>(old_dpi));
+            SetWindowPos(child.window, nullptr, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
+            if (replacement_font != nullptr) {
+                SendMessageW(child.window, WM_SETFONT, reinterpret_cast<WPARAM>(replacement_font), TRUE);
+            }
+        }
+        if (replacement_font != nullptr) {
+            if (ui_font_ != nullptr) {
+                DeleteObject(ui_font_);
+            }
+            ui_font_ = replacement_font;
+        }
+        InvalidateRect(window_, nullptr, TRUE);
+    }
+
     void CreateControls() {
-        const HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        ui_font_ = CreateUiFont(dpi_);
+        const HFONT font = ui_font_ != nullptr ? ui_font_ : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        const auto scale = [&](const int value) { return ScaleForDpi(value, dpi_); };
         const auto add_label = [&](const wchar_t* text, const int y) {
             const HWND control = CreateWindowExW(
                 0,
                 L"STATIC",
                 text,
                 WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                270,
-                24,
+                scale(20),
+                scale(y),
+                scale(270),
+                scale(24),
                 window_,
                 nullptr,
                 instance_,
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         };
-        const auto add_combo = [&](HWND& target, const int y) {
+        const auto add_combo = [&](HWND& target, const int y, const int id) {
             target = CreateWindowExW(
                 0,
                 L"COMBOBOX",
                 nullptr,
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST,
-                300,
-                y - 3,
-                245,
-                260,
+                scale(300),
+                scale(y - 3),
+                scale(245),
+                scale(260),
                 window_,
-                nullptr,
+                reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         };
-        const auto add_edit = [&](HWND& target, const int y) {
+        const auto add_edit = [&](HWND& target, const int y, const int id) {
             target = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
                 L"EDIT",
                 nullptr,
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER,
-                300,
-                y - 3,
-                145,
-                26,
+                scale(300),
+                scale(y - 3),
+                scale(145),
+                scale(26),
                 window_,
-                nullptr,
+                reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         };
-        const auto add_check = [&](HWND& target, const wchar_t* text, const int y) {
+        const auto add_check = [&](HWND& target, const wchar_t* text, const int y, const int id) {
             target = CreateWindowExW(
                 0,
                 L"BUTTON",
                 text,
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
-                20,
-                y,
-                525,
-                26,
+                scale(20),
+                scale(y),
+                scale(525),
+                scale(26),
                 window_,
-                nullptr,
+                reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
@@ -406,10 +511,10 @@ class Application final {
             L"STATIC",
             L"Stopped: ready",
             WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
-            20,
-            18,
-            525,
-            28,
+            scale(20),
+            scale(18),
+            scale(525),
+            scale(28),
             window_,
             reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStatus)),
             instance_,
@@ -417,14 +522,14 @@ class Application final {
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
 
         add_label(L"Profile", 68);
-        add_combo(profile_, 68);
+        add_combo(profile_, 68, kProfile);
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
         add_label(L"Motion", 108);
-        add_combo(motion_, 108);
+        add_combo(motion_, 108, kMotion);
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -437,27 +542,27 @@ class Application final {
         }
 
         add_label(L"Power request", 148);
-        add_combo(power_, 148);
+        add_combo(power_, 148, kPower);
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
         add_label(L"Pulse interval (seconds)", 188);
-        add_edit(interval_, 188);
+        add_edit(interval_, 188, kInterval);
         add_label(L"Motion distance (1-120)", 228);
-        add_edit(distance_, 228);
-        add_check(randomize_, L"Randomize pulse interval", 266);
+        add_edit(distance_, 228, kDistance);
+        add_check(randomize_, L"Randomize pulse interval", 266, kRandomize);
         add_label(L"Pause after genuine input (seconds; 0 disables)", 306);
-        add_edit(pause_input_, 306);
-        add_check(lock_pause_, L"Pause while the workstation is locked", 346);
+        add_edit(pause_input_, 306, kPauseInput);
+        add_check(lock_pause_, L"Pause while the workstation is locked", 346, kLockPause);
         add_label(L"Low-battery threshold (0 disables)", 386);
-        add_edit(battery_, 386);
-        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 426);
+        add_edit(battery_, 386, kBattery);
+        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 426, kFullscreen);
         add_label(L"Maximum session duration (seconds; 0 disables)", 466);
-        add_edit(max_duration_, 466);
-        add_check(start_minimized_, L"Start minimized to the notification area", 506);
-        add_check(close_to_tray_, L"Close button hides to the notification area", 536);
+        add_edit(max_duration_, 466, kMaxDuration);
+        add_check(start_minimized_, L"Start minimized to the notification area", 506, kStartMinimized);
+        add_check(close_to_tray_, L"Close button hides to the notification area", 536, kCloseToTray);
 
         const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id) {
             target = CreateWindowExW(
@@ -465,10 +570,10 @@ class Application final {
                 L"BUTTON",
                 text,
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                x,
-                578,
-                115,
-                32,
+                scale(x),
+                scale(578),
+                scale(115),
+                scale(32),
                 window_,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
@@ -570,6 +675,13 @@ class Application final {
         if (stop_ != nullptr) {
             EnableWindow(stop_, session_active_ ? TRUE : FALSE);
         }
+        for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
+                                   lock_pause_, battery_, fullscreen_, max_duration_, start_minimized_,
+                                   close_to_tray_, save_}) {
+            if (control != nullptr) {
+                EnableWindow(control, session_active_ ? FALSE : TRUE);
+            }
+        }
     }
 
     bool ReadControls(std::wstring& error) {
@@ -602,6 +714,9 @@ class Application final {
             return false;
         }
         session.interval = Seconds{static_cast<std::int64_t>(value)};
+        if (session.random_minimum > session.interval) {
+            session.random_minimum = Seconds{1};
+        }
         if (!read_number(distance_, 120, value) || value == 0) {
             error = L"Motion distance must be between 1 and 120.";
             return false;
@@ -660,6 +775,9 @@ class Application final {
         }
         if (options.interval.has_value()) {
             settings_.session.interval = *options.interval;
+            if (settings_.session.random_minimum > settings_.session.interval) {
+                settings_.session.random_minimum = Seconds{1};
+            }
         }
         if (options.distance.has_value()) {
             settings_.session.distance = *options.distance;
@@ -689,10 +807,6 @@ class Application final {
         if (options.close_to_tray.has_value()) {
             settings_.close_to_tray = *options.close_to_tray;
         }
-        const auto validation = idleharbor::core::validate(settings_.session);
-        if (!validation.valid) {
-            settings_.session = idleharbor::core::settings_for_profile(settings_.session.profile);
-        }
     }
 
     void ApplySelectedProfile() {
@@ -718,7 +832,7 @@ class Application final {
             disconnected_,
             battery.on_battery,
             battery.percent,
-            settings_.session.pause_when_fullscreen && idleharbor::platform::windows::IsForegroundFullscreen(),
+            runtime_settings_.pause_when_fullscreen && idleharbor::platform::windows::IsForegroundFullscreen(),
             idleharbor::platform::windows::LocalMinuteOfDay(),
         };
     }
@@ -734,18 +848,50 @@ class Application final {
             return;
         }
 
-        policy_ = std::make_unique<PolicyEngine>(settings_.session);
+        runtime_settings_ = settings_.session;
+        if ((runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected) &&
+            !session_notifications_available_) {
+            SetStatus(L"Stopped: session-change observer unavailable");
+            MessageBoxW(
+                window_,
+                L"Windows session-change notifications are unavailable. Disable the lock/disconnect safeguard "
+                L"explicitly or resolve the Windows error before starting.",
+                L"IdleHarbor safeguard",
+                MB_OK | MB_ICONWARNING);
+            return;
+        }
+        input_observer_requested_ = runtime_settings_.pause_on_user_activity;
+        if (input_observer_requested_) {
+            const auto capabilities = input_monitor_.Start(window_, kGenuineInputMessage);
+            input_observer_available_ = capabilities.any();
+            input_observer_complete_ = capabilities.mouse && capabilities.keyboard;
+            if (!input_observer_complete_) {
+                input_monitor_.Stop();
+                input_observer_requested_ = false;
+                input_observer_available_ = false;
+                SetStatus(L"Stopped: genuine-input observer unavailable");
+                MessageBoxW(
+                    window_,
+                    L"IdleHarbor could not observe both mouse and keyboard activity. Set the genuine-input "
+                    L"pause to 0 explicitly or resolve the Windows hook error before starting.",
+                    L"IdleHarbor safeguard",
+                    MB_OK | MB_ICONWARNING);
+                return;
+            }
+        }
+        policy_ = std::make_unique<PolicyEngine>(runtime_settings_);
         policy_->start(NowSeconds());
         sampler_ = std::make_unique<idleharbor::core::IntervalSampler>(
             GetTickCount64() ^ static_cast<ULONGLONG>(GetCurrentProcessId()),
-            settings_.session.random_minimum,
-            settings_.session.interval,
-            settings_.session.randomize);
+            runtime_settings_.random_minimum,
+            runtime_settings_.interval,
+            runtime_settings_.randomize);
         next_pulse_tick_ = GetTickCount64() + static_cast<ULONGLONG>(sampler_->next().count()) * 1000ULL;
-        const auto capabilities = input_monitor_.Start(window_, kGenuineInputMessage);
-        input_observer_available_ = capabilities.any();
         session_active_ = true;
-        SetTimer(window_, kTimerId, 1000, nullptr);
+        if (SetTimer(window_, kTimerId, 1000, nullptr) == 0) {
+            FailSession(L"session timer could not start (" + WindowsErrorText(GetLastError()) + L")");
+            return;
+        }
         Evaluate(false);
         UpdateButtons();
     }
@@ -763,8 +909,11 @@ class Application final {
         input_monitor_.Stop();
         power_request_.Clear();
         sampler_.reset();
+        policy_.reset();
         session_active_ = false;
+        input_observer_requested_ = false;
         input_observer_available_ = false;
+        input_observer_complete_ = false;
         const auto text = idleharbor::core::status_text(decision);
         SetStatus(std::wstring(text.begin(), text.end()));
         UpdateButtons();
@@ -780,7 +929,7 @@ class Application final {
     }
 
     bool ApplyPower() {
-        const auto requested = ToPlatformPowerMode(settings_.session.power);
+        const auto requested = ToPlatformPowerMode(runtime_settings_.power);
         if (power_request_.mode() == requested) {
             return true;
         }
@@ -792,14 +941,14 @@ class Application final {
     }
 
     bool EmitPulse() {
-        if (settings_.session.motion == MotionMode::Off) {
+        if (runtime_settings_.motion == MotionMode::Off) {
             return true;
         }
         MotionEmissionResult result{};
-        if (settings_.session.motion == MotionMode::Zen) {
+        if (runtime_settings_.motion == MotionMode::Zen) {
             result = idleharbor::platform::windows::EmitZenPulse();
         } else {
-            const auto plan = idleharbor::core::make_motion_plan(settings_.session.motion, settings_.session.distance);
+            const auto plan = idleharbor::core::make_motion_plan(runtime_settings_.motion, runtime_settings_.distance);
             std::vector<POINT> offsets;
             offsets.reserve(plan.relative_offsets.size());
             for (const auto point : plan.relative_offsets) {
@@ -836,7 +985,7 @@ class Application final {
             SetStatus(std::wstring(text.begin(), text.end()));
             return;
         }
-        if ((!was_running || power_request_.mode() != ToPlatformPowerMode(settings_.session.power)) && !ApplyPower()) {
+        if ((!was_running || power_request_.mode() != ToPlatformPowerMode(runtime_settings_.power)) && !ApplyPower()) {
             return;
         }
         if (GetTickCount64() >= next_pulse_tick_) {
@@ -846,8 +995,15 @@ class Application final {
             ScheduleNextPulse();
         }
         std::wstring status = L"Running";
-        if (!input_observer_available_) {
+        if (input_observer_requested_ && !input_observer_available_) {
             status += L" (genuine-input observer unavailable)";
+        } else if (input_observer_requested_ && !input_observer_complete_) {
+            status += L" (genuine-input observer partially available)";
+        } else if ((runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected) &&
+                   !session_notifications_available_) {
+            status += L" (session-change observer unavailable)";
+        } else if (settings_.emergency_hotkey && !hotkey_registered_) {
+            status += L" (emergency hotkey unavailable)";
         }
         SetStatus(status);
     }
@@ -934,6 +1090,19 @@ class Application final {
     }
 
     LRESULT HandleMessage(const UINT message, const WPARAM w_param, const LPARAM l_param) noexcept {
+        if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
+            tray_added_ = false;
+            InitializeTrayIcon();
+            if (tray_added_) {
+                UpdateTrayTooltip();
+            } else {
+                ShowWindow(window_, SW_SHOW);
+                SetStatus(
+                    session_active_ ? L"Running: notification icon unavailable; window kept visible"
+                                    : L"Stopped: notification icon unavailable; window kept visible");
+            }
+            return 0;
+        }
         switch (message) {
         case WM_CREATE:
             CreateControls();
@@ -955,6 +1124,7 @@ class Application final {
             }
             return 0;
         case kGenuineInputMessage:
+            input_monitor_.AcknowledgeNotification();
             Evaluate(true);
             return 0;
         case WM_HOTKEY:
@@ -986,12 +1156,17 @@ class Application final {
             }
             return 0;
         case WM_SIZE:
-            if (w_param == SIZE_MINIMIZED && settings_.close_to_tray) {
+            if (w_param == SIZE_MINIMIZED && settings_.close_to_tray && tray_added_) {
                 ShowWindow(window_, SW_HIDE);
             }
             return 0;
+        case WM_DPICHANGED:
+            ApplyDpiChange(
+                HIWORD(w_param),
+                *reinterpret_cast<const RECT*>(l_param));
+            return 0;
         case WM_CLOSE:
-            if (settings_.close_to_tray && !exiting_) {
+            if (settings_.close_to_tray && tray_added_ && !exiting_) {
                 ShowWindow(window_, SW_HIDE);
                 return 0;
             }
@@ -1008,8 +1183,15 @@ class Application final {
                 UnregisterHotKey(window_, kEmergencyHotkeyId);
                 hotkey_registered_ = false;
             }
-            WTSUnRegisterSessionNotification(window_);
+            if (session_notifications_available_) {
+                WTSUnRegisterSessionNotification(window_);
+                session_notifications_available_ = false;
+            }
             RemoveTrayIcon();
+            if (ui_font_ != nullptr) {
+                DeleteObject(ui_font_);
+                ui_font_ = nullptr;
+            }
             PostQuitMessage(0);
             return 0;
         default:
@@ -1038,10 +1220,16 @@ class Application final {
     HWND stop_ = nullptr;
     HWND save_ = nullptr;
     HICON tray_icon_ = nullptr;
+    HFONT ui_font_ = nullptr;
+    UINT taskbar_created_message_ = 0;
+    UINT dpi_ = USER_DEFAULT_SCREEN_DPI;
     bool tray_added_ = false;
     bool hotkey_registered_ = false;
+    bool session_notifications_available_ = false;
     bool session_active_ = false;
+    bool input_observer_requested_ = false;
     bool input_observer_available_ = false;
+    bool input_observer_complete_ = false;
     bool locked_ = false;
     bool disconnected_ = false;
     bool exiting_ = false;
@@ -1049,6 +1237,7 @@ class Application final {
     std::wstring status_text_ = L"Stopped: ready";
     std::filesystem::path settings_path_;
     idleharbor::app::AppSettings settings_{};
+    Settings runtime_settings_{};
     InputMonitor input_monitor_{};
     PowerRequest power_request_{};
     std::unique_ptr<PolicyEngine> policy_{};
@@ -1056,7 +1245,13 @@ class Application final {
 };
 
 bool SendCommandToExistingInstance(const std::wstring& raw_command_line) {
-    const HWND window = FindWindowW(kWindowClassName, nullptr);
+    HWND window = nullptr;
+    for (int attempt = 0; attempt < 40 && window == nullptr; ++attempt) {
+        window = FindWindowW(kWindowClassName, nullptr);
+        if (window == nullptr) {
+            Sleep(50);
+        }
+    }
     if (window == nullptr) {
         return false;
     }
@@ -1072,7 +1267,8 @@ bool SendCommandToExistingInstance(const std::wstring& raw_command_line) {
                reinterpret_cast<LPARAM>(&data),
                SMTO_ABORTIFHUNG,
                2000,
-               &result) != 0;
+               &result) != 0 &&
+           result == TRUE;
 }
 
 void ShowCommandLineError(const std::vector<std::wstring>& errors) {
@@ -1122,6 +1318,15 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
     const bool already_running = GetLastError() == ERROR_ALREADY_EXISTS;
     if (already_running) {
         CloseHandle(mutex);
+        if (parsed.options.portable || parsed.options.config_path.has_value()) {
+            MessageBoxW(
+                nullptr,
+                L"--portable and --config select storage only when the first IdleHarbor instance starts. "
+                L"Exit the running instance before changing storage.",
+                L"IdleHarbor command",
+                MB_OK | MB_ICONWARNING);
+            return 2;
+        }
         if (!SendCommandToExistingInstance(raw_command_line)) {
             MessageBoxW(nullptr, L"The existing IdleHarbor window could not be contacted.", L"IdleHarbor", MB_OK | MB_ICONWARNING);
             return 1;
@@ -1142,12 +1347,16 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
         CloseHandle(mutex);
         return 1;
     }
-    application.HandleCommand(parsed.options);
+    if (parsed.options.command != RequestedCommand::Launch) {
+        application.HandleCommand(parsed.options);
+    }
 
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
+        if (IsDialogMessageW(application.window(), &message) == FALSE) {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
     }
     CloseHandle(mutex);
     return static_cast<int>(message.wParam);

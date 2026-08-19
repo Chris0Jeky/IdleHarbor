@@ -137,7 +137,24 @@ MotionEmissionResult EmitMotionPulse(const std::span<const POINT> offsets) noexc
     if (anchor.x + offsets.back().x != origin.x || anchor.y + offsets.back().y != origin.y) {
         inputs.push_back(AbsoluteMove(origin, virtual_screen));
     }
-    return Send(inputs);
+
+    POINT current{};
+    if (GetCursorPos(&current) == FALSE) {
+        return {.succeeded = false, .error = GetLastError()};
+    }
+    if (current.x != origin.x || current.y != origin.y) {
+        // Genuine movement won the race while the pulse was being prepared. Skip the
+        // pulse rather than returning the pointer to a stale captured position.
+        return {.succeeded = true};
+    }
+    auto result = Send(inputs);
+    if (!result.succeeded && result.emitted_events > 0) {
+        // SendInput can theoretically accept only a prefix. Make one bounded cleanup
+        // attempt so an accepted anchor/path event does not leave the pointer displaced.
+        std::vector<INPUT> restoration{AbsoluteMove(origin, virtual_screen)};
+        static_cast<void>(Send(restoration));
+    }
+    return result;
 }
 
 MotionEmissionResult EmitZenPulse() noexcept {

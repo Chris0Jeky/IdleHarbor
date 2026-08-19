@@ -20,13 +20,7 @@ InputMonitorCapabilities InputMonitor::Start(
 
     notification_window_ = notification_window;
     notification_message_ = notification_message;
-
-    LASTINPUTINFO last_input{sizeof(last_input), 0};
-    if (GetLastInputInfo(&last_input) != FALSE) {
-        last_genuine_input_tick_.store(last_input.dwTime, std::memory_order_relaxed);
-    } else {
-        last_genuine_input_tick_.store(GetTickCount64(), std::memory_order_relaxed);
-    }
+    notification_pending_.store(false, std::memory_order_relaxed);
 
     const HINSTANCE module = GetModuleHandleW(nullptr);
     mouse_hook_ = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, module, 0);
@@ -52,14 +46,15 @@ void InputMonitor::Stop() noexcept {
     active_monitor_.compare_exchange_strong(expected, nullptr);
     notification_window_ = nullptr;
     notification_message_ = 0;
+    notification_pending_.store(false, std::memory_order_relaxed);
+}
+
+void InputMonitor::AcknowledgeNotification() noexcept {
+    notification_pending_.store(false, std::memory_order_release);
 }
 
 InputMonitorCapabilities InputMonitor::capabilities() const noexcept {
     return {.mouse = mouse_hook_ != nullptr, .keyboard = keyboard_hook_ != nullptr};
-}
-
-std::uint64_t InputMonitor::last_genuine_input_tick() const noexcept {
-    return last_genuine_input_tick_.load(std::memory_order_relaxed);
 }
 
 LRESULT CALLBACK InputMonitor::MouseHook(const int code, const WPARAM event, const LPARAM data) noexcept {
@@ -91,9 +86,11 @@ LRESULT CALLBACK InputMonitor::KeyboardHook(const int code, const WPARAM event, 
 }
 
 void InputMonitor::RecordGenuineInput() noexcept {
-    last_genuine_input_tick_.store(GetTickCount64(), std::memory_order_relaxed);
-    if (notification_window_ != nullptr && notification_message_ != 0) {
-        PostMessageW(notification_window_, notification_message_, 0, 0);
+    if (notification_window_ != nullptr && notification_message_ != 0 &&
+        !notification_pending_.exchange(true, std::memory_order_acq_rel)) {
+        if (PostMessageW(notification_window_, notification_message_, 0, 0) == FALSE) {
+            notification_pending_.store(false, std::memory_order_release);
+        }
     }
 }
 

@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <atomic>
-#include <cstdint>
 
 namespace idleharbor::platform::windows {
 
@@ -29,9 +28,9 @@ class InputMonitor final {
 
     [[nodiscard]] InputMonitorCapabilities Start(HWND notification_window, UINT notification_message) noexcept;
     void Stop() noexcept;
+    void AcknowledgeNotification() noexcept;
 
     [[nodiscard]] InputMonitorCapabilities capabilities() const noexcept;
-    [[nodiscard]] std::uint64_t last_genuine_input_tick() const noexcept;
 
   private:
     static LRESULT CALLBACK MouseHook(int code, WPARAM event, LPARAM data) noexcept;
@@ -44,7 +43,7 @@ class InputMonitor final {
     HHOOK keyboard_hook_ = nullptr;
     HWND notification_window_ = nullptr;
     UINT notification_message_ = 0;
-    std::atomic<std::uint64_t> last_genuine_input_tick_{0};
+    std::atomic<bool> notification_pending_{false};
 };
 
 }  // namespace idleharbor::platform::windows

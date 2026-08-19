@@ -18,6 +18,7 @@ struct MotionEmissionResult {
 
 // Offsets are cumulative path points relative to a safe anchor and should finish at {0, 0}.
 // IdleHarbor moves to the safe anchor, emits the path, and returns exactly to the captured origin.
+// A pulse is skipped if genuine movement changes that origin while the input batch is prepared.
 [[nodiscard]] MotionEmissionResult EmitMotionPulse(std::span<const POINT> offsets) noexcept;
 [[nodiscard]] MotionEmissionResult EmitZenPulse() noexcept;
 

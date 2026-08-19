@@ -4,20 +4,23 @@
 
 namespace idleharbor::platform::windows {
 
+BatterySnapshot InterpretBatteryStatus(const SYSTEM_POWER_STATUS& status) noexcept {
+    BatterySnapshot snapshot;
+    snapshot.available = status.BatteryFlag != 128U;
+    snapshot.power_source_known = status.ACLineStatus != 255;
+    snapshot.on_battery = snapshot.available && (status.ACLineStatus == 0 || !snapshot.power_source_known);
+    if (snapshot.available && status.BatteryLifePercent != 255) {
+        snapshot.percent = std::min<std::uint8_t>(status.BatteryLifePercent, 100);
+    }
+    return snapshot;
+}
+
 BatterySnapshot QueryBatterySnapshot() noexcept {
     SYSTEM_POWER_STATUS status{};
     if (GetSystemPowerStatus(&status) == FALSE) {
         return {};
     }
-
-    BatterySnapshot snapshot;
-    snapshot.available = (status.BatteryFlag & 128U) == 0;
-    snapshot.power_source_known = status.ACLineStatus != 255;
-    snapshot.on_battery = snapshot.available && status.ACLineStatus == 0;
-    if (snapshot.available && status.BatteryLifePercent != 255) {
-        snapshot.percent = std::min<std::uint8_t>(status.BatteryLifePercent, 100);
-    }
-    return snapshot;
+    return InterpretBatteryStatus(status);
 }
 
 bool WindowCoversMonitor(const RECT& window, const RECT& monitor, const LONG tolerance) noexcept {
