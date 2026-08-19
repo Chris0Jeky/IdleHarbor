@@ -71,6 +71,10 @@ enum ControlId : int {
     kMaxDuration = 111,
     kStartMinimized = 112,
     kCloseToTray = 113,
+    kDisconnectPause = 114,
+    kPauseOnBattery = 115,
+    kNotifications = 116,
+    kEmergencyHotkey = 117,
     kStart = 120,
     kStop = 121,
     kSave = 122,
@@ -278,7 +282,7 @@ class Application final {
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             ScaleForDpi(600, dpi_),
-            ScaleForDpi(665, dpi_),
+            ScaleForDpi(700, dpi_),
             nullptr,
             nullptr,
             instance_,
@@ -290,13 +294,7 @@ class Application final {
         InitializeTrayIcon();
         session_notifications_available_ =
             WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
-        if (settings_.emergency_hotkey) {
-            hotkey_registered_ = RegisterHotKey(
-                window_,
-                kEmergencyHotkeyId,
-                MOD_CONTROL | MOD_ALT | MOD_SHIFT,
-                VK_F12) != FALSE;
-        }
+        ApplyEmergencyHotkeySetting();
 
         RefreshControls();
         std::wstring initial_status = L"Stopped: ready";
@@ -521,15 +519,15 @@ class Application final {
             nullptr);
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
 
-        add_label(L"Profile", 68);
-        add_combo(profile_, 68, kProfile);
+        add_label(L"Profile", 56);
+        add_combo(profile_, 56, kProfile);
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Motion", 108);
-        add_combo(motion_, 108, kMotion);
+        add_label(L"Motion", 90);
+        add_combo(motion_, 90, kMotion);
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -541,28 +539,32 @@ class Application final {
             SendMessageW(motion_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Power request", 148);
-        add_combo(power_, 148, kPower);
+        add_label(L"Power request", 124);
+        add_combo(power_, 124, kPower);
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Pulse interval (seconds)", 188);
-        add_edit(interval_, 188, kInterval);
-        add_label(L"Motion distance (1-120)", 228);
-        add_edit(distance_, 228, kDistance);
-        add_check(randomize_, L"Randomize pulse interval", 266, kRandomize);
-        add_label(L"Pause after genuine input (seconds; 0 disables)", 306);
-        add_edit(pause_input_, 306, kPauseInput);
-        add_check(lock_pause_, L"Pause while the workstation is locked", 346, kLockPause);
-        add_label(L"Low-battery threshold (0 disables)", 386);
-        add_edit(battery_, 386, kBattery);
-        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 426, kFullscreen);
-        add_label(L"Maximum session duration (seconds; 0 disables)", 466);
-        add_edit(max_duration_, 466, kMaxDuration);
-        add_check(start_minimized_, L"Start minimized to the notification area", 506, kStartMinimized);
-        add_check(close_to_tray_, L"Close button hides to the notification area", 536, kCloseToTray);
+        add_label(L"Pulse interval (seconds)", 158);
+        add_edit(interval_, 158, kInterval);
+        add_label(L"Motion distance (1-120)", 192);
+        add_edit(distance_, 192, kDistance);
+        add_check(randomize_, L"Randomize pulse interval", 224, kRandomize);
+        add_label(L"Pause after genuine input (seconds; 0 disables)", 258);
+        add_edit(pause_input_, 258, kPauseInput);
+        add_check(lock_pause_, L"Pause while the workstation is locked", 290, kLockPause);
+        add_check(disconnect_pause_, L"Pause while the session is disconnected", 322, kDisconnectPause);
+        add_label(L"Low-battery threshold (0 disables)", 354);
+        add_edit(battery_, 354, kBattery);
+        add_check(pause_on_battery_, L"Pause whenever the device is on battery", 386, kPauseOnBattery);
+        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 418, kFullscreen);
+        add_label(L"Maximum session duration (seconds; 0 disables)", 450);
+        add_edit(max_duration_, 450, kMaxDuration);
+        add_check(start_minimized_, L"Start minimized to the notification area", 484, kStartMinimized);
+        add_check(close_to_tray_, L"Close button hides to the notification area", 516, kCloseToTray);
+        add_check(notifications_, L"Show safety state notifications", 548, kNotifications);
+        add_check(emergency_hotkey_, L"Enable emergency stop: Ctrl+Alt+Shift+F12", 580, kEmergencyHotkey);
 
         const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id) {
             target = CreateWindowExW(
@@ -571,7 +573,7 @@ class Application final {
                 text,
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                 scale(x),
-                scale(578),
+                scale(618),
                 scale(115),
                 scale(32),
                 window_,
@@ -595,6 +597,10 @@ class Application final {
         icon.hIcon = tray_icon_;
         wcscpy_s(icon.szTip, L"IdleHarbor");
         tray_added_ = Shell_NotifyIconW(NIM_ADD, &icon) != FALSE;
+        if (tray_added_) {
+            icon.uVersion = NOTIFYICON_VERSION_4;
+            Shell_NotifyIconW(NIM_SETVERSION, &icon);
+        }
     }
 
     void RemoveTrayIcon() noexcept {
@@ -618,6 +624,20 @@ class Application final {
         icon.uFlags = NIF_TIP;
         const std::wstring tooltip = L"IdleHarbor - " + status_text_;
         wcsncpy_s(icon.szTip, tooltip.c_str(), _TRUNCATE);
+        Shell_NotifyIconW(NIM_MODIFY, &icon);
+    }
+
+    void ShowSafetyNotification(const wchar_t* title, const std::wstring& message) {
+        if (!tray_added_ || !settings_.show_notifications) {
+            return;
+        }
+        NOTIFYICONDATAW icon{sizeof(icon)};
+        icon.hWnd = window_;
+        icon.uID = 1;
+        icon.uFlags = NIF_INFO;
+        wcsncpy_s(icon.szInfoTitle, title, _TRUNCATE);
+        wcsncpy_s(icon.szInfo, message.c_str(), _TRUNCATE);
+        icon.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;
         Shell_NotifyIconW(NIM_MODIFY, &icon);
     }
 
@@ -658,14 +678,31 @@ class Application final {
             pause_input_,
             std::to_wstring(settings_.session.pause_on_user_activity ? settings_.session.user_activity_cooldown.count() : 0));
         SetChecked(lock_pause_, settings_.session.pause_when_locked);
+        SetChecked(disconnect_pause_, settings_.session.pause_when_disconnected);
         SetControlText(battery_, std::to_wstring(settings_.session.pause_on_low_battery
                                                      ? settings_.session.low_battery_threshold
                                                      : 0));
         SetChecked(fullscreen_, settings_.session.pause_when_fullscreen);
+        SetChecked(pause_on_battery_, settings_.session.pause_on_battery);
         SetControlText(max_duration_, std::to_wstring(settings_.session.max_duration.count()));
         SetChecked(start_minimized_, settings_.start_minimized);
         SetChecked(close_to_tray_, settings_.close_to_tray);
+        SetChecked(notifications_, settings_.show_notifications);
+        SetChecked(emergency_hotkey_, settings_.emergency_hotkey);
         UpdateButtons();
+    }
+
+    void ApplyEmergencyHotkeySetting() {
+        if (settings_.emergency_hotkey && !hotkey_registered_) {
+            hotkey_registered_ = RegisterHotKey(
+                window_,
+                kEmergencyHotkeyId,
+                MOD_CONTROL | MOD_ALT | MOD_SHIFT,
+                VK_F12) != FALSE;
+        } else if (!settings_.emergency_hotkey && hotkey_registered_) {
+            UnregisterHotKey(window_, kEmergencyHotkeyId);
+            hotkey_registered_ = false;
+        }
     }
 
     void UpdateButtons() {
@@ -676,8 +713,9 @@ class Application final {
             EnableWindow(stop_, session_active_ ? TRUE : FALSE);
         }
         for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
-                                   lock_pause_, battery_, fullscreen_, max_duration_, start_minimized_,
-                                   close_to_tray_, save_}) {
+                                   lock_pause_, disconnect_pause_, battery_, pause_on_battery_, fullscreen_,
+                                   max_duration_, start_minimized_, close_to_tray_, notifications_,
+                                   emergency_hotkey_, save_}) {
             if (control != nullptr) {
                 EnableWindow(control, session_active_ ? FALSE : TRUE);
             }
@@ -732,6 +770,7 @@ class Application final {
             session.user_activity_cooldown = Seconds{static_cast<std::int64_t>(value)};
         }
         session.pause_when_locked = IsChecked(lock_pause_);
+        session.pause_when_disconnected = IsChecked(disconnect_pause_);
         if (!read_number(battery_, 100, value)) {
             error = L"Battery threshold must be between 0 and 100.";
             return false;
@@ -741,6 +780,7 @@ class Application final {
             session.low_battery_threshold = static_cast<std::uint8_t>(value);
         }
         session.pause_when_fullscreen = IsChecked(fullscreen_);
+        session.pause_on_battery = IsChecked(pause_on_battery_);
         if (!read_number(max_duration_, 30ULL * 24 * 60 * 60, value)) {
             error = L"Maximum duration must be between 0 and 2592000 seconds.";
             return false;
@@ -748,6 +788,8 @@ class Application final {
         session.max_duration = Seconds{static_cast<std::int64_t>(value)};
         settings_.start_minimized = IsChecked(start_minimized_);
         settings_.close_to_tray = IsChecked(close_to_tray_);
+        settings_.show_notifications = IsChecked(notifications_);
+        settings_.emergency_hotkey = IsChecked(emergency_hotkey_);
 
         const auto validation = idleharbor::core::validate(session);
         if (!validation.valid) {
@@ -848,6 +890,7 @@ class Application final {
             return;
         }
 
+        ApplyEmergencyHotkeySetting();
         runtime_settings_ = settings_.session;
         if ((runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected) &&
             !session_notifications_available_) {
@@ -916,6 +959,9 @@ class Application final {
         input_observer_complete_ = false;
         const auto text = idleharbor::core::status_text(decision);
         SetStatus(std::wstring(text.begin(), text.end()));
+        if (decision.reason == PolicyReason::MaxDuration) {
+            ShowSafetyNotification(L"IdleHarbor session stopped", L"The configured maximum duration was reached.");
+        }
         UpdateButtons();
     }
 
@@ -926,6 +972,7 @@ class Application final {
         const PolicyDecision decision{DecisionAction::Stop, EngineState::Stopped, PolicyReason::Manual, Seconds{0}};
         EndSession(decision);
         SetStatus(L"Stopped: " + message);
+        ShowSafetyNotification(L"IdleHarbor session stopped", message);
     }
 
     bool ApplyPower() {
@@ -982,7 +1029,11 @@ class Application final {
         if (decision.action == DecisionAction::Pause) {
             power_request_.Clear();
             const auto text = idleharbor::core::status_text(decision);
-            SetStatus(std::wstring(text.begin(), text.end()));
+            const std::wstring status(text.begin(), text.end());
+            SetStatus(status);
+            if (was_running) {
+                ShowSafetyNotification(L"IdleHarbor session paused", status);
+            }
             return;
         }
         if ((!was_running || power_request_.mode() != ToPlatformPowerMode(runtime_settings_.power)) && !ApplyPower()) {
@@ -995,6 +1046,9 @@ class Application final {
             ScheduleNextPulse();
         }
         std::wstring status = L"Running";
+        if (!was_running) {
+            ShowSafetyNotification(L"IdleHarbor session resumed", L"All configured safeguards are clear.");
+        }
         if (input_observer_requested_ && !input_observer_available_) {
             status += L" (genuine-input observer unavailable)";
         } else if (input_observer_requested_ && !input_observer_complete_) {
@@ -1015,13 +1069,18 @@ class Application final {
             RefreshControls();
             return;
         }
+        ApplyEmergencyHotkeySetting();
         std::string save_error;
         if (!idleharbor::app::SaveSettings(settings_path_, settings_, save_error)) {
             const std::wstring wide(save_error.begin(), save_error.end());
             MessageBoxW(window_, wide.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONERROR);
             return;
         }
-        SetStatus(session_active_ ? L"Running: settings saved; restart to apply changes" : L"Stopped: settings saved");
+        if (settings_.emergency_hotkey && !hotkey_registered_) {
+            SetStatus(L"Stopped: settings saved; emergency hotkey unavailable");
+        } else {
+            SetStatus(session_active_ ? L"Running: settings saved; restart to apply changes" : L"Stopped: settings saved");
+        }
     }
 
     void ShowTrayMenu() {
@@ -1131,6 +1190,7 @@ class Application final {
             if (w_param == kEmergencyHotkeyId) {
                 StopSession();
                 SetStatus(L"Stopped: emergency hotkey");
+                ShowSafetyNotification(L"IdleHarbor emergency stop", L"The active session was stopped immediately.");
             }
             return 0;
         case WM_WTSSESSION_CHANGE:
@@ -1148,10 +1208,10 @@ class Application final {
         case WM_COPYDATA:
             return HandleCopyData(reinterpret_cast<const COPYDATASTRUCT*>(l_param)) ? TRUE : FALSE;
         case kTrayMessage:
-            if (l_param == WM_LBUTTONDBLCLK || l_param == WM_LBUTTONUP) {
+            if (LOWORD(l_param) == WM_LBUTTONDBLCLK || LOWORD(l_param) == WM_LBUTTONUP) {
                 ShowWindow(window_, SW_SHOW);
                 SetForegroundWindow(window_);
-            } else if (l_param == WM_RBUTTONUP) {
+            } else if (LOWORD(l_param) == WM_CONTEXTMENU || LOWORD(l_param) == WM_RBUTTONUP) {
                 ShowTrayMenu();
             }
             return 0;
@@ -1211,11 +1271,15 @@ class Application final {
     HWND randomize_ = nullptr;
     HWND pause_input_ = nullptr;
     HWND lock_pause_ = nullptr;
+    HWND disconnect_pause_ = nullptr;
     HWND battery_ = nullptr;
+    HWND pause_on_battery_ = nullptr;
     HWND fullscreen_ = nullptr;
     HWND max_duration_ = nullptr;
     HWND start_minimized_ = nullptr;
     HWND close_to_tray_ = nullptr;
+    HWND notifications_ = nullptr;
+    HWND emergency_hotkey_ = nullptr;
     HWND start_ = nullptr;
     HWND stop_ = nullptr;
     HWND save_ = nullptr;
