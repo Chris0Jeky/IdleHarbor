@@ -178,7 +178,7 @@ bool WriteDataOwnershipMarker(const std::filesystem::path& directory, std::strin
     std::error_code filesystem_error;
     if (std::filesystem::exists(marker, filesystem_error)) {
         if (filesystem_error) {
-            error = "Settings were saved, but the data ownership marker could not be inspected.";
+            error = "Could not inspect the data ownership marker.";
         }
         return !filesystem_error;
     }
@@ -187,7 +187,7 @@ bool WriteDataOwnershipMarker(const std::filesystem::path& directory, std::strin
     temporary += L".tmp";
     std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
     if (!output) {
-        error = "Settings were saved, but the data ownership marker could not be created.";
+        error = "Could not create the data ownership marker.";
         return false;
     }
     output << "{\n"
@@ -197,7 +197,7 @@ bool WriteDataOwnershipMarker(const std::filesystem::path& directory, std::strin
            << "}\n";
     output.close();
     if (!output || MoveFileExW(temporary.c_str(), marker.c_str(), MOVEFILE_WRITE_THROUGH) == FALSE) {
-        error = "Settings were saved, but the data ownership marker could not be created.";
+        error = "Could not create the data ownership marker.";
         std::filesystem::remove(temporary, filesystem_error);
         return false;
     }
@@ -393,6 +393,10 @@ bool SaveSettings(
         }
     }
 
+    if (!parent_existed && !WriteDataOwnershipMarker(path.parent_path(), error)) {
+        return false;
+    }
+
     auto temporary = path;
     temporary += L".tmp";
     std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
@@ -440,9 +444,6 @@ bool SaveSettings(
             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == FALSE) {
         error = "Could not replace the settings file (Windows error " + std::to_string(GetLastError()) + ").";
         std::filesystem::remove(temporary, filesystem_error);
-        return false;
-    }
-    if (!parent_existed && !WriteDataOwnershipMarker(path.parent_path(), error)) {
         return false;
     }
     return true;
