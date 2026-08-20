@@ -94,18 +94,69 @@ SafetyRegions ComputeSafetyRegions(const int client_width, const int client_heig
     const int safe_dpi = std::max(dpi, 1);
     const int width = std::max(client_width, 1);
     const int height = std::max(client_height, 1);
-    const int header_height = PhysicalPixels(58, safe_dpi);
+    const int header_height = std::min(PhysicalPixels(58, safe_dpi), height);
     const auto action_layout = DetermineActionLayout(width, safe_dpi);
     const int footer_height = PhysicalPixels(action_layout == ActionLayoutMode::Stacked ? 92 : 52, safe_dpi);
     const int footer_top = std::max(header_height, height - footer_height);
     const int horizontal_margin = std::min(PhysicalPixels(20, safe_dpi), std::max((width - 1) / 2, 0));
     return {
         {horizontal_margin,
-         PhysicalPixels(12, safe_dpi),
+         std::min(PhysicalPixels(12, safe_dpi), height),
          width - horizontal_margin,
          std::min(PhysicalPixels(42, safe_dpi), header_height)},
         {0, footer_top, width, height},
         {0, header_height, width, footer_top},
+    };
+}
+
+ActionButtonRects ComputeActionButtonRects(const int client_width, const int client_height, const int dpi) noexcept {
+    const int safe_dpi = std::max(dpi, 1);
+    const int width = std::max(client_width, 1);
+    const int height = std::max(client_height, 1);
+    const auto regions = ComputeSafetyRegions(width, height, safe_dpi);
+    const auto action_layout = DetermineActionLayout(width, safe_dpi);
+    const int margin = PhysicalPixels(20, safe_dpi);
+    const int gap = PhysicalPixels(10, safe_dpi);
+    const int available = std::max(width - 2 * margin, 1);
+    const int action_top = std::clamp(regions.actions.top, 0, height);
+    const int action_height = std::max(height - action_top, 0);
+    if (action_height == 0) {
+        return {};
+    }
+
+    const auto make_rect = [&](const int requested_x, const int requested_y, const int requested_width, const int requested_height) {
+        const int rect_width = std::clamp(requested_width, 1, width);
+        const int rect_height = std::clamp(requested_height, 1, action_height);
+        const int x = std::clamp(requested_x, 0, width - rect_width);
+        const int y = std::clamp(requested_y, action_top, height - rect_height);
+        return PixelRect{x, y, x + rect_width, y + rect_height};
+    };
+
+    if (action_layout == ActionLayoutMode::Stacked) {
+        const int button_height = std::min(PhysicalPixels(32, safe_dpi), std::max((action_height - gap) / 2, 1));
+        const int actual_gap = std::min(gap, std::max(action_height - 2 * button_height, 0));
+        const int block_height = 2 * button_height + actual_gap;
+        const int first_y = action_top + std::max((action_height - block_height) / 2, 0);
+        return {
+            make_rect(margin, first_y, available, button_height),
+            make_rect(margin, first_y + button_height + actual_gap, available, button_height),
+        };
+    }
+
+    const int button_height = std::min(PhysicalPixels(32, safe_dpi), std::max(action_height, 1));
+    const int button_y = action_top + std::max((action_height - button_height) / 2, 0);
+    if (action_layout == ActionLayoutMode::Wrapped) {
+        const int half_width = std::max((available - gap) / 2, 1);
+        return {
+            make_rect(margin, button_y, half_width, button_height),
+            make_rect(margin + half_width + gap, button_y, half_width, button_height),
+        };
+    }
+
+    const int button_width = std::min(PhysicalPixels(115, safe_dpi), available);
+    return {
+        make_rect(margin, button_y, button_width, button_height),
+        make_rect(margin + PhysicalPixels(125, safe_dpi), button_y, button_width, button_height),
     };
 }
 

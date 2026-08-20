@@ -703,26 +703,15 @@ class Application final {
                 width = std::max(regions.status.right - regions.status.left, Scale(80));
                 height = std::max(regions.status.bottom - regions.status.top, Scale(24));
             } else if (child.region == LayoutRegion::FixedBottom) {
-                const auto action_layout = idleharbor::app::DetermineActionLayout(
+                const auto action_buttons = idleharbor::app::ComputeActionButtonRects(
                     static_cast<int>(client.right),
+                    static_cast<int>(client.bottom),
                     static_cast<int>(dpi_));
-                const int margin = Scale(20);
-                const int gap = Scale(10);
-                const int available = std::max(static_cast<int>(client.right) - 2 * margin, Scale(80));
-                if (action_layout == idleharbor::app::ActionLayoutMode::Wide) {
-                    x = margin + (child.window == stop_ ? Scale(125) : 0);
-                    y = regions.actions.top + Scale(10);
-                    width = Scale(115);
-                } else if (action_layout == idleharbor::app::ActionLayoutMode::Wrapped) {
-                    const int half_width = std::max((available - gap) / 2, Scale(80));
-                    x = child.window == stop_ ? margin + half_width + gap : margin;
-                    y = regions.actions.top + Scale(10);
-                    width = half_width;
-                } else {
-                    x = margin;
-                    y = regions.actions.top + Scale(6) + (child.window == stop_ ? Scale(42) : 0);
-                    width = available;
-                }
+                const auto& action = child.window == stop_ ? action_buttons.stop : action_buttons.start;
+                x = action.left;
+                y = action.top;
+                width = action.right - action.left;
+                height = action.bottom - action.top;
             } else {
                 x = Scale(child.arranged_x);
                 y = Scale(child.arranged_y) - scroll_position_;

@@ -136,6 +136,23 @@ void test_fractional_dpi_layout_uses_true_logical_widths() {
     }
 }
 
+void test_stacked_stop_stays_inside_short_clients() {
+    using idleharbor::app::ComputeActionButtonRects;
+    using idleharbor::app::PhysicalPixels;
+    for (const int dpi : {96, 120, 144, 168}) {
+        const int width = PhysicalPixels(220, dpi);
+        for (const int logical_height : {100, 90, 70}) {
+            const int height = PhysicalPixels(logical_height, dpi);
+            const auto buttons = ComputeActionButtonRects(width, height, dpi);
+            CHECK(buttons.start.left >= 0 && buttons.start.right <= width);
+            CHECK(buttons.stop.left >= 0 && buttons.stop.right <= width);
+            CHECK(buttons.start.top >= 0 && buttons.start.bottom <= height);
+            CHECK(buttons.stop.top >= 0 && buttons.stop.bottom <= height);
+            CHECK(buttons.stop.bottom >= buttons.start.bottom);
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -149,5 +166,6 @@ int main() {
     test_focus_reveal_is_gated_by_actual_focus_change();
     test_narrow_work_areas_reflow_settings_and_actions();
     test_fractional_dpi_layout_uses_true_logical_widths();
+    test_stacked_stop_stays_inside_short_clients();
     return failures == 0 ? 0 : 1;
 }
