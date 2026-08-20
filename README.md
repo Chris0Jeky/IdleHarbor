@@ -7,7 +7,7 @@
 
 ![IdleHarbor social preview](docs/assets/idleharbor-social.svg)
 
-## Screenshot
+## Genuine UI
 
 <p align="center">
   <img src="docs/assets/idleharbor-window.png"
@@ -16,6 +16,15 @@
 </p>
 
 This is a real Release-QA capture at 200% Windows display scaling, not a mock-up.
+
+<p align="center">
+  <img src="docs/assets/idleharbor-viewport.png"
+       alt="IdleHarbor resized at 200 percent scaling with its native vertical scrollbar"
+       width="600">
+</p>
+
+The compact capture shows the same native window resized to a short work area. Wheel, scrollbar,
+and keyboard focus paths keep every control reachable.
 
 IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
 presentations, installations, and local dashboards. It combines optional motion input with Windows
