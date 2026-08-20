@@ -10,7 +10,7 @@
 ## Genuine UI
 
 The gallery below is the portfolio capture surface, captured from the exact merged-main
-release-candidate build `b9bfa82`. Earlier screenshots are not release evidence.
+release-candidate build `6fa05cd`. Earlier screenshots are not release evidence.
 
 ### States at a glance
 
@@ -81,8 +81,9 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The exact merged-main x64 demo build is 516,608 bytes (504.5 KiB); its SHA-256 and reproducible
-three-run resource measurements are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+The exact merged-main x64 demo build is 516,608 bytes (504.5 KiB) with SHA-256
+`750a5c5d2ad7ec021284ce21536565973c6dacdf926f566958b1947c1dccb878`; its reproducible three-run
+resource measurements are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

@@ -11,7 +11,7 @@ path, recoverable settings handling, and transactional per-user installation. No
 release has been created or published.
 
 The live merged baseline is `origin/main` at
-`b9bfa82a45dd8cd777c3232a4d71b68f8ef9a9c4`. PRs
+`6fa05cdcd8722bb1f675974c76f1bf990802de1a`. PRs
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8),
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10),
@@ -21,11 +21,12 @@ The live merged baseline is `origin/main` at
 [#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18),
 [#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), and
 [#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25),
-[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29), and
-[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) landed dependency pinning, settings recovery,
+[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29),
+[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30), and
+[#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) landed dependency pinning, settings recovery,
 installer/release trust, the high-DPI viewport, rollback recovery, fixed viewport safety regions,
 upstream motion-multiplier parity, final viewport accessibility polish, and packaging-test isolation.
-Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, #26, #27, and #28 are closed.
+Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, #26, #27, #28, and #32 are closed.
 
 The landed installer evidence includes x64 CTest plus complete packaging and real rollback matrices
 under PowerShell 7 and Windows PowerShell 5.1. It covers each startup mechanism, fresh failure
@@ -56,9 +57,9 @@ part of PR #16.
 
 Issue [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks final exact-build Running,
 Paused, full-window, viewport, and tray captures plus the repository social preview. This branch
-starts from merged main `b9bfa82` and records the privacy-safe capture set, high-contrast social
+starts from merged main `6fa05cd` and records the privacy-safe capture set, high-contrast social
 SVG/PNG, and exact x64 demo evidence. The unsigned 0.1.0 executable is 516,608 bytes with SHA-256
-`432026b0719671bd33c1b0ca0f7df809fec20e73fc05b38b6e513606584f6d54`; three 60-second stopped and
+`750a5c5d2ad7ec021284ce21536565973c6dacdf926f566958b1947c1dccb878`; three 60-second stopped and
 active system-request runs are documented in `docs/BENCHMARKS.md`. The GitHub social-preview upload
 remains a pre-merge publication action and is not claimed complete here.
 
@@ -88,17 +89,16 @@ Windows PowerShell 5.1 at 192 DPI, including every real body control staying wit
 client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
 mixed-DPI verification.
 
-The follow-up branch `agent/v0.1.0-scrollbar-release` addresses issue #32 and the late PR #30 review:
-`UpdateViewport` begins each convergence pass from a scrollbar-free candidate, then explicitly
-republishes scrollbar visibility and range from content height versus viewport height. Its bounded
-transaction also ignores re-entrant `WM_SIZE` notifications and preserves the requested scroll
-position until the final stable layout is known, preventing a temporary columns probe from losing
-an in-range near-bottom position. Deterministic layout coverage models the 570-to-700 logical
-boundary across supported DPI values. On this desktop, the normal minimum window size yields a
-587-logical-pixel viewport and the usable work area caps the tall probe at 670 logical pixels; the
-native harness preserved position 24 through a 570-to-580 height-only resize, then cleared the range,
-hid the scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Windows
-PowerShell 5.1. A physical 560-576 logical viewport remains unverified on the attached display.
+PR [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) merged issue #32 into `main` at
+`6fa05cdcd8722bb1f675974c76f1bf990802de1a`. `UpdateViewport` now begins each convergence pass
+from a scrollbar-free candidate, explicitly republishes scrollbar visibility and range, ignores
+re-entrant `WM_SIZE` notifications, and preserves the requested scroll position until the final
+stable layout before applying the clamp/SIF_POS publication. Deterministic layout coverage models
+the 570-to-700 logical boundary across supported DPI values. On this desktop, the native harness
+preserved position 24 through a 570-to-580 height-only resize, then cleared the range, hid the
+scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Windows PowerShell
+5.1. The physical near-boundary width was 587 logical pixels due to the application minimum; exact
+560-576 logical native behavior remains unverified, with deterministic model coverage only.
 
 `HUMAN_TODO.md` remains authoritative:
 
