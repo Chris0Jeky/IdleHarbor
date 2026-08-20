@@ -49,11 +49,11 @@ step-local `RELEASE_TAG` data rather than direct PowerShell interpolation. The r
 paths consume `$env:RELEASE_TAG`, and `packaging/Test-ReleaseWorkflow.ps1` proves the contract with
 Windows PowerShell 5.1-compatible syntax.
 
-The branch has incorporated the final UI/motion baseline. Before merge, its exact integrated head
-must pass the x64 Release build and CTest, release-workflow and packaging suites sequentially under
-PowerShell 7 and Windows PowerShell 5.1, hosted x64/ARM64/x86 plus CodeQL/C++ analysis, a scoped
-fresh-context review, conversation resolution, and the three-minute aging floor. No real release is
-part of PR #16.
+The branch has incorporated the final UI/motion baseline. Its current integrated code passes the
+Visual Studio 2019 x64 Release build and CTest 7/7 plus the release-workflow and packaging suites
+sequentially under PowerShell 7 and Windows PowerShell 5.1. Before merge, the final pushed head still
+needs hosted x64/ARM64/x86 plus CodeQL/C++ analysis, a scoped fresh-context review, conversation
+resolution, and the three-minute aging floor. No real release is part of PR #16.
 
 ### Portfolio and publication
 
