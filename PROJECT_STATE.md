@@ -73,6 +73,15 @@ can change internal action focus without a state transition. Issue
 scrollbar wider than IdleHarbor's logical body inset. Both were classified non-blocking in PR #24's
 bounded final review.
 
+The follow-up branch `agent/v0.1.0-ui-final` implements both bounded UI fixes: deferred Start focus
+is now posted only after an actual active-to-stopped transition, and body layout measures the
+settings viewport after sizing it, using its effective client width for breakpoint and fill-width
+decisions. Deterministic layout tests cover 96/120/144/168/192 DPI and a 48-logical-pixel scrollbar
+case. The Visual Studio 2019 x64 Release build, CTest 7/7, and the existing native desktop harness
+passed under PowerShell 7 and Windows PowerShell 5.1 at 192 DPI. The external harness does not yet
+exercise redundant `--stop` focus preservation as a named assertion, and only one display is
+attached for mixed-DPI verification.
+
 `HUMAN_TODO.md` remains authoritative:
 
 - q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a
@@ -86,9 +95,9 @@ bounded final review.
 1. Re-prove, review, and merge PR #16; confirm issue #12 closes and sweep late review once.
 2. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
    and the uploaded GitHub social preview.
-3. Run the final native runtime, packaging, installer, performance, security, accessibility, and
-   release-artifact audit. Track or finish #26-#28 according to their bounded severity and release
-   impact.
+3. Integrate and review the `agent/v0.1.0-ui-final` follow-up, then run the final native runtime,
+   packaging, installer, performance, security, accessibility, and release-artifact audit. Track or
+   finish #26-#28 according to their bounded severity and release impact.
 4. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
    derive package-manager manifests from verified real URLs and hashes.
 

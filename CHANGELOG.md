@@ -64,6 +64,9 @@ where practical.
 - Retain an exact-path transaction recovery backup when managed-file rollback is incomplete, clean
   it up after a complete rollback, and reject first-time same-directory installs without a valid
   ownership marker.
+- Keep a redundant Stop request from moving focus when no session transition occurred.
+- Size the settings body from the scroll viewport's effective client width, including wider native
+  scrollbars, so stacked and fill-width controls remain within the visible viewport.
 
 ### Release boundary
 

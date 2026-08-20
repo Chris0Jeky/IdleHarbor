@@ -675,10 +675,25 @@ class Application final {
             return;
         }
         const auto regions = SafetyRegionsFor(client);
-        const auto settings_layout = idleharbor::app::DetermineSettingsLayout(static_cast<int>(client.right), static_cast<int>(dpi_));
+        if (settings_viewport_ != nullptr) {
+            SetWindowPos(
+                settings_viewport_,
+                nullptr,
+                regions.viewport.left,
+                regions.viewport.top,
+                std::max(regions.viewport.right - regions.viewport.left, 1),
+                std::max(regions.viewport.bottom - regions.viewport.top, 0),
+                SWP_NOACTIVATE | SWP_NOZORDER);
+        }
+        RECT viewport_client{};
+        const int viewport_width = settings_viewport_ != nullptr &&
+                                            GetClientRect(settings_viewport_, &viewport_client) != FALSE
+                                        ? std::max(static_cast<int>(viewport_client.right), 1)
+                                        : std::max(regions.viewport.right - regions.viewport.left, 1);
+        const auto settings_layout = idleharbor::app::DetermineSettingsLayout(viewport_width, static_cast<int>(dpi_));
         const bool stacked = settings_layout == idleharbor::app::SettingsLayoutMode::Stacked;
         const int logical_client_width = std::max(
-            idleharbor::app::LogicalPixels(static_cast<int>(client.right), static_cast<int>(dpi_)),
+            idleharbor::app::LogicalPixels(viewport_width, static_cast<int>(dpi_)),
             1);
         const auto stacked_body = idleharbor::app::ComputeStackedBodyLayout(logical_client_width);
         int narrow_y = 0;
@@ -708,16 +723,6 @@ class Application final {
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
         body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
-        if (settings_viewport_ != nullptr) {
-            SetWindowPos(
-                settings_viewport_,
-                nullptr,
-                regions.viewport.left,
-                regions.viewport.top,
-                std::max(regions.viewport.right - regions.viewport.left, 1),
-                std::max(regions.viewport.bottom - regions.viewport.top, 0),
-                SWP_NOACTIVATE | SWP_NOZORDER);
-        }
         for (const auto& child : child_layouts_) {
             int x = 0;
             int y = 0;
@@ -1518,6 +1523,7 @@ class Application final {
     }
 
     void EndSession(const PolicyDecision& decision) {
+        const bool transitioned_to_stopped = session_active_;
         KillTimer(window_, kTimerId);
         input_monitor_.Stop();
         power_request_.Clear();
@@ -1534,7 +1540,7 @@ class Application final {
             ShowSafetyNotification(L"IdleHarbor session stopped", L"The configured maximum duration was reached.");
         }
         UpdateButtons();
-        if (start_ != nullptr) {
+        if (transitioned_to_stopped && start_ != nullptr) {
             PostMessageW(window_, kDeferredFocusMessage, reinterpret_cast<WPARAM>(start_), 0);
         }
     }
