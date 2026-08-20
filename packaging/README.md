@@ -2,12 +2,13 @@
 
 IdleHarbor is distributed as a native Windows executable with no application runtime or network
 dependency. The portable archive is the canonical package; the PowerShell installer is an optional
-per-user convenience layer around that archive. Download only from the
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
+per-user convenience layer around that archive. Once available, download only from the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). If that page is
+unavailable, the tag workflow has not published a verified release artifact.
 
 ## Release artifacts
 
-The `v0.1.0` release provides:
+The `v0.1.0` tag workflow publishes these exact assets:
 
 - [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip);
 - [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip);
@@ -119,6 +120,6 @@ Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The release provides SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+The tag workflow publishes SHA-256, SBOM, and attestation evidence. `v0.1.0` is
 intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
 and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.

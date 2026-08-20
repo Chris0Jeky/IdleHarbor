@@ -49,9 +49,11 @@ controlled. It does not provide concealment, monitoring bypasses, or claims of u
 
 ## Status
 
-The current stable release is [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
-The visible runtime, policy core, settings store, CLI, portable packaging scripts, per-user
-installer, startup choices, CI, CodeQL, SBOM, and attestation workflow are implemented.
+Version `0.1.0` is prepared for the first stable tag. When the tag workflow succeeds, the canonical
+release page is [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). If that page
+is unavailable, no verified release artifact has been published yet. The visible runtime, policy
+core, settings store, CLI, portable packaging scripts, per-user installer, startup choices, CI,
+CodeQL, SBOM, and attestation workflow are implemented.
 
 | Area | Available now | Notes |
 | --- | --- | --- |
@@ -59,7 +61,7 @@ installer, startup choices, CI, CodeQL, SBOM, and attestation workflow are imple
 | Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
 | Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
 | Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
-| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Download `v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
+| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.1.0` page once published](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
 | Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.1.0` is unsigned |
 
 Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
@@ -191,13 +193,15 @@ in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
 ## Download, install, and trust
 
-Download the architecture-labelled portable archives from the
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0):
+After the tag workflow succeeds, download the architecture-labelled portable archives from the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). Until that page
+exists, build from source rather than using an unverified mirror. The workflow publishes these exact
+asset names:
 
 - [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip) for most Windows PCs;
 - [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip) for Windows on Arm.
 
-The release also provides:
+It also publishes:
 
 - `SHA256SUMS.txt` checksum manifest;
 - SPDX 2.3 SBOM JSON for each executable;

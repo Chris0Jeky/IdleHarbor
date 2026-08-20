@@ -8,7 +8,7 @@ where practical.
 
 No user-visible changes have landed since `v0.1.0`.
 
-## [0.1.0] - 2026-08-20
+## [0.1.0] - Unreleased
 
 ### Added
 
@@ -107,8 +107,8 @@ No user-visible changes have landed since `v0.1.0`.
 
 ### Distribution
 
-- Published under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives accompanied by
-  SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
+- Prepared for publication under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives
+  accompanied by SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
 
 [Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0

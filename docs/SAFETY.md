@@ -49,12 +49,13 @@ that a safeguard or pulse will work in every application.
 
 ## Distribution trust
 
-Download only from the project’s
+When it is available, download only from the project’s
 [`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0), then verify the
-architecture, SHA-256 manifest, SPDX SBOM, and GitHub attestation before running it. `v0.1.0` is
-intentionally unsigned, so Authenticode is expected to report `NotSigned`; checksums and attestations
-establish artifact identity and provenance, not publisher identity. Do not disable endpoint
-protection to run an unverified build.
+architecture, SHA-256 manifest, SPDX SBOM, and GitHub attestation before running it. If that page is
+unavailable, no verified release artifact exists yet. `v0.1.0` is intentionally unsigned, so
+Authenticode is expected to report `NotSigned`; checksums and attestations establish artifact
+identity and provenance, not publisher identity. Do not disable endpoint protection to run an
+unverified build.
 
 ## Vulnerabilities
 

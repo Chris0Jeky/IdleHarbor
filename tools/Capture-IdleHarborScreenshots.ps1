@@ -27,6 +27,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
+$destinationRoot = $outputRoot
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 
 $captureNames = @(
@@ -134,6 +135,9 @@ namespace IdleHarbor.Capture
         public static extern bool SetForegroundWindow(IntPtr window);
 
         [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
         public static extern uint GetDpiForWindow(IntPtr window);
 
         [DllImport("user32.dll")]
@@ -236,7 +240,9 @@ namespace IdleHarbor.Capture
 function Write-CaptureSettings([string]$Path, [bool]$PauseOutsideActiveHours) {
     $activeHoursEnabled = if ($PauseOutsideActiveHours) { 'true' } else { 'false' }
     $currentMinute = ([DateTime]::Now.Hour * 60) + [DateTime]::Now.Minute
-    $activeHoursStart = if ($PauseOutsideActiveHours) { ($currentMinute + 5) % 1440 } else { 0 }
+    # Put the one-minute window on the opposite side of the day so ordinary
+    # capture delays cannot accidentally enter it.
+    $activeHoursStart = if ($PauseOutsideActiveHours) { ($currentMinute + 720) % 1440 } else { 0 }
     $activeHoursEnd = if ($PauseOutsideActiveHours) { ($activeHoursStart + 1) % 1440 } else { 0 }
     $content = @"
 # Deterministic local settings used only for IdleHarbor documentation captures.
@@ -269,6 +275,40 @@ emergency_hotkey=true
     [IO.File]::WriteAllText($Path, $content.TrimStart(), $encoding)
 }
 
+function Ensure-CaptureForeground([IntPtr]$Window) {
+    if ($Window -eq [IntPtr]::Zero) {
+        throw 'Cannot capture a null window handle.'
+    }
+    if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -eq $Window) {
+        return
+    }
+
+    [IdleHarbor.Capture.Native]::ShowWindow($Window, 9) | Out-Null
+    # HWND_TOP with SWP_NOMOVE, SWP_NOSIZE, and SWP_SHOWWINDOW raises the
+    # window without leaving it permanently topmost after the capture.
+    if (-not [IdleHarbor.Capture.Native]::SetWindowPos(
+            $Window,
+            [IntPtr]::Zero,
+            0,
+            0,
+            0,
+            0,
+            0x0043)) {
+        throw 'Could not raise the documentation-capture window.'
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(2)
+    do {
+        [IdleHarbor.Capture.Native]::SetForegroundWindow($Window) | Out-Null
+        if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -eq $Window) {
+            return
+        }
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw 'IdleHarbor did not become foreground; refusing to capture another application.'
+}
+
 function Start-CaptureOwner([string]$ConfigPath) {
     $owner = Start-Process -FilePath $executablePath -ArgumentList @(
         '--show', '--config', $ConfigPath) -PassThru
@@ -293,7 +333,7 @@ function Start-CaptureOwner([string]$ConfigPath) {
             0x0040)) {
         throw 'Could not size the documentation-capture window.'
     }
-    [IdleHarbor.Capture.Native]::SetForegroundWindow($window) | Out-Null
+    Ensure-CaptureForeground $window
     Start-Sleep -Milliseconds 600
 
     $dpi = [int][IdleHarbor.Capture.Native]::GetDpiForWindow($window)
@@ -366,20 +406,27 @@ function Save-ScreenRectangle(
 }
 
 function Save-WindowCapture([IntPtr]$Window, [string]$Path) {
+    Ensure-CaptureForeground $Window
     [IdleHarbor.Capture.Native]::RedrawWindow(
         $Window,
         [IntPtr]::Zero,
         [IntPtr]::Zero,
         0x0185) | Out-Null
     Start-Sleep -Milliseconds 250
+    Ensure-CaptureForeground $Window
     $rectangle = New-Object IdleHarbor.Capture.Native+RECT
     if (-not [IdleHarbor.Capture.Native]::GetWindowRect($Window, [ref]$rectangle)) {
         throw 'Could not read the capture window rectangle.'
     }
     Save-ScreenRectangle $rectangle $Path
+    if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
+        [IO.File]::Delete($Path)
+        throw 'Foreground changed during capture; discarded the image.'
+    }
 }
 
 function Save-TrayMenuCapture([IntPtr]$Window, [string]$Path) {
+    Ensure-CaptureForeground $Window
     $identifier = New-Object IdleHarbor.Capture.Native+NOTIFYICONIDENTIFIER
     $identifier.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($identifier)
     $identifier.hWnd = $Window
@@ -416,12 +463,28 @@ function Save-TrayMenuCapture([IntPtr]$Window, [string]$Path) {
         if ($menu -eq [IntPtr]::Zero) {
             throw 'The notification-area menu did not appear.'
         }
+        [uint32]$ownerProcessId = 0
+        [uint32]$menuProcessId = 0
+        [IdleHarbor.Capture.Native]::GetWindowThreadProcessId(
+            $Window, [ref]$ownerProcessId) | Out-Null
+        [IdleHarbor.Capture.Native]::GetWindowThreadProcessId(
+            $menu, [ref]$menuProcessId) | Out-Null
+        if ($menuProcessId -ne $ownerProcessId) {
+            throw 'The visible popup menu does not belong to IdleHarbor; refusing to capture it.'
+        }
         Start-Sleep -Milliseconds 250
+        if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
+            throw 'Foreground changed while opening the tray menu; refusing to capture it.'
+        }
         $menuRectangle = New-Object IdleHarbor.Capture.Native+RECT
         if (-not [IdleHarbor.Capture.Native]::GetWindowRect($menu, [ref]$menuRectangle)) {
             throw 'Could not read the notification-area menu rectangle.'
         }
         Save-ScreenRectangle $menuRectangle $Path
+        if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
+            [IO.File]::Delete($Path)
+            throw 'Foreground changed during tray-menu capture; discarded the image.'
+        }
         [IdleHarbor.Capture.Native]::keybd_event(0x1B, 0, 0, [UIntPtr]::Zero)
         [IdleHarbor.Capture.Native]::keybd_event(0x1B, 0, 0x0002, [UIntPtr]::Zero)
     }
@@ -449,6 +512,8 @@ function Get-ImageEvidence([string]$FileName, [string]$State) {
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-capture-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
+$outputRoot = Join-Path $tempRoot 'captures'
+New-Item -ItemType Directory -Path $outputRoot | Out-Null
 $steadyConfig = Join-Path $tempRoot 'steady.ini'
 $pauseConfig = Join-Path $tempRoot 'pause.ini'
 Write-CaptureSettings $steadyConfig $false
@@ -489,6 +554,56 @@ try {
     Wait-Status $status 'Paused*' | Out-Null
     Start-Sleep -Milliseconds 350
     Save-WindowCapture $owner.Window (Join-Path $outputRoot 'idleharbor-paused.png')
+    Stop-CaptureOwner $owner
+    $owner = $null
+
+    $sourceRevision = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[0-9a-f]{40}$') {
+        throw 'Could not determine the exact source revision for the capture manifest.'
+    }
+    $executableItem = Get-Item -LiteralPath $executablePath
+    $signature = Get-AuthenticodeSignature -FilePath $executablePath
+    $captures = @(
+        (Get-ImageEvidence 'idleharbor-window.png' 'Stopped settings and fixed actions')
+        (Get-ImageEvidence 'idleharbor-viewport.png' 'Stopped settings scrolled to safeguards and notification options')
+        (Get-ImageEvidence 'idleharbor-running.png' 'Running motion-free keep-awake session')
+        (Get-ImageEvidence 'idleharbor-paused.png' 'Paused outside configured active hours')
+        (Get-ImageEvidence 'idleharbor-tray-menu.png' 'Running notification-area menu')
+    )
+    $manifest = [ordered]@{
+        schema = 1
+        capturedAtUtc = [DateTime]::UtcNow.ToString('o')
+        sourceRevision = $sourceRevision
+        dpi = $ExpectedDpi
+        executable = [ordered]@{
+            file = $executableItem.Name
+            sizeBytes = $executableItem.Length
+            sha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            authenticodeStatus = [string]$signature.Status
+        }
+        captures = $captures
+    }
+    $manifestPath = Join-Path $outputRoot 'capture-manifest.json'
+    $encoding = New-Object Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText(
+        $manifestPath,
+        (($manifest | ConvertTo-Json -Depth 6) + [Environment]::NewLine),
+        $encoding)
+
+    # Promote only a complete capture set. The manifest moves last so a failed
+    # capture never describes a partially refreshed image set.
+    foreach ($name in $captureNames) {
+        $stagedPath = Join-Path $outputRoot $name
+        if (-not (Test-Path -LiteralPath $stagedPath -PathType Leaf)) {
+            throw "Staged capture is incomplete: $stagedPath"
+        }
+    }
+    foreach ($name in $captureNames) {
+        Copy-Item -LiteralPath (Join-Path $outputRoot $name) `
+            -Destination (Join-Path $destinationRoot $name) -Force
+    }
+
+    $manifest
 }
 finally {
     if ($null -ne $owner) {
@@ -501,38 +616,3 @@ finally {
         [IO.Directory]::Delete($resolvedTemp, $true)
     }
 }
-
-$sourceRevision = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[0-9a-f]{40}$') {
-    throw 'Could not determine the exact source revision for the capture manifest.'
-}
-$executableItem = Get-Item -LiteralPath $executablePath
-$signature = Get-AuthenticodeSignature -FilePath $executablePath
-$captures = @(
-    (Get-ImageEvidence 'idleharbor-window.png' 'Stopped settings and fixed actions')
-    (Get-ImageEvidence 'idleharbor-viewport.png' 'Stopped settings scrolled to safeguards and notification options')
-    (Get-ImageEvidence 'idleharbor-running.png' 'Running motion-free keep-awake session')
-    (Get-ImageEvidence 'idleharbor-paused.png' 'Paused outside configured active hours')
-    (Get-ImageEvidence 'idleharbor-tray-menu.png' 'Running notification-area menu')
-)
-$manifest = [ordered]@{
-    schema = 1
-    capturedAtUtc = [DateTime]::UtcNow.ToString('o')
-    sourceRevision = $sourceRevision
-    dpi = $ExpectedDpi
-    executable = [ordered]@{
-        file = $executableItem.Name
-        sizeBytes = $executableItem.Length
-        sha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash.ToLowerInvariant()
-        authenticodeStatus = [string]$signature.Status
-    }
-    captures = $captures
-}
-$manifestPath = Join-Path $outputRoot 'capture-manifest.json'
-$encoding = New-Object Text.UTF8Encoding($false)
-[IO.File]::WriteAllText(
-    $manifestPath,
-    (($manifest | ConvertTo-Json -Depth 6) + [Environment]::NewLine),
-    $encoding)
-
-$manifest
