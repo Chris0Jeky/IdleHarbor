@@ -156,7 +156,10 @@ For a future extracted portable archive, the per-user installer is:
 .\install.ps1 -Startup None
 ```
 
-Startup is opt-in. Supported choices are `TaskScheduler`, `StartupFolder`, `RunKey`, and `None`:
+Installation creates a per-user Start Menu launcher by default at `Start Menu\Programs\IdleHarbor.lnk`.
+It opens the installed application with `--show`; use `-StartMenu None` to omit or remove the
+installer-owned launcher. This setting is independent of automatic startup: startup is opt-in.
+Supported automatic-startup choices are `TaskScheduler`, `StartupFolder`, `RunKey`, and `None`:
 
 ```powershell
 .\install.ps1 -Startup TaskScheduler
@@ -165,8 +168,8 @@ Startup is opt-in. Supported choices are `TaskScheduler`, `StartupFolder`, `RunK
 The Task Scheduler option is the recommended least-privilege choice. It creates a per-user
 interactive task that starts `--start --minimized`. `-WhatIf` previews changes; `uninstall.ps1`
 removes only entries and files proven to belong to IdleHarbor. Failed install/update operations
-restore managed files and owned startup state, while unexpected files and pre-existing scheduler
-folders are preserved. See [`packaging/README.md`](../packaging/README.md).
+restore managed files, startup state, and exact prior Start Menu shortcut bytes, while unexpected
+files and pre-existing scheduler folders are preserved. See [`packaging/README.md`](../packaging/README.md).
 
 ## Visibility and stopping
 
