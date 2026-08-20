@@ -11,11 +11,12 @@ path, recoverable settings handling, and transactional per-user installation. No
 release has been created or published.
 
 The live merged baseline is `origin/main` at
-`4c0aa98d6ba2091ae073c325ff3cf4183f7de5e3`. PRs
+`90977a9be9804a719c853912cca9b0aeaf3524b0`. PRs
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8),
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10),
 [#13](https://github.com/Chris0Jeky/IdleHarbor/pull/13),
+[#16](https://github.com/Chris0Jeky/IdleHarbor/pull/16),
 [#17](https://github.com/Chris0Jeky/IdleHarbor/pull/17),
 [#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18),
 [#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), and
@@ -43,17 +44,11 @@ attached.
 ### Release workflow
 
 PR [#16](https://github.com/Chris0Jeky/IdleHarbor/pull/16), branch
-`agent/v0.1.0-release-tag-data`, implements issue
-[#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12) by carrying the triggering tag through
-step-local `RELEASE_TAG` data rather than direct PowerShell interpolation. The resolve and publish
-paths consume `$env:RELEASE_TAG`, and `packaging/Test-ReleaseWorkflow.ps1` proves the contract with
-Windows PowerShell 5.1-compatible syntax.
-
-The branch has incorporated the final UI/motion baseline. Its current integrated code passes the
-Visual Studio 2019 x64 Release build and CTest 7/7 plus the release-workflow and packaging suites
-sequentially under PowerShell 7 and Windows PowerShell 5.1. Before merge, the final pushed head still
-needs hosted x64/ARM64/x86 plus CodeQL/C++ analysis, a scoped fresh-context review, conversation
-resolution, and the three-minute aging floor. No real release is part of PR #16.
+`agent/v0.1.0-release-tag-data`, merged into `main` at
+`90977a9be9804a719c853912cca9b0aeaf3524b0` and closed issue
+[#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12). Its release-tag workflow contract and
+Windows PowerShell 5.1-compatible tests are now part of the merged baseline. No real release is
+part of PR #16.
 
 ### Portfolio and publication
 
@@ -63,9 +58,13 @@ checkpoint branch `agent/v0.1.0-portfolio-polish` predates the final UI/motion b
 incorporate final `main`, replace every earlier capture, refresh performance evidence, and pass
 visual/privacy review before its PR is opened.
 
-Issue [#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) records a LOW packaging-test
-isolation limitation: simultaneous PowerShell 7 and 5.1 suites can observe each other's legitimate
-in-flight transaction directory. Sequential suites pass and leave no residue.
+Issue [#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) has an unmerged checkpoint on branch
+`agent/v0.1.0-packaging-isolation`: a bounded, abandoned-owner-safe Local mutex serializes the
+PowerShell 7 and 5.1 packaging suites while retaining the existing global transaction-residue
+assertions. The sequential suite passes under both runtimes. The first concurrent proof returned
+exit code `0` for PowerShell 7 and `1` for Windows PowerShell 5.1; its failure output was not
+captured, and no transaction residue remained. Treat the slice as NOT verified until that failure
+is reproduced with separate stdout/stderr capture, fixed, and the concurrent matrix passes.
 
 Issue [#27](https://github.com/Chris0Jeky/IdleHarbor/issues/27) tracks redundant Stop requests that
 can change internal action focus without a state transition. Issue
@@ -83,7 +82,9 @@ bounded final review.
 
 ## Resume order
 
-1. Re-prove, review, and merge PR #16; confirm issue #12 closes and sweep late review once.
+1. Reproduce issue #26's concurrent Windows PowerShell 5.1 failure with separate stdout/stderr
+   capture, fix the smallest confirmed cause, then pass the sequential and concurrent matrix before
+   review or PR creation.
 2. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
    and the uploaded GitHub social preview.
 3. Run the final native runtime, packaging, installer, performance, security, accessibility, and

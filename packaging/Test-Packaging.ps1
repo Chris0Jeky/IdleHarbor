@@ -131,11 +131,23 @@ $outputRoot = Join-Path $tempRoot 'dist'
 $installRoot = Join-Path $tempRoot 'IdleHarbor'
 $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
 $retainedTransactionPaths = @()
+$packagingTestMutex = $null
+$packagingTestMutexOwned = $false
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
 Assert-InstallerOwnershipPreflight (Join-Path $packagingRoot 'install.ps1')
 New-Item -ItemType Directory -Path $sourceRoot, $buildRoot, $outputRoot -Force | Out-Null
 try {
+    $packagingTestMutex = New-Object System.Threading.Mutex($false, 'Local\IdleHarbor-Packaging-Test')
+    try {
+        $packagingTestMutexOwned = $packagingTestMutex.WaitOne([TimeSpan]::FromMinutes(10))
+    }
+    catch [System.Threading.AbandonedMutexException] {
+        $packagingTestMutexOwned = $true
+    }
+    Assert-True $packagingTestMutexOwned `
+        'Timed out waiting for the concurrent IdleHarbor packaging test lock.'
+
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x00, 0x01, 0x02, 0x03))
 
@@ -486,10 +498,23 @@ try {
     Write-Output 'Packaging checks passed.'
 }
 finally {
-    foreach ($retainedTransactionPath in @($retainedTransactionPaths)) {
-        if (Test-Path -LiteralPath $retainedTransactionPath -PathType Container) {
-            Remove-Item -LiteralPath $retainedTransactionPath -Recurse -Force
+    try {
+        foreach ($retainedTransactionPath in @($retainedTransactionPaths)) {
+            if (Test-Path -LiteralPath $retainedTransactionPath -PathType Container) {
+                Remove-Item -LiteralPath $retainedTransactionPath -Recurse -Force
+            }
+        }
+        if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
+    }
+    finally {
+        try {
+            if ($packagingTestMutexOwned) {
+                $packagingTestMutex.ReleaseMutex()
+                $packagingTestMutexOwned = $false
+            }
+        }
+        finally {
+            if ($null -ne $packagingTestMutex) { $packagingTestMutex.Dispose() }
         }
     }
-    if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }
