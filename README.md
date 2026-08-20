@@ -103,10 +103,14 @@ Motion modes are selectable independently of power requests:
 | Motion | Behavior |
 | --- | --- |
 | Off | No pointer/input pulse; useful with a power request |
-| Normal | Small visible diagonal path |
+| Normal | Small visible diagonal path, scaled by the distance multiplier |
 | Zen | Virtual mouse input intended not to move the visible pointer |
-| Circle | Bounded circular path |
-| Linear | Horizontal back-and-forth path |
+| Circle | Bounded circular path, scaled by the distance multiplier |
+| Linear | Horizontal back-and-forth path, scaled by the distance multiplier |
+
+The distance setting is a multiplier from **1** to **120**, not a raw pixel radius. Visible motion
+uses the canonical Mouse Jiggler pattern deltas translated into cumulative safe-anchor points; the
+reference is [`JigglePatterns.cs`](https://github.com/arkane-systems/mousejiggler/blob/master/MouseJiggler/JigglePatterns.cs).
 
 Profiles provide named starting points and can be refined before saving:
 
@@ -137,7 +141,7 @@ Motion:   --motion off|zen|diagonal|linear|circle
 Power:    --power none|system|display
 Timing:   --interval DURATION, --random, --no-random, --pause-on-input DURATION,
           --stop-after DURATION
-Safety:   --distance 1..120, --battery-threshold 0..100,
+Safety:   --distance MULTIPLIER (1..120), --battery-threshold 0..100,
           --pause-on-fullscreen, --no-pause-on-fullscreen
 Window:   --minimized, --close-to-tray, --no-close-to-tray
 Storage:  --portable, --config PATH

@@ -226,7 +226,8 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
             const auto value = TakeValue(result, arguments, index);
             const auto parsed = value.has_value() ? ParseUnsigned(*value) : std::nullopt;
             if (value.has_value() && (!parsed.has_value() || *parsed < 1 || *parsed > 120)) {
-                AddError(result, L"Invalid distance '" + std::wstring(*value) + L"'; use an integer from 1 to 120.");
+                AddError(result, L"Invalid distance multiplier '" + std::wstring(*value) +
+                                    L"'; use an integer from 1 to 120.");
             } else if (parsed.has_value()) {
                 result.options.distance = static_cast<std::uint32_t>(*parsed);
             }
@@ -275,7 +276,7 @@ Session options:
   --motion MODE, --mode, -o   off, zen, diagonal (normal), linear, or circle
   --power MODE                none, system, or display
   --interval DURATION, -s     Pulse interval, from 1s to 24h
-  --distance N, -d            Movement distance, from 1 to 120
+  --distance N, -d            Distance multiplier, from 1 to 120
   --random, -r                Randomize pulses from 1s to the interval
   --no-random                 Use the exact interval
   --pause-on-input DURATION   Resume after this much genuine-input quiet time;

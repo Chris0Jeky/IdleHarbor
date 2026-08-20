@@ -9,7 +9,7 @@ validated INI settings, strict CLI, bounded motion, genuine-input observation, p
 battery/fullscreen/session safeguards, visible tray controls, an emergency stop path, recoverable
 settings handling, and transactional per-user installation. No release or tag has been published.
 
-`origin/main` is `71093ac16c20f5859f57e7ca54fb69fbf217199b`. Pull requests
+`origin/main` is `974d8406d14fead3b7ffbdd4ed88534473f16c97`. Pull requests
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8), and
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10) landed pinned action updates,
@@ -30,9 +30,8 @@ installs require a valid ownership marker. Follow-up edge hardening remains trac
 
 ### High-DPI viewport
 
-The merged baseline is `origin/main` at `7b1bcf3`. Ready-for-review PR
-[#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18), on branch
-`agent/v0.1.0-viewport-safety`, remains open and unmerged. It carries the viewport hardening
+The merged baseline is `origin/main` at `974d840` (PR
+[#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18) merged on 2026-08-20). It carries the viewport hardening
 slice for issues #14 and #15, including:
 
 - `be6b42d`: canonical DPI-scaled geometry, work-area clamping, resize layout, vertical scrolling,
@@ -53,6 +52,15 @@ forward/reverse keyboard traversal, activated Save with Space, started/stopped a
 hid/restored the window through the notification area. The fractional-DPI and short-client follow-up
 has not had a new desktop smoke. Only one display is attached, so a true cross-monitor mixed-DPI
 transition is not locally verifiable and must remain explicit.
+
+### Motion multiplier parity
+
+Issue [#23](https://github.com/Chris0Jeky/IdleHarbor/issues/23) is implemented on branch
+`agent/v0.1.0-motion-parity` and is awaiting review; it is not merged. Normal, Linear, Circle, and
+Zen plans now use the official Mouse Jiggler multiplier patterns translated into cumulative
+safe-anchor points that end at `{0,0}`. The accepted multiplier range remains 1–120, with exact
+deterministic pattern, boundary, and overflow-clamping tests. The primary source is
+[`JigglePatterns.cs`](https://github.com/arkane-systems/mousejiggler/blob/master/MouseJiggler/JigglePatterns.cs).
 
 Before issue [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) is closed, update user-facing
 docs and genuine screenshots, run a final exact-head native/desktop proof, obtain hosted CI and an
