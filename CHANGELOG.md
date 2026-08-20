@@ -90,6 +90,10 @@ where practical.
   obscure the fixed Save/Start/Stop actions.
 - Mark profile defaults and recovered settings as unsaved until explicitly saved, expose that state
   to accessibility APIs, and keep all three footer actions separated at narrow high-DPI sizes.
+- Keep first-owner and forwarded command-line overrides consistently available for explicit saving
+  without silently changing the persisted INI baseline.
+- Preserve the unsaved-state prefix in notification-area tooltips and accessible status text while
+  recovering from a missing tray icon.
 
 ### Release boundary
 

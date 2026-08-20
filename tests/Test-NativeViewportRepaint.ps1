@@ -321,6 +321,40 @@ $window = [IntPtr]::Zero
 
 try {
     [void][IdleHarbor.NativeViewportRepaint]::SetThreadDpiAwarenessContext([IntPtr](-4))
+
+    # A first-owner runtime override must remain explicitly saveable instead
+    # of being mistaken for persisted INI state. Prove that contract before
+    # starting the clean repaint scenario below.
+    $overrideConfigPath = Join-Path $tempRoot 'override-settings.ini'
+    $process = Start-Process -FilePath $executablePath -ArgumentList @(
+        '--show', '--config', $overrideConfigPath, '--motion', 'off') -PassThru
+    $overrideDeadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 100
+        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$process.Id)
+    } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $overrideDeadline)
+    if ($window -eq [IntPtr]::Zero) {
+        throw 'The runtime-override owner did not expose its main window within 10 seconds.'
+    }
+    $overrideSave = [IdleHarbor.NativeViewportRepaint]::FindDescendantControl($window, 122)
+    $overrideStatus = [IdleHarbor.NativeViewportRepaint]::FindDescendantControl($window, 100)
+    if ($overrideSave -eq [IntPtr]::Zero -or $overrideStatus -eq [IntPtr]::Zero -or
+        -not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($overrideSave)) {
+        throw 'A first-owner runtime override was not exposed as explicitly saveable.'
+    }
+    if ([IdleHarbor.NativeViewportRepaint]::ReadWindowText($overrideStatus) -notlike 'Unsaved changes*') {
+        throw 'A first-owner runtime override did not expose its unsaved status.'
+    }
+    $exitCommand = Start-Process -FilePath $executablePath -ArgumentList @('--exit') -PassThru
+    if (-not $exitCommand.WaitForExit(5000)) {
+        throw 'The override-owner exit command did not return.'
+    }
+    if (-not $process.WaitForExit(5000)) {
+        throw 'The runtime-override owner did not exit.'
+    }
+    $process = $null
+    $window = [IntPtr]::Zero
+
     $arguments = @('--show', '--config', $configPath)
     $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
