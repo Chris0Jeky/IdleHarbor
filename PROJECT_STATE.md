@@ -8,10 +8,12 @@ IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral
 validated local settings, strict CLI, independently designed bounded motion patterns, Windows power
 requests, genuine-input observation, battery/fullscreen/session safeguards, visible tray controls,
 an emergency stop, and transactional per-user installation. It has no telemetry or network service.
-The source and release artifacts are licensed `GPL-3.0-only`. No tag or release has been published.
+The polished native interface uses themed Windows controls, a dedicated status card, visible
+Save/Start/Stop actions, and a scrollable high-DPI settings body. The source and release artifacts
+are licensed `GPL-3.0-only`. No tag or release has been published.
 
 The current merged baseline is `origin/main` at
-`4be21adfe69b299739b451a255e69d268757b668`. PRs
+`cf773735234ad3481a409575e881fe5515deb35b`. PRs
 [#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
 [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
 scroll-range convergence, and inherited-scrollbar fixes. PR
@@ -47,17 +49,17 @@ uninstaller remove only an exact, marker-owned shortcut; changed or unowned shor
 preserved. The lifecycle suite uses temporary injected shortcut paths, and the actual per-user Start
 Menu path was exercised successfully during the local release-candidate installation.
 
-This licensing branch removes the only direct upstream motion-coordinate dependency, records the
-historical inspiration in `THIRD-PARTY-NOTICES.md`, and applies `GPL-3.0-only` consistently to the
-repository, portable archive, package manifest, and SPDX SBOM metadata.
+PR [#39](https://github.com/Chris0Jeky/IdleHarbor/pull/39) removed the only direct upstream
+motion-coordinate dependency, recorded the historical inspiration in `THIRD-PARTY-NOTICES.md`, and
+applied `GPL-3.0-only` consistently to the repository, portable archive, package manifest, and SPDX
+SBOM metadata.
 
 ## Portfolio and publication queue
 
-PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains exact-build portfolio text and
-privacy-reviewed UI captures. Its hosted x64/ARM64/x86 and CodeQL checks are green, and independent
-content review found no blocking defect. It remains intentionally unmerged until the repository
-social-preview image is uploaded and visually checked on GitHub. After runtime changes land, its
-exact-build evidence must be refreshed against final `main` before merge. Issue
+PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains pre-redesign portfolio text and
+privacy-reviewed captures. It is intentionally superseded rather than merged because its imagery
+no longer represents the release candidate. Fresh exact-build screenshots, social-preview artwork,
+and publication metadata will replace it after the redesigned UI lands. Issue
 [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks that publication boundary.
 
 The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
@@ -75,8 +77,8 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 
 ## Resume order
 
-1. Prove, review, and merge the GPLv3/provenance slice.
-2. Complete the native UI redesign, then refresh exact-build screenshots, documentation, repository
+1. Prove and merge the native UI redesign.
+2. Refresh exact-build screenshots, documentation, repository
    metadata, and social-preview artwork.
 3. Run final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact QA; preserve a dated demonstration bundle.

@@ -25,6 +25,8 @@ where practical.
 - Fixed the live status and immediate Start/Stop actions outside the scrolling settings body; narrow
   work areas now reflow settings and wrap or stack actions, and focus reveal no longer undoes pointer
   or scrollbar scrolling when focus is unchanged.
+- Polished the native interface with themed common controls, clearer section hierarchy, a dedicated
+  status card, and a fixed Save/Start/Stop footer that remains visible while settings scroll.
 - Confined the native scrollbar track to the settings viewport, aligned Tab and Shift+Tab with visual
   order (including Save before fixed Start/Stop), transferred keyboard focus to the newly enabled
   Start/Stop action after session changes, re-revealed a still-focused setting after resize or DPI
@@ -84,6 +86,8 @@ where practical.
   5.1 and PowerShell 7 packaging runs do not depend on command auto-loading.
 - Repaint the settings viewport and all descendant controls after scrolling, layout convergence,
   and Running/Stopped enabled-state changes so stale control fragments do not survive until resize.
+- Mark profile defaults and recovered settings as unsaved until explicitly saved, expose that state
+  to accessibility APIs, and keep all three footer actions separated at narrow high-DPI sizes.
 
 ### Release boundary
 
