@@ -304,9 +304,9 @@ class Application final {
         const auto loaded_settings = idleharbor::app::LoadSettings(settings_path_);
         settings_ = loaded_settings.settings;
         settings_load_warnings_ = loaded_settings.warnings;
-        ApplyCommandLineOptions(options);
         saved_settings_ = settings_;
-        dirty_ = !settings_load_warnings_.empty();
+        ApplyCommandLineOptions(options);
+        dirty_ = SettingsNeedSave();
         taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
         dpi_ = GetDpiForSystem();
 
@@ -387,6 +387,7 @@ class Application final {
             (options.command == RequestedCommand::Start ||
              (options.command == RequestedCommand::Toggle && !session_active_));
         ApplyCommandLineOptions(options);
+        dirty_ = SettingsNeedSave();
         RefreshControls();
         if (automatic_start_blocked) {
             ShowWindow(window_, SW_SHOW);
@@ -1299,7 +1300,7 @@ class Application final {
         icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         icon.uCallbackMessage = kTrayMessage;
         icon.hIcon = tray_icon_;
-        wcsncpy_s(icon.szTip, (L"IdleHarbor - " + status_text_).c_str(), _TRUNCATE);
+        wcsncpy_s(icon.szTip, (L"IdleHarbor - " + DisplayStatusText()).c_str(), _TRUNCATE);
         tray_added_ = Shell_NotifyIconW(NIM_ADD, &icon) != FALSE;
         if (tray_added_) {
             icon.uVersion = NOTIFYICON_VERSION_4;
@@ -1312,7 +1313,9 @@ class Application final {
         status_text_ = session_active_ ? L"Running: notification icon unavailable; window kept visible"
                                        : L"Stopped: notification icon unavailable; window kept visible";
         if (status_ != nullptr) {
-            SetControlText(status_, status_text_);
+            SetControlText(status_, DisplayStatusText());
+            InvalidateRect(status_, nullptr, TRUE);
+            UpdateWindow(status_);
         }
     }
 

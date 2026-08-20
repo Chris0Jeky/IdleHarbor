@@ -1,8 +1,9 @@
 # User guide
 
-IdleHarbor is a visible, user-controlled Windows utility. The integration branch contains the
-runtime and packaging workflows, but no tagged release has been published yet. Build from source or
-use a future release archive only after checking its checksum and provenance.
+IdleHarbor is a visible, user-controlled Windows utility. When the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) is available,
+download its architecture-matched archive and check the published checksum and provenance. If the
+page is unavailable, no verified release artifact exists yet; build from source instead.
 
 ## First run
 
@@ -20,7 +21,7 @@ shown so a user can understand why a pulse is not being emitted.
 ## Window, scaling, and keyboard navigation
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
-area. The live Running/Paused/Stopped status and immediate Start/Stop actions remain in fixed safety
+area. The live Running/Paused/Stopped status and Start/Stop/Save actions remain in fixed safety
 regions while the settings body uses a native vertical scrollbar whose track is confined to that
 body. On narrow or highly scaled work areas, settings reflow into a single column and the action row
 wraps or stacks so every control stays visible and keyboard reachable, including unusually tiny work
@@ -30,12 +31,12 @@ areas.
 - An open profile, motion, or power list keeps native wheel handling so its choices can be browsed.
 - Precision touchpads and high-resolution wheels retain partial input until a complete wheel step is
   reached; IdleHarbor also follows the Windows wheel-lines/page setting.
-- Use **Tab** and **Shift+Tab** to traverse controls in visual top-to-bottom order. Save is reached
-  before the fixed Start and Stop actions. The body viewport automatically reveals the focused setting
-  when focus changes or a resize/DPI reflow clips the still-focused setting; scrolling with the
-  pointer or scrollbar does not snap back. Start and Stop remain visible in the fixed safety region,
-  while Save stays in the scrollable body. Starting or stopping from the keyboard transfers focus to
-  the newly enabled opposite action, keeping the immediate control path intact.
+- Use **Tab** and **Shift+Tab** to traverse controls in visual top-to-bottom order. The fixed action
+  footer follows its visible **Start**, **Stop**, **Save** order. The body viewport automatically
+  reveals the focused setting when focus changes or a resize/DPI reflow clips the still-focused
+  setting; scrolling with the pointer or scrollbar does not snap back. Starting or stopping from the
+  keyboard transfers focus to the newly enabled opposite action, keeping the immediate control path
+  intact.
 
 Moving the window between monitors reapplies the destination DPI and constrains the suggested size
 to that monitor's usable work area.
@@ -119,6 +120,11 @@ behavior. `--minimized` starts hidden in the notification area. `--close-to-tray
 `--no-close-to-tray` control close behavior. `--portable` and `--config PATH` choose storage at
 owner-instance launch.
 
+Profile and settings options are runtime overrides. They update the owner window and are marked as
+unsaved, but they do not silently rewrite the persisted INI file. Use the visible **Save** action if
+the resulting values should become the next launch defaults. This is true for options on the first
+owner invocation and for options forwarded by a later invocation.
+
 Run `IdleHarbor.exe --help` for the exact current syntax and ranges.
 
 ## Advanced INI settings
@@ -150,7 +156,9 @@ Other persisted keys include `profile`, `motion`, `power`, `interval_seconds`,
 
 ## Installation and startup
 
-For a future extracted portable archive, the per-user installer is:
+After downloading and checksum-verifying the architecture-matched release ZIP, extract it. The
+recommended installation keeps automatic startup off while creating the default per-user Start
+Menu launcher:
 
 ```powershell
 .\install.ps1 -Startup None
@@ -171,6 +179,11 @@ removes only entries and files proven to belong to IdleHarbor. Failed install/up
 restore managed files, startup state, and exact prior Start Menu shortcut bytes, while unexpected
 files and pre-existing scheduler folders are preserved. See [`packaging/README.md`](../packaging/README.md).
 
+Running the executable directly from the extracted archive is also supported and creates no startup
+entry. On a managed laptop, do not enable Task Scheduler, Startup-folder, or Run-key startup unless
+device policy permits both the application and the chosen persistence mechanism. Do not disable or
+independently whitelist around endpoint controls.
+
 ## Visibility and stopping
 
 Minimize-to-tray reduces window clutter; it is not concealment. The tray menu provides Show, Start
@@ -184,4 +197,5 @@ visible controls. A tray icon may be unavailable while Windows Explorer is resta
 - Simulated input may be blocked or handled differently by applications and integrity boundaries.
 - Low-level input hooks and session notifications depend on Windows policy and availability.
 - Display scaling and monitor layouts vary; verify the viewport after changing a monitor's scale.
-- A release is not yet published; do not invent a download URL or assume signing.
+- `v0.1.0` is unsigned; validate the published checksum and attestation and expect Windows to report
+  no Authenticode publisher identity.

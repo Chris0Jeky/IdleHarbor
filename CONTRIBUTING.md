@@ -1,7 +1,7 @@
 # Contributing to IdleHarbor
 
-Thank you for helping make a small, trustworthy Windows utility. The project is pre-release, so
-behavior and interfaces may change. Keep changes focused, explain user-visible effects, and never
+Thank you for helping make a small, trustworthy Windows utility. The project is young, so behavior
+and interfaces may continue to evolve. Keep changes focused, explain user-visible effects, and never
 trade away an explicit stop path or truthful documentation for convenience.
 
 ## Before you start
@@ -23,6 +23,26 @@ ctest --test-dir build --output-on-failure
 
 Keep the core policy and motion logic testable without moving the real pointer. Runtime/UI checks
 should be explicit and isolated from normal user input.
+
+## Refreshing UI evidence
+
+Build an x64 Release executable, close every existing IdleHarbor owner, set the interactive display
+to the intended capture scale, and run:
+
+```powershell
+.\tools\Capture-IdleHarborScreenshots.ps1 `
+  -Executable .\build\x64\Release\IdleHarbor.exe `
+  -ExpectedDpi 192 `
+  -Force
+```
+
+The tool creates stopped, scrolled, running, policy-paused, and notification-area captures under
+`docs/assets`, plus `capture-manifest.json` with the exact source revision, executable identity,
+Authenticode state, dimensions, and image hashes. Inspect every PNG before committing it; the
+manifest is evidence of identity, not a substitute for visual review. The tool brings IdleHarbor to
+the foreground for each capture. During the tray-menu capture, it briefly moves the physical cursor
+to the notification icon, sends Escape to close the menu, and restores the original cursor position;
+do not interact with the desktop while it runs.
 
 ## Pull requests
 

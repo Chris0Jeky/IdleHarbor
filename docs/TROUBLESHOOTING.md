@@ -1,7 +1,7 @@
 # Troubleshooting
 
-IdleHarbor is pre-release. Record the commit or package version, Windows edition/build, architecture,
-selected profile, relevant settings, and the smallest reproducible sequence. Remove credentials,
+Record the release version or commit, Windows edition/build, architecture, selected profile,
+relevant settings, and the smallest reproducible sequence. Remove credentials,
 private work data, and managed-device details before sharing diagnostics.
 
 ## Build and test

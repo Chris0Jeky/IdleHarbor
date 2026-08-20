@@ -321,6 +321,40 @@ $window = [IntPtr]::Zero
 
 try {
     [void][IdleHarbor.NativeViewportRepaint]::SetThreadDpiAwarenessContext([IntPtr](-4))
+
+    # A first-owner runtime override must remain explicitly saveable instead
+    # of being mistaken for persisted INI state. Prove that contract before
+    # starting the clean repaint scenario below.
+    $overrideConfigPath = Join-Path $tempRoot 'override-settings.ini'
+    $process = Start-Process -FilePath $executablePath -ArgumentList @(
+        '--show', '--config', $overrideConfigPath, '--motion', 'off') -PassThru
+    $overrideDeadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 100
+        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$process.Id)
+    } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $overrideDeadline)
+    if ($window -eq [IntPtr]::Zero) {
+        throw 'The runtime-override owner did not expose its main window within 10 seconds.'
+    }
+    $overrideSave = [IdleHarbor.NativeViewportRepaint]::FindDescendantControl($window, 122)
+    $overrideStatus = [IdleHarbor.NativeViewportRepaint]::FindDescendantControl($window, 100)
+    if ($overrideSave -eq [IntPtr]::Zero -or $overrideStatus -eq [IntPtr]::Zero -or
+        -not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($overrideSave)) {
+        throw 'A first-owner runtime override was not exposed as explicitly saveable.'
+    }
+    if ([IdleHarbor.NativeViewportRepaint]::ReadWindowText($overrideStatus) -notlike 'Unsaved changes*') {
+        throw 'A first-owner runtime override did not expose its unsaved status.'
+    }
+    $exitCommand = Start-Process -FilePath $executablePath -ArgumentList @('--exit') -PassThru
+    if (-not $exitCommand.WaitForExit(5000)) {
+        throw 'The override-owner exit command did not return.'
+    }
+    if (-not $process.WaitForExit(5000)) {
+        throw 'The runtime-override owner did not exit.'
+    }
+    $process = $null
+    $window = [IntPtr]::Zero
+
     $arguments = @('--show', '--config', $configPath)
     $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
@@ -409,6 +443,30 @@ try {
     if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save)) {
         throw 'Saving the selected profile did not clear the dirty state.'
     }
+
+    # A settings-only command forwarded to the owner must expose the same
+    # explicitly saveable dirty state as a first-owner override.
+    $forwardedOverride = Start-Process -FilePath $executablePath -ArgumentList @(
+        '--motion', 'linear') -PassThru
+    if (-not $forwardedOverride.WaitForExit(5000) -or $forwardedOverride.ExitCode -ne 0) {
+        throw 'The forwarded settings override did not complete successfully.'
+    }
+    $forwardedDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    while (-not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -and
+           [DateTime]::UtcNow -lt $forwardedDeadline) {
+        Start-Sleep -Milliseconds 25
+    }
+    if (-not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -or
+        [IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -notlike 'Unsaved changes*') {
+        throw 'A forwarded settings override was not exposed as explicitly saveable and unsaved.'
+    }
+    [IdleHarbor.NativeViewportRepaint]::SendMessage(
+        $save, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null # BM_CLICK
+    if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -or
+        [IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -like 'Unsaved changes*') {
+        throw 'Saving the forwarded settings override did not clear its dirty state.'
+    }
+
     [IdleHarbor.NativeViewportRepaint]::RedrawWindow(
         $viewport,
         [IntPtr]::Zero,
@@ -430,6 +488,9 @@ try {
     }
     if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($profile)) {
         throw 'The motion-free native session did not disable its settings controls.'
+    }
+    if ([IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -notlike 'Unsaved changes*') {
+        throw 'A forwarded start with runtime overrides did not retain its unsaved status.'
     }
     # The themed combo boxes animate their enabled-to-disabled transition.
     # Let that finite system animation settle before comparing a natural frame

@@ -32,6 +32,11 @@ Read the rules for the device, account, network, and work environment before ins
 IdleHarbor. If a policy prohibits simulated input or third-party utilities, do not run it. The
 project cannot determine or approve an employer's policy on a user's behalf.
 
+Application approval and persistence approval may be separate decisions. Do not configure the
+Task Scheduler, Startup-folder, or Run-key options on a managed laptop unless policy permits both
+IdleHarbor and that startup mechanism. If endpoint controls block it, do not disable or independently
+whitelist around them.
+
 ## Privacy and privilege
 
 The current application has no network service or telemetry path. It stores validated local
@@ -44,10 +49,13 @@ that a safeguard or pulse will work in every application.
 
 ## Distribution trust
 
-There is no published release yet. When artifacts are published, verify the architecture, SHA-256
-manifest, SPDX SBOM, and GitHub attestation before running them. Authenticode signing is not claimed
-until the human signing decision is made. Do not disable endpoint protection to run an unverified
-build.
+When it is available, download only from the project’s
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0), then verify the
+architecture, SHA-256 manifest, SPDX SBOM, and GitHub attestation before running it. If that page is
+unavailable, no verified release artifact exists yet. `v0.1.0` is intentionally unsigned, so
+Authenticode is expected to report `NotSigned`; checksums and attestations establish artifact
+identity and provenance, not publisher identity. Do not disable endpoint protection to run an
+unverified build.
 
 ## Vulnerabilities
 

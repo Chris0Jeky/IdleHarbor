@@ -2,14 +2,16 @@
 
 IdleHarbor is distributed as a native Windows executable with no application runtime or network
 dependency. The portable archive is the canonical package; the PowerShell installer is an optional
-per-user convenience layer around that archive. No release archive has been published yet.
+per-user convenience layer around that archive. Once available, download only from the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). If that page is
+unavailable, the tag workflow has not published a verified release artifact.
 
 ## Release artifacts
 
-The tag-triggered release workflow is prepared to produce:
+The `v0.1.0` tag workflow publishes these exact assets:
 
-- `IdleHarbor-<version>-windows-x64-portable.zip`;
-- `IdleHarbor-<version>-windows-arm64-portable.zip`;
+- [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip);
+- [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip);
 - `SHA256SUMS.txt` for the final asset directory;
 - per-architecture SPDX 2.3 SBOM JSON;
 - GitHub artifact attestations;
@@ -18,7 +20,6 @@ The tag-triggered release workflow is prepared to produce:
 The workflow builds Win32 in CI for coverage, but the current release matrix publishes x64 and
 ARM64 archives. It accepts only stable `v<major>.<minor>.<patch>` tags, passes the triggering tag
 through step-local environment data, and validates the same tag before packaging or publication.
-Do not use a download URL until a tagged release exists.
 
 ### Trust-file asset contract
 
@@ -34,6 +35,16 @@ file is not tracked.
 Extract the architecture-matched archive and run `IdleHarbor.exe`. Portable use does not create a
 startup entry. It stores `IdleHarbor.ini` beside the executable when launched with `--portable`.
 Use the tray menu or documented command-line options to control a session.
+
+For the simplest persistent per-user setup without automatic startup, verify and extract the ZIP,
+then run:
+
+```powershell
+.\install.ps1 -Startup None
+```
+
+This creates the default Start Menu launcher and leaves startup disabled. The ZIP remains the
+canonical distribution; installation is optional.
 
 ## Per-user installation
 
@@ -85,6 +96,10 @@ bytes remain available for manual repair. Managed paths that are symbolic links,
 multiply linked files are rejected so an update cannot write through the installation boundary.
 Unexpected user files are preserved.
 
+On a managed laptop, do not choose Task Scheduler, StartupFolder, or RunKey unless policy permits
+both IdleHarbor and that persistence mechanism. If endpoint controls block the executable or
+installer, do not disable or independently whitelist around them.
+
 Uninstall with:
 
 ```powershell
@@ -98,13 +113,13 @@ proving it is empty; a pre-existing or non-empty folder is preserved.
 
 ## Verification and trust
 
-After a future release is published, verify the checksum manifest and inspect the signature state:
+After downloading, verify the checksum manifest and inspect the signature state:
 
 ```powershell
 Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The release workflow is configured to produce SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+The tag workflow publishes SHA-256, SBOM, and attestation evidence. `v0.1.0` is
 intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
 and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.

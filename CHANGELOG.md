@@ -6,6 +6,8 @@ where practical.
 
 ## [Unreleased]
 
+## [0.1.0] - Unreleased
+
 ### Added
 
 - GNU General Public License version 3 only (`GPL-3.0-only`), with the complete licence and a
@@ -22,19 +24,21 @@ where practical.
 - Per-user installer, ownership marker, WhatIf preview, uninstall, and opt-in Task Scheduler/Startup-folder/HKCU Run choices.
 - CI build matrix, pinned actions, CodeQL workflow, portable release packaging, checksums, SPDX SBOMs, and GitHub attestations.
 - Per-monitor-DPI-aware resize and scrolling that keeps every setting and action keyboard reachable.
+- Reproducible 192-DPI documentation captures for stopped, running, intelligently paused, scrolled,
+  and notification-area states, with exact executable and image hashes in a machine-readable manifest.
 - Fixed the live status and immediate Start/Stop actions outside the scrolling settings body; narrow
   work areas now reflow settings and wrap or stack actions, and focus reveal no longer undoes pointer
   or scrollbar scrolling when focus is unchanged.
 - Polished the native interface with themed common controls, clearer section hierarchy, a dedicated
-  status card, and a fixed Save/Start/Stop footer that remains visible while settings scroll.
+  status card, and a fixed Start/Stop/Save footer that remains visible while settings scroll.
 - Confined the native scrollbar track to the settings viewport, aligned Tab and Shift+Tab with visual
-  order (including Save before fixed Start/Stop), transferred keyboard focus to the newly enabled
+  order (including the fixed footer's Start, Stop, Save sequence), transferred keyboard focus to the newly enabled
   Start/Stop action after session changes, re-revealed a still-focused setting after resize or DPI
   reflow, and adapted stacked controls to unusually narrow work areas.
 
 ### Changed
 
-- Documentation now describes the landed integration branch rather than the original foundation stub.
+- Documentation now describes the implemented release candidate rather than the original foundation stub.
 - Motion distance remains a multiplier, while Normal, Circle, and Linear now use independently
   designed IdleHarbor paths that preserve bounded safe-anchor restoration.
 
@@ -87,17 +91,22 @@ where practical.
 - Repaint the settings viewport and all descendant controls after scrolling, layout convergence,
   and Running/Stopped enabled-state changes so stale control fragments do not survive until resize.
 - Clear newly exposed parent and footer pixels after viewport resize so clipped settings never
-  obscure the fixed Save/Start/Stop actions.
+  obscure the fixed Start/Stop/Save actions.
 - Mark profile defaults and recovered settings as unsaved until explicitly saved, expose that state
   to accessibility APIs, and keep all three footer actions separated at narrow high-DPI sizes.
+- Keep first-owner and forwarded command-line overrides consistently available for explicit saving
+  without silently changing the persisted INI baseline.
+- Preserve the unsaved-state prefix in notification-area tooltips and accessible status text while
+  recovering from a missing tray icon.
+- Resolve the release-version source root after PowerShell parameter binding so the default release
+  checks run under both Windows PowerShell 5.1 and PowerShell 7.
+- Keep the packaging test's deterministic scheduled-task shim isolated from the real per-user
+  ScheduledTasks module and any installed IdleHarbor task.
 
-### Release boundary
+### Distribution
 
-- No version has been published. The licence is `GPL-3.0-only`; `v0.1.0` will be unsigned and
-  accompanied by checksums, SBOMs, and GitHub artifact attestations.
+- Prepared for publication under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives
+  accompanied by SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
 
-## [0.1.0] - Unreleased
-
-This heading reserves the first release entry. It must not be dated or described as released until
-the tagged artifacts, release checks, checksums, SBOMs, attestations, and unsigned-release notice
-are verified.
+[Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0

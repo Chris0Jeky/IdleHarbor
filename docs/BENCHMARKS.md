@@ -5,16 +5,17 @@ are a release-candidate baseline for one Windows machine, not a universal resour
 
 ## v0.1.0 x64 local baseline
 
-Measured on 2026-08-19 from native source commit `fc9a0e3` (the following commit changed packaging
-only). The exact executable is identified by SHA-256 so the result remains auditable.
+Measured on 2026-08-20 from native source commit `f011f7a` (the following commit added only the
+capture tool and generated documentation images). The exact executable is identified by SHA-256 so
+the result remains auditable.
 
 | Property | Value |
 | --- | --- |
 | Windows | NT 10.0.26100.0, x64 |
 | Logical processors | 18 |
 | Build | MSVC 19.29 / Visual Studio Build Tools 2019, CMake Release, static MSVC runtime |
-| Executable | 493,056 bytes (481.5 KiB) |
-| Executable SHA-256 | `2db24a680c7fa9b3ed4133ab1b79ea1865e90dc56619d01b22a598b5488c4ef0` |
+| Executable | 521,728 bytes (509.5 KiB) |
+| Executable SHA-256 | `f39b280be248c84b6e625dcf5995673aee3949aea6a68967274554aabc0b62f2` |
 | Repeats | 3 |
 | Window per phase | 60 seconds, sampled every 500 ms |
 
@@ -25,11 +26,12 @@ active path and emitted no pointer input.
 
 | Metric | Stopped median (range) | Active median (range) |
 | --- | ---: | ---: |
-| CPU time per 60-second window | 0 ms (0-0) | 15.625 ms (15.625-31.250) |
-| CPU, normalized across 18 logical processors | 0% (0-0) | 0.0014% (0.0014-0.0029) |
-| Average working set | 13.261 MiB (13.243-13.280) | 13.250 MiB (13.238-13.250) |
-| Average private bytes | 1.838 MiB (1.818-1.870) | 1.781 MiB (1.766-1.781) |
-| Maximum handle count | 158 (158-158) | 158 (158-158) |
+| CPU time per 60-second window | 0 ms (0-0) | 0 ms (0-15.625) |
+| CPU, normalized across 18 logical processors | 0% (0-0) | 0% (0-0.0014) |
+| Average working set | 14.381 MiB (14.374-14.382) | 15.850 MiB (15.838-15.861) |
+| Average private bytes | 1.986 MiB (1.974-1.987) | 2.115 MiB (2.096-2.138) |
+| Maximum handle count | 163 (163-163) | 177 (177-177) |
+| Maximum thread count | 4 (4-4) | 4 (4-5) |
 
 The binary imports only Windows system libraries (`SHELL32`, `WTSAPI32`, `ole32`, `USER32`,
 `KERNEL32`, and `GDI32`); it has no .NET, Qt, Electron, or separately installed Visual C++ runtime

@@ -3,11 +3,18 @@ param(
     [Parameter(Mandatory)]
     [string]$Tag,
 
-    [string]$SourceRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$SourceRoot = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 evaluates parameter defaults before populating
+# $PSScriptRoot. Resolve the script-relative default after parameter binding so
+# direct `-File` invocation behaves the same in both supported editions.
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = Split-Path -Parent $PSScriptRoot
+}
 
 $tagMatch = [regex]::Match($Tag, '^v(?<version>\d+\.\d+\.\d+)$')
 if (-not $tagMatch.Success) {
