@@ -1,6 +1,7 @@
-# IdleHarbor
+# IdleHarbor — Lightweight Windows Mouse Jiggler and Keep-Awake Utility
 
-> Transparent, configurable idle prevention for Windows, built as a small native application.
+> A small, native Windows mouse jiggler and keep-awake utility for authorized work sessions,
+> presentations, installations, and long-running local tasks.
 
 [![CI](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
@@ -27,10 +28,11 @@ This is a real Release-QA capture at 200% Windows display scaling, not a mock-up
 The compact capture shows the same native window resized to a short work area. Wheel, scrollbar,
 and keyboard focus paths keep every control reachable.
 
-IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
-presentations, installations, and local dashboards. It combines optional motion input with Windows
-power requests, visible controls, conservative safeguards, and an immediate stop path. It does not
-provide concealment, monitoring bypasses, or claims of undetectability.
+IdleHarbor is an open-source, lightweight alternative to bulky mouse-jiggler applications. It is an
+independent C++20/Win32 utility with no separately installed application runtime: optional motion
+input and Windows power requests can be configured independently, while visible controls,
+conservative safeguards, and an immediate stop path keep the session understandable and user
+controlled. It does not provide concealment, monitoring bypasses, or claims of undetectability.
 
 ## Status
 
@@ -172,7 +174,7 @@ active_hours_end_minute=1080
 An end earlier than the start represents an overnight window. The complete key names are documented
 in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-## Distribution
+## Download, install, and trust
 
 There is no published release yet, so this repository intentionally contains no guessed download
 URL. The release workflow is prepared to produce architecture-labelled portable archives such as
@@ -184,8 +186,61 @@ URL. The release workflow is prepared to produce architecture-labelled portable 
 - package manifest with source revision and architecture.
 
 The optional per-user installer, Start Menu launcher, and startup helpers are documented in
-[`packaging/README.md`](packaging/README.md). `v0.1.0` will be explicitly unsigned; use the
-published checksums, SBOMs, and GitHub attestations to verify its artifacts.
+[`packaging/README.md`](packaging/README.md). Once `v0.1.0` is tagged, its release page will be the
+source for architecture-labelled portable archives and their checksums; no download URL is guessed
+before that page exists. `v0.1.0` will be explicitly unsigned, so Windows may show a publisher
+warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify its
+artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
+
+## Frequently asked questions
+
+### Is IdleHarbor a mouse jiggler?
+
+Yes. It can send bounded, configurable input patterns for applications that legitimately need
+input activity, or it can run with motion **Off** and use only a Windows power request. It is a
+transparent utility, not an invisible or undetectable mouse jiggler.
+
+### Will it stop Windows from sleeping?
+
+The **System** and **Display** power modes request that Windows keep the selected power state
+available while a session is active. Whether that request is honored can depend on Windows policy,
+hardware, lock state, battery settings, or a managed-device policy. Motion and power are separate,
+so neither mechanism should be treated as a universal sleep-prevention guarantee.
+
+### Does it move the visible pointer?
+
+That depends on the selected motion mode. **Normal**, **Circle**, and **Linear** are bounded visible
+patterns; **Zen** requests virtual input intended not to move the visible pointer; **Off** emits no
+motion. Applications can detect, block, log, or ignore simulated input.
+
+### Does it need .NET, Electron, or another runtime?
+
+No separately installed application runtime is required. IdleHarbor is a native C++20/Win32 Windows
+program built against Windows system libraries. The release notes and benchmark evidence describe
+the exact build and its measured footprint.
+
+### How do I stop it immediately?
+
+Use the visible **Stop** button, the notification-area menu, or the configured emergency hotkey.
+The session also pauses or stops for safeguards such as genuine input, lock or disconnect, battery
+policy, fullscreen policy, active hours, and maximum duration when enabled.
+
+### Is it appropriate for a managed work laptop?
+
+Only if the device, account, and workplace rules allow it. Read [`docs/SAFETY.md`](docs/SAFETY.md)
+and obtain any required approval first. IdleHarbor does not bypass monitoring or make activity
+claims on a user's behalf.
+
+### Is the first release code-signed?
+
+No. `v0.1.0` is intentionally unsigned because no signing identity has been provided. Checksums,
+an SPDX SBOM, and GitHub provenance attestations provide release evidence, but they do not remove
+Windows' unsigned-publisher warning. Signing can be added in a later release.
+
+### Which license does IdleHarbor use?
+
+The source and release artifacts use the GNU General Public License version 3 only
+([`GPL-3.0-only`](LICENSE)). The repository and portable archives include the complete license text.
 
 ## Safety boundary
 
