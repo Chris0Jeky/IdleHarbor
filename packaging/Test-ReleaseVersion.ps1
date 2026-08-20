@@ -9,9 +9,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$tagMatch = [regex]::Match($Tag, '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$')
+$tagMatch = [regex]::Match($Tag, '^v(?<version>\d+\.\d+\.\d+)$')
 if (-not $tagMatch.Success) {
-    throw "Release tag is not a supported SemVer tag: $Tag"
+    throw "Release tag is not a supported stable SemVer tag: $Tag"
 }
 $tagVersion = $tagMatch.Groups['version'].Value
 

@@ -137,7 +137,9 @@ Startup is opt-in. Supported choices are `TaskScheduler`, `StartupFolder`, `RunK
 
 The Task Scheduler option is the recommended least-privilege choice. It creates a per-user
 interactive task that starts `--start --minimized`. `-WhatIf` previews changes; `uninstall.ps1`
-removes only entries and files proven to belong to IdleHarbor. See [`packaging/README.md`](../packaging/README.md).
+removes only entries and files proven to belong to IdleHarbor. Failed install/update operations
+restore managed files and owned startup state, while unexpected files and pre-existing scheduler
+folders are preserved. See [`packaging/README.md`](../packaging/README.md).
 
 ## Visibility and stopping
 

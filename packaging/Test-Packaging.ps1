@@ -170,6 +170,11 @@ try {
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
+    $initialMarker = Get-Content -Raw -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json') | ConvertFrom-Json
+    Assert-True (@($initialMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') `
+        'Installer marker does not record Task Scheduler folder ownership.'
+    Assert-True ($initialMarker.taskFolderOwned -eq $false) `
+        'A non-scheduled installation incorrectly claimed Task Scheduler folder ownership.'
 
     $installedExecutable = Join-Path $installRoot 'IdleHarbor.exe'
     $installedMarker = Join-Path $installRoot '.idleharbor-managed.json'
@@ -220,6 +225,27 @@ try {
     Remove-Item -LiteralPath $unexpectedFile -Force
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
+
+    $hardlinkRoot = Join-Path $tempRoot 'hardlink-boundary\IdleHarbor'
+    $hardlinkSentinel = Join-Path $tempRoot 'hardlink-boundary-sentinel.bin'
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+    $hardlinkExecutable = Join-Path $hardlinkRoot 'IdleHarbor.exe'
+    Remove-Item -LiteralPath $hardlinkExecutable -Force
+    [IO.File]::WriteAllBytes($hardlinkSentinel, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
+    New-Item -ItemType HardLink -Path $hardlinkExecutable -Target $hardlinkSentinel | Out-Null
+    $hardlinkRejected = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+    }
+    catch { $hardlinkRejected = $_.Exception.Message -like '*hard links*' }
+    Assert-True $hardlinkRejected 'Installer accepted a multiply linked managed destination file.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
+        'Installer overwrote data outside its boundary through a managed hard link.'
+    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $hardlinkRoot | Out-Null
+    Assert-True (-not (Test-Path -LiteralPath $hardlinkRoot)) `
+        'Uninstaller did not remove the in-root hard link without touching its external peer.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
+        'Uninstaller changed the external peer of an in-root hard link.'
 
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -NoLaunch | Out-Null
     $savedAppData = $env:APPDATA
@@ -322,6 +348,13 @@ try {
     try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.1' | Out-Null }
     catch { $versionMismatchRejected = $true }
     Assert-True $versionMismatchRejected 'Release version validator accepted a mismatched tag.'
+
+    foreach ($unsupportedTag in @('v0.1.0-rc.1', 'v0.1.0+build.1')) {
+        $unsupportedTagRejected = $false
+        try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag $unsupportedTag | Out-Null }
+        catch { $unsupportedTagRejected = $true }
+        Assert-True $unsupportedTagRejected "Release version validator accepted unsupported tag $unsupportedTag."
+    }
 
     $versionFixture = Join-Path $tempRoot 'version-fixture'
     New-Item -ItemType Directory -Path (Join-Path $versionFixture 'include\idleharbor'), (Join-Path $versionFixture 'resources') -Force | Out-Null

@@ -32,6 +32,59 @@ $KnownFiles = @(
     'LICENSE'
 )
 
+if (-not ('IdleHarbor.Packaging.FileIdentity' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace IdleHarbor.Packaging
+{
+    public static class FileIdentity
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ByHandleFileInformation
+        {
+            public uint FileAttributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public uint VolumeSerialNumber;
+            public uint FileSizeHigh;
+            public uint FileSizeLow;
+            public uint NumberOfLinks;
+            public uint FileIndexHigh;
+            public uint FileIndexLow;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetFileInformationByHandle(
+            SafeFileHandle file,
+            out ByHandleFileInformation information);
+
+        public static uint GetLinkCount(string path)
+        {
+            using (FileStream stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete))
+            {
+                ByHandleFileInformation information;
+                if (!GetFileInformationByHandle(stream.SafeFileHandle, out information))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                return information.NumberOfLinks;
+            }
+        }
+    }
+}
+'@
+}
+
 function Confirm-Change {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -139,6 +192,62 @@ function Assert-OwnedOrEmptyDestination([string]$Root, [string]$SourceRoot) {
 
 function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
+}
+
+function Assert-SafeManagedFile([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Managed install path is not a regular file: $Path"
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Managed install path may not be a junction or symbolic link: $Path"
+    }
+    $linkCount = [IdleHarbor.Packaging.FileIdentity]::GetLinkCount($item.FullName)
+    if ($linkCount -ne 1) {
+        throw "Managed install path has $linkCount hard links; refusing to cross the install boundary: $Path"
+    }
+}
+
+function Test-TaskFolderExists {
+    $service = New-Object -ComObject 'Schedule.Service'
+    $service.Connect()
+    try {
+        $null = $service.GetFolder($TaskPath.TrimEnd('\'))
+        return $true
+    }
+    catch {
+        if ($_.Exception.HResult -eq -2147024894) { return $false }
+        throw
+    }
+}
+
+function Remove-EmptyOwnedTaskFolder {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [bool]$Owned
+    )
+
+    if (-not $Owned) { return $false }
+    $service = New-Object -ComObject 'Schedule.Service'
+    $service.Connect()
+    try {
+        $folder = $service.GetFolder($TaskPath.TrimEnd('\'))
+    }
+    catch {
+        if ($_.Exception.HResult -eq -2147024894) { return $true }
+        throw
+    }
+
+    if ($folder.GetTasks(0).Count -ne 0 -or $folder.GetFolders(0).Count -ne 0) {
+        return $false
+    }
+    if ($PSCmdlet.ShouldProcess("scheduled task folder $TaskPath", 'Remove empty installer-owned folder')) {
+        $service.GetFolder('\').DeleteFolder($TaskPath.Trim('\'), 0)
+        return $true
+    }
+    return $false
 }
 
 function Get-RunCommand() {
@@ -323,9 +432,7 @@ function New-InstallSnapshot {
         foreach ($relativeFile in @($RelativeFiles | Select-Object -Unique)) {
             $destination = Join-Path $InstallRoot $relativeFile
             $exists = Test-Path -LiteralPath $destination
-            if ($exists -and -not (Test-Path -LiteralPath $destination -PathType Leaf)) {
-                throw "Managed install path is not a regular file: $destination"
-            }
+            if ($exists) { Assert-SafeManagedFile $destination }
 
             $backup = Join-Path $backupRoot $relativeFile
             if ($exists) {
@@ -365,6 +472,9 @@ function Restore-InstallSnapshot {
             if (-not (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
                 New-Item -ItemType Directory -Path $InstallRoot | Out-Null
             }
+            if (Test-Path -LiteralPath ([string]$entry.destination)) {
+                Assert-SafeManagedFile ([string]$entry.destination)
+            }
             Copy-Item -LiteralPath ([string]$entry.backup) -Destination ([string]$entry.destination) -Force
         }
         elseif (Test-Path -LiteralPath ([string]$entry.destination) -PathType Leaf) {
@@ -387,7 +497,15 @@ function Restore-InstallSnapshot {
     }
 }
 
-function Get-StartupSnapshot([string]$Executable) {
+function Get-StartupSnapshot {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [bool]$CaptureTaskFolder
+    )
+
     $taskXml = $null
     $task = Get-OwnedTask $Executable
     if ($null -ne $task) {
@@ -409,6 +527,7 @@ function Get-StartupSnapshot([string]$Executable) {
 
     return [pscustomobject]@{
         taskXml = $taskXml
+        taskFolderExisted = $(if ($CaptureTaskFolder) { Test-TaskFolderExists } else { $true })
         shortcutBytes = $shortcutBytes
         runCommand = $runCommand
         runKind = $runKind
@@ -444,6 +563,12 @@ function Restore-StartupSnapshot {
             -Value ([string]$Snapshot.runCommand) `
             -Type ([Microsoft.Win32.RegistryValueKind]$Snapshot.runKind)
     }
+    if (-not $Snapshot.taskFolderExisted) {
+        $folderRemoved = Remove-EmptyOwnedTaskFolder -Owned $true -Confirm:$false
+        if (-not $folderRemoved -and (Test-TaskFolderExists)) {
+            Write-Warning "Preserved non-empty Task Scheduler folder after rollback: $TaskPath"
+        }
+    }
 }
 
 $sourceRoot = Get-SourceRoot $SourcePath
@@ -458,13 +583,21 @@ Assert-StartupEntriesOwned $destinationExecutable
 $sourceIsInstallRoot = Test-SamePath $sourceRoot $safeRoot
 $installSnapshot = $null
 $startupSnapshot = $null
+$previousTaskFolderOwned = $false
+if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    $existingMarker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
+    if (@($existingMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') {
+        $previousTaskFolderOwned = ($existingMarker.taskFolderOwned -eq $true)
+    }
+}
 
 if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Stop-OwnedApplicationIfRunning $destinationExecutable
 }
 
 if (-not $WhatIfPreference) {
-    $startupSnapshot = Get-StartupSnapshot $destinationExecutable
+    $captureTaskFolder = ($Startup -eq 'TaskScheduler' -or $previousTaskFolderOwned)
+    $startupSnapshot = Get-StartupSnapshot -Executable $destinationExecutable -CaptureTaskFolder $captureTaskFolder
     $installSnapshot = New-InstallSnapshot -InstallRoot $safeRoot -RelativeFiles @($KnownFiles + $MarkerName)
 }
 
@@ -481,25 +614,40 @@ try {
         if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }
         $destinationFile = Join-Path $safeRoot $fileName
         if (Confirm-Change $destinationFile 'Install package file') {
+            if (Test-Path -LiteralPath $destinationFile) { Assert-SafeManagedFile $destinationFile }
             Copy-Item -LiteralPath $sourceFile -Destination $destinationFile -Force
             Invoke-InjectedFailure 'AfterCopy'
         }
     }
 
+    Set-Startup $destinationExecutable $Startup
+
+    $taskFolderOwned = $previousTaskFolderOwned
+    if (-not $WhatIfPreference) {
+        if ($Startup -eq 'TaskScheduler' -and -not $startupSnapshot.taskFolderExisted) {
+            $taskFolderOwned = $true
+        }
+        elseif ($Startup -ne 'TaskScheduler' -and $taskFolderOwned) {
+            if (Remove-EmptyOwnedTaskFolder -Owned $true -Confirm:$false) {
+                $taskFolderOwned = $false
+            }
+        }
+    }
+
     if (Confirm-Change $markerPath 'Write ownership marker') {
+        if (Test-Path -LiteralPath $markerPath) { Assert-SafeManagedFile $markerPath }
         $installedFiles = @($KnownFiles | Where-Object { Test-Path -LiteralPath (Join-Path $safeRoot $_) -PathType Leaf })
         $marker = [ordered]@{
             product = $ProductName
             installRoot = $safeRoot
             executable = $destinationExecutable
             managedFiles = $installedFiles
+            taskFolderOwned = $taskFolderOwned
             installedAtUtc = [DateTime]::UtcNow.ToString('o')
         }
         $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
         Invoke-InjectedFailure 'AfterMarker'
     }
-
-    Set-Startup $destinationExecutable $Startup
 }
 catch {
     $failure = $_

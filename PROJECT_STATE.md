@@ -14,8 +14,9 @@ SBOMs, pinned CI, CodeQL, and GitHub attestations. No release or tag has been pu
 
 ## Landed base
 
-`origin/main` is `f9c07ef0a5e5b0b4c73bc591bc8b448bfabf3ec2`, the merge commit for pull request
-[#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8). Issue
+`origin/main` is `b4bf3dd850bf4abe408fbece4d473c2117bf2bef`, including the merged settings-recovery
+pull request [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8) and reviewed GitHub Actions
+dependency pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7). Issue
 [#3](https://github.com/Chris0Jeky/IdleHarbor/issues/3) is closed.
 
 The settings-recovery change passed exact-head x64, ARM64, x86, CodeQL analysis, and CodeQL
@@ -29,27 +30,30 @@ Branch `agent/v0.1.0-installer-trust` contains:
 
 - transactional fresh-install and update rollback;
 - restoration of managed files, the ownership marker, and owned startup state after caught failure;
+- linked-file/reparse rejection before managed paths can cross the install-root boundary;
+- tracked ownership and cleanup of installer-created empty Task Scheduler folders while preserving
+  pre-existing or non-empty folders;
 - application-manifest version validation;
 - a tracked-root-`LICENSE` publication guard without inventing licence approval; and
-- an explicit contract keeping checksums and per-architecture SPDX files as release siblings.
+- an explicit contract keeping checksums and per-architecture SPDX files as release siblings;
+- a stable-only tag policy shared by the workflow and embedded-version validator; and
+- packaging/checksum verification compatible with PowerShell 7 and Windows PowerShell 5.1.
 
 Verified before merging current `main`:
 
 - native x64 Release build and CTest passed 6/6;
-- the PowerShell 7 packaging suite passed;
+- the complete packaging suite passed under PowerShell 7 and Windows PowerShell 5.1, including
+  normalized archive/checksum paths, stable-tag rejection, and hard-link boundary refusal;
 - the installer transaction smoke passed under PowerShell 7 and Windows PowerShell 5.1; and
 - a real rollback matrix passed under both shells for RunKey, Startup Folder, and Task Scheduler,
   covering fresh failure cleanup, exact existing-startup restoration, file/marker rollback,
-  unexpected-file preservation, successful update, and clean uninstall.
+  unexpected-file preservation, successful update, clean uninstall, and preservation of a
+  pre-existing scheduler folder.
 
-A fresh-context independent review of `dd65ee8` found no confirmed CRITICAL/HIGH defect. The live
-matrix did expose an empty Task Scheduler folder left after uninstall/rollback; the exact empty test
-folder was removed, and product cleanup still needs a bounded ownership-safe fix before the PR.
-
-Issue [#9](https://github.com/Chris0Jeky/IdleHarbor/issues/9) remains in this release lane: normalize
-ZIP separators and replace `System.IO.Path.GetRelativePath` so the complete packaging suite passes
-under Windows PowerShell 5.1 as well as PowerShell 7. The workflow/validator must also consistently
-reject unsupported prerelease/build tags for the stable-only v0.1.0 lane.
+A fresh-context independent review of `dd65ee8` found no confirmed CRITICAL/HIGH defect. Later live
+testing found the empty scheduler-folder residue and linked-file boundary defect; both now have
+direct regression coverage, but the final combined logic still needs one fresh-context review after
+current `main` is integrated.
 
 Intended merge issues are [#4](https://github.com/Chris0Jeky/IdleHarbor/issues/4),
 [#5](https://github.com/Chris0Jeky/IdleHarbor/issues/5), and
@@ -60,8 +64,8 @@ Intended merge issues are [#4](https://github.com/Chris0Jeky/IdleHarbor/issues/4
 - Branch `agent/v0.1.0-ui-viewport` has the high-DPI layout implementation but still needs current
   `main` integrated, child-target/high-resolution wheel routing, and real mixed-DPI UI evidence for
   [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2).
-- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) was rebased onto current
-  `main`; exact-head CI and a fresh-base review are in progress.
+- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) passed exact-head CI and
+  a fresh-base review, then merged with a merge commit.
 - Portfolio visuals and the social preview remain under
   [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6).
 - `powercfg /requests` remains NOT verified because this machine requires elevation and no elevation
@@ -80,8 +84,8 @@ attestation and clean install path, and generate WinGet/Scoop manifests from rea
 
 ## Next safe slices
 
-1. Finish Task Scheduler folder ownership cleanup, PowerShell 5.1 packaging portability, and stable
-   tag-policy tests on this branch; rerun both shells plus native CMake/CTest.
+1. Merge current `origin/main`, rerun the scoped two-shell packaging/startup tests plus native
+   CMake/CTest, and verify no startup residue remains.
 2. Obtain one fresh-context review of the final logic, open the #4/#5/#9 PR, and ship only after
    exact-head hosted checks and the aging floor.
 3. Finish and ship the high-DPI viewport, dependency PR, and portfolio evidence.
