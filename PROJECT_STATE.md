@@ -11,7 +11,7 @@ path, recoverable settings handling, and transactional per-user installation. No
 release has been created or published.
 
 The live merged baseline is `origin/main` at
-`1aa55b754239e1899b09bb6f785299ed2550879b`. PRs
+`b9bfa82a45dd8cd777c3232a4d71b68f8ef9a9c4`. PRs
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8),
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10),
@@ -20,11 +20,12 @@ The live merged baseline is `origin/main` at
 [#17](https://github.com/Chris0Jeky/IdleHarbor/pull/17),
 [#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18),
 [#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), and
-[#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25), and
-[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29) landed dependency pinning, settings recovery,
+[#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25),
+[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29), and
+[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) landed dependency pinning, settings recovery,
 installer/release trust, the high-DPI viewport, rollback recovery, fixed viewport safety regions,
 upstream motion-multiplier parity, final viewport accessibility polish, and packaging-test isolation.
-Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, and #26 are closed.
+Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, #26, #27, and #28 are closed.
 
 The landed installer evidence includes x64 CTest plus complete packaging and real rollback matrices
 under PowerShell 7 and Windows PowerShell 5.1. It covers each startup mechanism, fresh failure
@@ -54,10 +55,12 @@ part of PR #16.
 ### Portfolio and publication
 
 Issue [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks final exact-build Running,
-Paused, full-window, viewport, and tray captures plus the repository social preview. The pushed
-checkpoint branch `agent/v0.1.0-portfolio-polish` predates the final UI/motion baseline; it must
-incorporate final `main`, replace every earlier capture, refresh performance evidence, and pass
-visual/privacy review before its PR is opened.
+Paused, full-window, viewport, and tray captures plus the repository social preview. This branch
+starts from merged main `b9bfa82` and records the privacy-safe capture set, high-contrast social
+SVG/PNG, and exact x64 demo evidence. The unsigned 0.1.0 executable is 516,608 bytes with SHA-256
+`432026b0719671bd33c1b0ca0f7df809fec20e73fc05b38b6e513606584f6d54`; three 60-second stopped and
+active system-request runs are documented in `docs/BENCHMARKS.md`. The GitHub social-preview upload
+remains a pre-merge publication action and is not claimed complete here.
 
 PR [#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29) merged the issue
 [#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) fix into `main` at
@@ -73,7 +76,7 @@ can change internal action focus without a state transition. Issue
 scrollbar wider than IdleHarbor's logical body inset. Both were classified non-blocking in PR #24's
 bounded final review.
 
-The follow-up branch `agent/v0.1.0-ui-final` implements both bounded UI fixes: deferred Start focus
+The merged UI-final changes implement both bounded UI fixes: deferred Start focus
 is now posted only after an actual active-to-stopped transition, and body layout measures the
 settings viewport after sizing it, using its effective client width for breakpoint and fill-width
 decisions. `UpdateViewport` now converges layout and scroll-range publication across native
@@ -95,13 +98,11 @@ mixed-DPI verification.
 
 ## Resume order
 
-1. Re-prove, review, and merge the `agent/v0.1.0-ui-final` fixes for issues #27 and #28, then sweep
-   late review feedback once.
-2. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
+1. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
    and the uploaded GitHub social preview.
-3. Run the final native runtime, packaging, installer, performance, security, accessibility, and
+2. Run the final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact audit.
-4. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
+3. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
    derive package-manager manifests from verified real URLs and hashes.
 
 ## Proving commands

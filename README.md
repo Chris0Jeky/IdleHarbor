@@ -9,22 +9,40 @@
 
 ## Genuine UI
 
+The gallery below is the portfolio capture surface, captured from the exact merged-main
+release-candidate build `b9bfa82`. Earlier screenshots are not release evidence.
+
+### States at a glance
+
+| Running | Safety pause |
+| :---: | :---: |
+| <img src="docs/assets/idleharbor-running.png" alt="IdleHarbor visibly running with its current state shown above the settings" width="560"> | <img src="docs/assets/idleharbor-paused.png" alt="IdleHarbor visibly paused with the reason shown in the status area" width="560"> |
+
+Settings are locked while a session is active, and every automatic pause explains why it happened.
+The genuine notification-area menu keeps **Show**, **Stop**, and **Exit** immediately available:
+
 <p align="center">
-  <img src="docs/assets/idleharbor-window.png"
-       alt="IdleHarbor settings window at 200 percent Windows display scaling"
-       width="594">
+  <img src="docs/assets/idleharbor-tray-menu.png"
+       alt="IdleHarbor notification-area menu with Show, Stop, and Exit actions"
+       width="250">
 </p>
 
-This is a real Release-QA capture at 200% Windows display scaling, not a mock-up.
+### Full window and compact viewport
+
+<p align="center">
+  <img src="docs/assets/idleharbor-window.png"
+       alt="IdleHarbor exact-build settings window at 200 percent Windows display scaling"
+       width="589">
+</p>
 
 <p align="center">
   <img src="docs/assets/idleharbor-viewport.png"
-       alt="IdleHarbor resized at 200 percent scaling with its native vertical scrollbar"
-       width="600">
+       alt="IdleHarbor exact-build compact viewport with its native vertical scrollbar"
+       width="589">
 </p>
 
-The compact capture shows the same native window resized to a short work area. Wheel, scrollbar,
-and keyboard focus paths keep every control reachable.
+The capture set is privacy-safe and shows the visible status, fixed safety controls, native
+scrollbar, running and paused states, and notification-area actions.
 
 IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
 presentations, installations, and local dashboards. It combines optional motion input with Windows
@@ -63,9 +81,8 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-An earlier release-candidate x64 build measured 493,056 bytes (481.5 KiB); current release artifacts
-will be measured again before publication. The reproducible three-run local resource baseline and
-its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+The exact merged-main x64 demo build is 516,608 bytes (504.5 KiB); its SHA-256 and reproducible
+three-run resource measurements are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

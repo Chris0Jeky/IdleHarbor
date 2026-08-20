@@ -24,6 +24,9 @@ where practical.
   order (including Save before fixed Start/Stop), transferred keyboard focus to the newly enabled
   Start/Stop action after session changes, re-revealed a still-focused setting after resize or DPI
   reflow, and adapted stacked controls to unusually narrow work areas.
+- Added privacy-safe exact-build Running, Paused, full-window, compact-viewport, and tray captures;
+  refreshed the social preview footer for stronger contrast and recorded the final x64 resource
+  baseline.
 
 ### Changed
 

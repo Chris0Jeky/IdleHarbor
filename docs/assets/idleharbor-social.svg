@@ -49,5 +49,5 @@
 
   <line x1="474" y1="433" x2="1122" y2="433" stroke="#2b3b55" stroke-width="2"/>
   <text x="474" y="485" fill="#8fa5bd" font-family="Segoe UI, Arial, sans-serif" font-size="23" letter-spacing="3">POWER REQUESTS  ·  INPUT MODES  ·  INTELLIGENT PAUSE</text>
-  <text x="474" y="540" fill="#5f7895" font-family="Segoe UI, Arial, sans-serif" font-size="20">Portable x64 / ARM64 • tray UI • local-only settings • immediate stop</text>
+  <text x="474" y="540" fill="#8fa5bd" font-family="Segoe UI, Arial, sans-serif" font-size="20">Portable x64 / ARM64 • tray UI • local-only settings • immediate stop</text>
 </svg>

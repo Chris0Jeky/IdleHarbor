@@ -3,6 +3,51 @@
 IdleHarbor includes a reproducible local measurement script rather than telemetry. Results below
 are a release-candidate baseline for one Windows machine, not a universal resource guarantee.
 
+The historical baseline remains below for comparison. The exact merged-main demo evidence is
+recorded first and is identified by both source commit and executable hash.
+
+## Exact merged-main x64 demo evidence
+
+Measured on 2026-08-20 from merged-main source commit `b9bfa82a45dd8cd777c3232a4d71b68f8ef9a9c4`.
+The unsigned x64 executable is 516,608 bytes (504.5 KiB), version 0.1.0, with SHA-256
+`432026b0719671bd33c1b0ca0f7df809fec20e73fc05b38b6e513606584f6d54`.
+
+| Property | Value |
+| --- | --- |
+| Windows | Microsoft Windows NT 10.0.26100.0 |
+| Architecture | AMD64 |
+| Logical processors | 18 |
+| Build | MSVC Release, exact merged-main source commit above |
+| Executable | 516,608 bytes (504.5 KiB), unsigned |
+| Executable SHA-256 | `432026b0719671bd33c1b0ca0f7df809fec20e73fc05b38b6e513606584f6d54` |
+| Imported system libraries | `COMCTL32`, `SHELL32`, `WTSAPI32`, `ole32`, `USER32`, `KERNEL32`, `GDI32` |
+| Runs | 3 |
+| Window per phase | 60 seconds, sampled every 500 ms |
+
+| Metric | Stopped median (range) | Active system-request median (range) |
+| --- | ---: | ---: |
+| CPU time per 60-second window | 0 ms (0-0) | 0 ms (0-31.25) |
+| CPU, normalized across 18 logical processors | 0% (0-0) | 0% (0-0.0029) |
+| Average working set | 14.269 MiB (14.251-14.271) | 15.732 MiB (15.717-15.736) |
+| Average private bytes | 2.012 MiB (1.992-2.014) | 2.154 MiB (2.150-2.181) |
+| Maximum handle count | 164 (164-164) | 178 (178-178) |
+| Threads | 4 (4-4) | 4 (4-5) |
+
+The active phase used the power-request-only path with motion disabled, so this is a low-disruption
+active baseline rather than a motion or hook-cost measurement. The raw JSON is retained with the
+final demo evidence outside the repository and has SHA-256
+`5f54946f64f02a124c7ef73a5f36ca50c1f8440de73c6c6a4c53d94b879e678f`.
+
+The exact-build portfolio captures are privacy-safe PNGs. Their dimensions and SHA-256 values are:
+
+| Capture | Dimensions | SHA-256 |
+| --- | ---: | --- |
+| `idleharbor-window.png` | 1178x1389 | `bd9e3ae7db44bc7aa4d90a2070d131c23a3e747a6b266c08d46fe2fd4bbb4d20` |
+| `idleharbor-viewport.png` | 1178x789 | `46b3f7ee629f54aee5887f7a65711155b177e485e126aa544c6ee2fac194d141` |
+| `idleharbor-running.png` | 1178x789 | `bdbc31fb2690610c608e249b18cd0b43d665b6dee8ec54c50a5e7a350f6a0157` |
+| `idleharbor-paused.png` | 1178x789 | `51fdb85cd022305f01411339a5299eb4583fb4eb5e0a25ac65349801a08e4739` |
+| `idleharbor-tray-menu.png` | 244x415 | `bf72e24f89fb21c7a8559c82c28ebd0b632da2babd6d4d18b91a73d02d3f9015` |
+
 ## v0.1.0 x64 local baseline
 
 Measured on 2026-08-19 from native source commit `fc9a0e3` (the following commit changed packaging
