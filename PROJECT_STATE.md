@@ -73,6 +73,10 @@ Issues [#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
 [#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) closed with PR #47. The bounded post-release
 queue remains:
 
+- [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6): upload the prepared social preview after GitHub's Settings UI recovers;
+- [#37](https://github.com/Chris0Jeky/IdleHarbor/issues/37): handle Start Menu known-folder relocation without weakening ownership checks;
+- [#38](https://github.com/Chris0Jeky/IdleHarbor/issues/38): make installer and uninstaller `-WhatIf` summaries unambiguously preview-only;
+- [#40](https://github.com/Chris0Jeky/IdleHarbor/issues/40): pin a complete canonical GPLv3 text check in the publication gate;
 - [#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42): deterministic tray-failure dirty-state test;
 - [#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46): tray recovery/status refresh follow-up;
 - [#48](https://github.com/Chris0Jeky/IdleHarbor/issues/48): restore the scheduler command after packaging tests;
