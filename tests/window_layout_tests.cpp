@@ -96,6 +96,25 @@ void test_focus_reveal_is_gated_by_actual_focus_change() {
     CHECK(FocusChanged(0, 0x20));
 }
 
+void test_tab_order_puts_body_save_before_fixed_actions() {
+    using idleharbor::app::TabOrderBefore;
+    using idleharbor::app::TabOrderPosition;
+    using idleharbor::app::TabOrderRegion;
+    const TabOrderPosition save{TabOrderRegion::Body, 566, 270, 10};
+    const TabOrderPosition start{TabOrderRegion::FixedBottom, 0, 20, 8};
+    const TabOrderPosition stop{TabOrderRegion::FixedBottom, 0, 145, 9};
+    CHECK(TabOrderBefore(save, start));
+    CHECK(TabOrderBefore(start, stop));
+    CHECK(!TabOrderBefore(stop, start));
+    CHECK(TabOrderBefore(TabOrderPosition{TabOrderRegion::Body, 50, 20, 0}, save));
+}
+
+void test_layout_change_reveals_only_when_focused_control_is_clipped() {
+    using idleharbor::app::ScrollPositionToReveal;
+    CHECK(ScrollPositionToReveal(300, 340, 380, 1200, 200) == 300);
+    CHECK(ScrollPositionToReveal(300, 520, 560, 1200, 200) == 360);
+}
+
 void test_narrow_work_areas_reflow_settings_and_actions() {
     using idleharbor::app::ActionLayoutMode;
     using idleharbor::app::DetermineActionLayout;
@@ -153,6 +172,22 @@ void test_stacked_stop_stays_inside_short_clients() {
     }
 }
 
+void test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi() {
+    using idleharbor::app::ComputeStackedBodyLayout;
+    using idleharbor::app::LogicalPixels;
+    using idleharbor::app::PhysicalPixels;
+    for (const int dpi : {96, 120, 144, 168}) {
+        for (const int logical_width : {80, 99}) {
+            const int physical_width = PhysicalPixels(logical_width, dpi);
+            const int measured_logical_width = LogicalPixels(physical_width, dpi);
+            const auto body = ComputeStackedBodyLayout(measured_logical_width);
+            CHECK(body.left >= 0);
+            CHECK(body.width >= 1);
+            CHECK(body.left + body.width <= measured_logical_width);
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -164,8 +199,11 @@ int main() {
     test_wheel_delta_preserves_direction_and_remainder();
     test_fixed_safety_regions_never_scroll_with_the_body();
     test_focus_reveal_is_gated_by_actual_focus_change();
+    test_tab_order_puts_body_save_before_fixed_actions();
+    test_layout_change_reveals_only_when_focused_control_is_clipped();
     test_narrow_work_areas_reflow_settings_and_actions();
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_stacked_stop_stays_inside_short_clients();
+    test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();
     return failures == 0 ? 0 : 1;
 }

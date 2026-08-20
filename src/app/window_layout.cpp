@@ -160,6 +160,27 @@ ActionButtonRects ComputeActionButtonRects(const int client_width, const int cli
     };
 }
 
+bool TabOrderBefore(const TabOrderPosition& left, const TabOrderPosition& right) noexcept {
+    const auto left_region = static_cast<int>(left.region);
+    const auto right_region = static_cast<int>(right.region);
+    if (left_region != right_region) {
+        return left_region < right_region;
+    }
+    if (left.top != right.top) {
+        return left.top < right.top;
+    }
+    if (left.left != right.left) {
+        return left.left < right.left;
+    }
+    return left.sequence < right.sequence;
+}
+
+StackedBodyLayout ComputeStackedBodyLayout(const int logical_client_width) noexcept {
+    const int width = std::max(logical_client_width, 1);
+    const int margin = std::min(20, std::max((width - 1) / 2, 0));
+    return {margin, std::max(width - 2 * margin, 1)};
+}
+
 bool FocusChanged(const std::uintptr_t previous_focus, const std::uintptr_t current_focus) noexcept {
     return previous_focus != current_focus;
 }
