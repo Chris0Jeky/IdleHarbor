@@ -37,8 +37,10 @@ found no untriaged late feedback.
 
 ## Saved installer and release-trust slice
 
-Branch: `agent/v0.1.0-installer-trust`  
-Remote head: `dd65ee83af1113100936420dc860c8c2169f26cf`  
+Branch: `agent/v0.1.0-installer-trust`
+
+Remote head: `dd65ee83af1113100936420dc860c8c2169f26cf`
+
 Worktree: `..\IdleHarbor-worktrees\installer-trust-ship`
 
 Commits:
@@ -73,7 +75,8 @@ No PR is open for this branch. Intended issues are
 
 ## Saved high-DPI viewport slice
 
-Branch: `agent/v0.1.0-ui-viewport`  
+Branch: `agent/v0.1.0-ui-viewport`
+
 Implementation commit: `be6b42d77e73cac563e7bce76abe4a14fedbd4a4`
 
 The slice adds DPI-scaled control geometry, work-area clamping, resize layout, vertical scrolling,
