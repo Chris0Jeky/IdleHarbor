@@ -5,20 +5,22 @@ Last updated: 2026-08-20
 ## Current milestone
 
 IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral policy core,
-validated local settings, strict CLI, upstream-compatible motion patterns, Windows power requests,
-genuine-input observation, battery/fullscreen/session safeguards, visible tray controls, an
-emergency stop, and transactional per-user installation. It has no telemetry or network service.
-No licence, tag, or release has been created or published.
+validated local settings, strict CLI, independently designed bounded motion patterns, Windows power
+requests, genuine-input observation, battery/fullscreen/session safeguards, visible tray controls,
+an emergency stop, and transactional per-user installation. It has no telemetry or network service.
+The source and release artifacts are licensed `GPL-3.0-only`. No tag or release has been published.
 
 The current merged baseline is `origin/main` at
-`abcaf19e21aa535085dd34a052207c26d12acca4`. PRs
+`4be21adfe69b299739b451a255e69d268757b668`. PRs
 [#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
 [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
 scroll-range convergence, and inherited-scrollbar fixes. PR
 [#35](https://github.com/Chris0Jeky/IdleHarbor/pull/35) closed issue
 [#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) with the descendant-repaint fix and native
-192-DPI smoke. Earlier merged work established the runtime, settings recovery, installer rollback
-and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and packaging isolation.
+192-DPI smoke. PR [#36](https://github.com/Chris0Jeky/IdleHarbor/pull/36) then landed the default,
+ownership-safe Start Menu launcher. Earlier merged work established the runtime, settings recovery,
+installer rollback and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and
+packaging isolation.
 
 ## Repaint follow-up
 
@@ -35,15 +37,19 @@ The smoke passes on the fixed x64 Release build. The supplied screenshot remains
 pre-fix reproduction: repeated automation against the old binary did not reproduce the intermittent
 artifact deterministically, so a red-old/green-new image comparison is not claimed.
 
-## Current installer follow-up
+## Current release-preparation follow-up
 
-The current branch adds a per-user Start Menu shortcut as the installer's default launch surface.
+The merged installer adds a per-user Start Menu shortcut as its default launch surface.
 It opens the visible settings window with `--show`; automatic startup remains an independent,
 explicit choice. The installer records ownership only for a shortcut it created, restores exact
 prior bytes on rollback, and rejects unsafe or foreign shortcut leaves. `-StartMenu None` and the
 uninstaller remove only an exact, marker-owned shortcut; changed or unowned shortcuts are
-preserved. The lifecycle suite uses temporary injected shortcut paths, so the actual per-user Start
-Menu path will be exercised during the final machine installation after this slice merges.
+preserved. The lifecycle suite uses temporary injected shortcut paths, and the actual per-user Start
+Menu path was exercised successfully during the local release-candidate installation.
+
+This licensing branch removes the only direct upstream motion-coordinate dependency, records the
+historical inspiration in `THIRD-PARTY-NOTICES.md`, and applies `GPL-3.0-only` consistently to the
+repository, portable archive, package manifest, and SPDX SBOM metadata.
 
 ## Portfolio and publication queue
 
@@ -63,22 +69,19 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 
 `HUMAN_TODO.md` is authoritative:
 
-- q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a
-  copyright holder, create a tag, publish a release, or submit package manifests until the user
-  supplies that decision.
-- q-2: Authenticode signing is optional. Without a signing identity, document `0.1.0` as unsigned
-  and rely on checksums, SBOMs, and GitHub provenance attestations.
+- q-1: resolved 2026-08-20 as `GPL-3.0-only`; no copyright holder was inferred.
+- q-2: resolved 2026-08-20 as an explicitly unsigned `v0.1.0`, relying on checksums, SPDX SBOMs,
+  and GitHub provenance attestations. Signing can be reconsidered for a later release.
 
 ## Resume order
 
-1. Prove, review, and merge the ownership-safe Start Menu installer follow-up, then sweep late
-   review feedback once.
-2. Incorporate final `main` into PR #31, refresh its exact-build evidence, and complete the GitHub
-   social-preview upload/visual check.
+1. Prove, review, and merge the GPLv3/provenance slice.
+2. Complete the native UI redesign, then refresh exact-build screenshots, documentation, repository
+   metadata, and social-preview artwork.
 3. Run final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact QA; preserve a dated demonstration bundle.
-4. Resolve q-1 and q-2 with the user. Only then add the approved licence, tag/publish `v0.1.0`, and
-   derive package-manager manifests from verified release URLs and hashes.
+4. Tag and publish unsigned `v0.1.0`, then derive and submit package-manager manifests from its
+   immutable release URLs and hashes.
 
 ## Proving commands
 

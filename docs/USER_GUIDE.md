@@ -56,7 +56,7 @@ An application may implement idle detection differently. Zen is not guaranteed t
 and visible movement is not evidence of human presence.
 
 For visible modes, the `--distance` setting is a multiplier from **1** to **120**, not a raw pixel
-radius. IdleHarbor follows the canonical Mouse Jiggler pattern deltas and translates them into
+radius. IdleHarbor uses independently designed bounded motion paths and translates them into
 cumulative safe-anchor points that finish at the captured pointer position.
 
 ## Profiles

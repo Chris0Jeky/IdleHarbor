@@ -332,6 +332,19 @@ $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
 $retainedTransactionPaths = @()
 $packagingTestMutex = $null
 $packagingTestMutexOwned = $false
+$global:IdleHarborPackagingTestScheduledTask = $null
+
+# Keep the lifecycle suite isolated from a real per-user IdleHarbor task. The installer scripts run
+# in child scopes and resolve this deterministic test double before the ScheduledTasks cmdlet.
+function Get-ScheduledTask {
+    [CmdletBinding()]
+    param(
+        [string]$TaskPath,
+        [string]$TaskName
+    )
+    return $global:IdleHarborPackagingTestScheduledTask
+}
+
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
 Assert-StartMenuOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
@@ -358,6 +371,23 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
+
+    $global:IdleHarborPackagingTestScheduledTask = [pscustomobject]@{
+        Actions = @([pscustomobject]@{
+            Execute = (Join-Path $env:WINDIR 'System32\notepad.exe')
+            Arguments = ''
+            WorkingDirectory = (Join-Path $env:WINDIR 'System32')
+        })
+    }
+    $taskPreflightRejected = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -WhatIf | Out-Null
+    }
+    catch {
+        $taskPreflightRejected = $_.Exception.Message -like '*different scheduled task already owns*'
+    }
+    Assert-True $taskPreflightRejected 'Installer did not reject the simulated foreign scheduled task.'
+    $global:IdleHarborPackagingTestScheduledTask = $null
     Assert-StartMenuLifecycle `
         -InstallScript (Join-Path $packagingRoot 'install.ps1') `
         -UninstallScript (Join-Path $packagingRoot 'uninstall.ps1') `
@@ -605,6 +635,9 @@ try {
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
+        Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/LICENSE') 'Archive lacks the GPLv3 licence.'
+        Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/THIRD-PARTY-NOTICES.md') `
+            'Archive lacks the provenance notice.'
         Assert-True ($entryNames -notcontains 'IdleHarbor-0.1.0-test-windows-x64-portable/SHA256SUMS.txt') `
             'Archive unexpectedly owns the release-directory checksum manifest.'
         Assert-True (@($entryNames | Where-Object { $_ -match '\.spdx\.json$' }).Count -eq 0) `
@@ -620,6 +653,10 @@ try {
         Assert-True ($manifestProperties -notcontains 'builtFrom') 'Package manifest contains a legacy local builtFrom path.'
         Assert-True ($manifestProperties -contains 'sourceRevision') 'Package manifest lacks its supplied source revision.'
         Assert-True ($packageManifest.sourceRevision -eq 'test-revision') 'Package manifest source revision is incorrect.'
+        Assert-True ($packageManifest.license -eq 'GPL-3.0-only') 'Package manifest licence is incorrect.'
+        Assert-True ($packageManifest.licenseFile -eq 'LICENSE') 'Package manifest licence path is incorrect.'
+        Assert-True ($packageManifest.sourceUrl -eq 'https://github.com/Chris0Jeky/IdleHarbor') `
+            'Package manifest source URL is incorrect.'
         $manifestJson = $packageManifest | ConvertTo-Json -Depth 5 -Compress
         Assert-True (-not ($manifestJson -match '([A-Za-z]:\\|/Users/|/home/)')) 'Package manifest contains a local path.'
     }
@@ -632,6 +669,9 @@ try {
     $sbomDocument = Get-Content -Raw -LiteralPath $sbom | ConvertFrom-Json
     Assert-True ($sbomDocument.spdxVersion -eq 'SPDX-2.3') 'SBOM is not SPDX 2.3.'
     Assert-True ($sbomDocument.packages[0].filesAnalyzed -eq $true) 'SBOM package must declare filesAnalyzed=true.'
+    Assert-True ($sbomDocument.packages[0].licenseDeclared -eq 'GPL-3.0-only') 'SBOM package licence is incorrect.'
+    Assert-True ($sbomDocument.packages[0].licenseConcluded -eq 'GPL-3.0-only') 'SBOM concluded licence is incorrect.'
+    Assert-True ($sbomDocument.files[0].licenseConcluded -eq 'GPL-3.0-only') 'SBOM file licence is incorrect.'
     $fileSha1 = (Get-FileDigestHex $fakeExecutable 'SHA1').ToLowerInvariant()
     $sha1Algorithm = [Security.Cryptography.SHA1]::Create()
     try {
@@ -682,7 +722,8 @@ try {
         New-Item -ItemType Directory -Path $fixture -Force | Out-Null
         & git -C $fixture init --quiet 2>$null | Out-Null
     }
-    Set-Content -LiteralPath (Join-Path $licenseFixture 'LICENSE') -Value 'fixture licence'
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'LICENSE') `
+        -Destination (Join-Path $licenseFixture 'LICENSE')
     & git -C $licenseFixture add -- LICENSE | Out-Null
     & $licenseScript -RepositoryRoot $licenseFixture | Out-Null
     $missingLicenseRejected = $false
@@ -724,6 +765,7 @@ finally {
         }
         finally {
             if ($null -ne $packagingTestMutex) { $packagingTestMutex.Dispose() }
+            Remove-Variable -Name IdleHarborPackagingTestScheduledTask -Scope Global -ErrorAction SilentlyContinue
         }
     }
 }

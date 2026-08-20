@@ -17,4 +17,11 @@ if ($LASTEXITCODE -ne 0 -or $tracked.Count -ne 1 -or $tracked[0] -cne 'LICENSE')
     throw 'Publication requires LICENSE to be tracked at the repository root.'
 }
 
-Write-Output "Tracked root LICENSE validated: $licensePath"
+$licenseText = Get-Content -Raw -LiteralPath $licensePath
+if ($licenseText -notmatch '(?m)^\s*GNU GENERAL PUBLIC LICENSE\s*$' -or
+    $licenseText -notmatch '(?m)^\s*Version 3, 29 June 2007\s*$' -or
+    $licenseText -notmatch 'Everyone is permitted to copy and distribute verbatim copies') {
+    throw 'Publication requires the complete GNU General Public License version 3 text.'
+}
+
+Write-Output "Tracked GPL-3.0-only root LICENSE validated: $licensePath"

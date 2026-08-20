@@ -42,7 +42,14 @@ New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 try {
     Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path $stagePackage 'IdleHarbor.exe')
 
-    foreach ($relative in @('packaging\install.ps1', 'packaging\uninstall.ps1', 'packaging\install.cmd', 'README.md', 'LICENSE')) {
+    foreach ($relative in @(
+        'packaging\install.ps1',
+        'packaging\uninstall.ps1',
+        'packaging\install.cmd',
+        'README.md',
+        'LICENSE',
+        'THIRD-PARTY-NOTICES.md'
+    )) {
         $source = Join-Path $repoRoot $relative
         if (Test-Path -LiteralPath $source -PathType Leaf) {
             Copy-Item -LiteralPath $source -Destination (Join-Path $stagePackage (Split-Path -Leaf $source))
@@ -59,6 +66,9 @@ try {
         architecture = $Architecture
         packageType = 'portable'
         executable = 'IdleHarbor.exe'
+        license = 'GPL-3.0-only'
+        licenseFile = 'LICENSE'
+        sourceUrl = 'https://github.com/Chris0Jeky/IdleHarbor'
         createdUtc = [DateTime]::UtcNow.ToString('o')
     }
     if (-not [string]::IsNullOrWhiteSpace($SourceRevision)) {
