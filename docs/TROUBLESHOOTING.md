@@ -68,12 +68,15 @@ active_hours_end_minute=1080
 
 ## Installation and startup
 
-Run the installer with `-WhatIf` first. Startup is disabled by default; if enabled, the installer
-creates only the selected per-user Task Scheduler, Startup-folder, or HKCU Run entry. A matching
-uninstaller removes entries and files only when its ownership marker proves they belong to
-IdleHarbor. Caught install/update failures restore the previous managed files and startup state.
-Linked managed paths are rejected rather than followed outside the install root. Settings are
-preserved unless `-PurgeData` is explicitly supplied.
+Run the installer with `-WhatIf` first. A Start Menu launcher is created by default; automatic
+startup is disabled by default and, if enabled, creates only the selected per-user Task Scheduler,
+Startup-folder, or HKCU Run entry. Use `-StartMenu None` to remove only an unchanged launcher
+claimed by the install marker. A matching uninstaller preserves a changed or foreign launcher with
+a warning and removes entries/files only when ownership is proven. The Start Menu link is checked
+before mutation: directories, reparse points, multiply-linked files, and foreign links are refused
+where ownership cannot be proven. Caught install/update failures restore the previous managed files,
+startup state, and exact Start Menu shortcut bytes. Linked managed paths are rejected rather than
+followed outside the install root. Settings are preserved unless `-PurgeData` is explicitly supplied.
 
 ## Report a bug
 
