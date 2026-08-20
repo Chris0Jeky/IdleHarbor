@@ -135,7 +135,7 @@ void test_fractional_dpi_layout_uses_true_logical_widths() {
     using idleharbor::app::LogicalPixels;
     using idleharbor::app::PhysicalPixels;
     using idleharbor::app::SettingsLayoutMode;
-    for (const int dpi : {120, 144, 168}) {
+    for (const int dpi : {96, 120, 144, 168, 192}) {
         const int physical_normal_width = PhysicalPixels(560, dpi);
         CHECK(LogicalPixels(physical_normal_width, dpi) == 560);
         CHECK(DetermineSettingsLayout(physical_normal_width, dpi) == SettingsLayoutMode::Columns);
@@ -152,6 +152,62 @@ void test_fractional_dpi_layout_uses_true_logical_widths() {
         CHECK(DetermineActionLayout(physical_narrow_width, dpi) == ActionLayoutMode::Wide);
         CHECK(DetermineActionLayout(PhysicalPixels(320, dpi), dpi) == ActionLayoutMode::Wrapped);
         CHECK(DetermineActionLayout(PhysicalPixels(220, dpi), dpi) == ActionLayoutMode::Stacked);
+    }
+}
+
+void test_settings_layout_uses_the_viewport_client_width() {
+    using idleharbor::app::ComputeStackedBodyLayout;
+    using idleharbor::app::DetermineSettingsLayout;
+    using idleharbor::app::LogicalPixels;
+    using idleharbor::app::PhysicalPixels;
+    using idleharbor::app::SettingsLayoutMode;
+
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int outer_width = PhysicalPixels(600, dpi);
+        const int scrollbar_width = PhysicalPixels(48, dpi);
+        const int viewport_width = outer_width - scrollbar_width;
+        const int logical_viewport_width = LogicalPixels(viewport_width, dpi);
+        CHECK(logical_viewport_width < 560);
+        CHECK(DetermineSettingsLayout(viewport_width, dpi) == SettingsLayoutMode::Stacked);
+        const auto body = ComputeStackedBodyLayout(logical_viewport_width);
+        CHECK(body.left >= 0);
+        CHECK(body.left + body.width <= logical_viewport_width);
+    }
+}
+
+void test_scrollbar_boundary_reflows_and_keeps_bottom_reachable() {
+    using idleharbor::app::ClampScrollPosition;
+    using idleharbor::app::ComputeStackedBodyLayout;
+    using idleharbor::app::DetermineSettingsLayout;
+    using idleharbor::app::MaximumScrollPosition;
+    using idleharbor::app::PhysicalPixels;
+    using idleharbor::app::SettingsLayoutMode;
+
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int outer_width = PhysicalPixels(560, dpi);
+        const int viewport_width = outer_width - PhysicalPixels(48, dpi);
+        CHECK(DetermineSettingsLayout(outer_width, dpi) == SettingsLayoutMode::Columns);
+        CHECK(DetermineSettingsLayout(viewport_width, dpi) == SettingsLayoutMode::Stacked);
+
+        const auto body = ComputeStackedBodyLayout(idleharbor::app::LogicalPixels(viewport_width, dpi));
+        const int content_height = PhysicalPixels(570 + body.width / 2, dpi);
+        const int viewport_height = PhysicalPixels(390, dpi);
+        const int maximum = MaximumScrollPosition(content_height, viewport_height);
+        CHECK(maximum > 0);
+        CHECK(ClampScrollPosition(maximum, content_height, viewport_height) == maximum);
+    }
+}
+
+void test_viewport_fill_widths_respect_the_effective_client_width() {
+    using idleharbor::app::LogicalPixels;
+    using idleharbor::app::PhysicalPixels;
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int outer_width = PhysicalPixels(600, dpi);
+        const int viewport_width = outer_width - PhysicalPixels(48, dpi);
+        const int logical_viewport_width = LogicalPixels(viewport_width, dpi);
+        const int fill_right = logical_viewport_width - 300 - 20;
+        CHECK(fill_right >= 80);
+        CHECK(300 + fill_right + 20 <= logical_viewport_width);
     }
 }
 
@@ -203,6 +259,9 @@ int main() {
     test_layout_change_reveals_only_when_focused_control_is_clipped();
     test_narrow_work_areas_reflow_settings_and_actions();
     test_fractional_dpi_layout_uses_true_logical_widths();
+    test_settings_layout_uses_the_viewport_client_width();
+    test_scrollbar_boundary_reflows_and_keeps_bottom_reachable();
+    test_viewport_fill_widths_respect_the_effective_client_width();
     test_stacked_stop_stays_inside_short_clients();
     test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();
     return failures == 0 ? 0 : 1;

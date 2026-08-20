@@ -11,7 +11,7 @@ path, recoverable settings handling, and transactional per-user installation. No
 release has been created or published.
 
 The live merged baseline is `origin/main` at
-`90977a9be9804a719c853912cca9b0aeaf3524b0`. PRs
+`1aa55b754239e1899b09bb6f785299ed2550879b`. PRs
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8),
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10),
@@ -20,10 +20,11 @@ The live merged baseline is `origin/main` at
 [#17](https://github.com/Chris0Jeky/IdleHarbor/pull/17),
 [#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18),
 [#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), and
-[#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25) landed dependency pinning, settings recovery,
+[#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25), and
+[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29) landed dependency pinning, settings recovery,
 installer/release trust, the high-DPI viewport, rollback recovery, fixed viewport safety regions,
-upstream motion-multiplier parity, and final viewport accessibility polish. Issues #2, #3, #4, #5,
-#9, #11, #14, #15, #19, #20, #21, #22, and #23 are closed.
+upstream motion-multiplier parity, final viewport accessibility polish, and packaging-test isolation.
+Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, and #26 are closed.
 
 The landed installer evidence includes x64 CTest plus complete packaging and real rollback matrices
 under PowerShell 7 and Windows PowerShell 5.1. It covers each startup mechanism, fresh failure
@@ -58,21 +59,31 @@ checkpoint branch `agent/v0.1.0-portfolio-polish` predates the final UI/motion b
 incorporate final `main`, replace every earlier capture, refresh performance evidence, and pass
 visual/privacy review before its PR is opened.
 
-Issue [#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) has an unmerged checkpoint on branch
-`agent/v0.1.0-packaging-isolation`: a bounded, abandoned-owner-safe Local mutex serializes the
-PowerShell 7 and 5.1 packaging suites while retaining the existing global transaction-residue
-assertions. The concurrent failure was reproduced with separate stdout/stderr capture: Windows
-PowerShell 5.1 lost the auto-loaded `Get-FileHash` command while PowerShell 7 passed. SBOM and
-checksum generation now use in-process .NET hashing, and the final concurrent proof returned exit
-code `0` for both runtimes with empty stderr and no transaction residue. Sequential proofs also
-returned exit code `0` under PowerShell 7 and Windows PowerShell 5.1. The slice is ready for review
-and PR creation; it is not merged into `main`.
+PR [#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29) merged the issue
+[#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) fix into `main` at
+`1aa55b754239e1899b09bb6f785299ed2550879b`. A bounded, abandoned-owner-safe Local mutex serializes
+the PowerShell 7 and 5.1 packaging suites while retaining global transaction-residue assertions.
+SBOM and checksum generation use in-process .NET hashing. The final concurrent proof returned exit
+code `0` for both runtimes with empty stderr and no transaction residue; sequential proofs also
+returned exit code `0` under both runtimes.
 
 Issue [#27](https://github.com/Chris0Jeky/IdleHarbor/issues/27) tracks redundant Stop requests that
 can change internal action focus without a state transition. Issue
 [#28](https://github.com/Chris0Jeky/IdleHarbor/issues/28) tracks control sizing when Windows uses a
 scrollbar wider than IdleHarbor's logical body inset. Both were classified non-blocking in PR #24's
 bounded final review.
+
+The follow-up branch `agent/v0.1.0-ui-final` implements both bounded UI fixes: deferred Start focus
+is now posted only after an actual active-to-stopped transition, and body layout measures the
+settings viewport after sizing it, using its effective client width for breakpoint and fill-width
+decisions. `UpdateViewport` now converges layout and scroll-range publication across native
+scrollbar-driven reflow, so a 560-logical-pixel breakpoint transition cannot leave a stale thumb
+range or unreachable bottom controls. Deterministic layout tests cover 96/120/144/168/192 DPI, the
+560 logical boundary, and a 48-logical-pixel scrollbar case. The Visual Studio 2019 x64 Release
+build and CTest 7/7 passed. The reusable native desktop harness passed under PowerShell 7 and
+Windows PowerShell 5.1 at 192 DPI, including every real body control staying within the viewport
+client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
+mixed-DPI verification.
 
 `HUMAN_TODO.md` remains authoritative:
 
@@ -84,14 +95,13 @@ bounded final review.
 
 ## Resume order
 
-1. Review and merge the completed issue #26 branch, confirm the issue closes, and sweep late review
-   feedback once.
-2. Integrate, prove, review, and merge the `agent/v0.1.0-ui-final` fixes for issues #27 and #28.
-3. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
+1. Re-prove, review, and merge the `agent/v0.1.0-ui-final` fixes for issues #27 and #28, then sweep
+   late review feedback once.
+2. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
    and the uploaded GitHub social preview.
-4. Run the final native runtime, packaging, installer, performance, security, accessibility, and
+3. Run the final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact audit.
-5. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
+4. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
    derive package-manager manifests from verified real URLs and hashes.
 
 ## Proving commands
