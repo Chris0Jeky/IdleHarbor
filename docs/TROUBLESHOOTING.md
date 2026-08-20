@@ -6,13 +6,22 @@ private work data, and managed-device details before sharing diagnostics.
 
 ## Build and test
 
-Use a Windows developer PowerShell with Visual Studio 2022:
+Use a Windows developer PowerShell with Visual Studio 2019 or newer. For Visual Studio 2019 Build
+Tools:
 
 ```powershell
-cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-Packaging.ps1
+```
+
+With Visual Studio 2022, substitute generator `Visual Studio 17 2022`. The optional native viewport
+smoke needs an interactive desktop, briefly positions the pointer over the settings body, and must
+run with no other IdleHarbor instance open:
+
+```powershell
+.\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 ```
 
 The project is Windows-only. CI additionally builds ARM64 and Win32; release packaging currently
@@ -25,6 +34,14 @@ targets x64 and ARM64.
 - If Explorer has restarted, the tray icon may not be present; use `--show` or restart the owner.
 - Check that the executable is not blocked by endpoint policy. Do not weaken security controls to
   force an unverified binary to run.
+
+## Settings controls leave fragments after scrolling
+
+Record the Windows display scale and whether the session was Running or Stopped. Resize once to
+force a complete repaint, then repeat the same wheel or scrollbar movement. Current builds repaint
+the settings viewport and all descendant controls after layout, scrolling, and enabled-state
+changes. If fragments return, attach before/after screenshots and run the native viewport smoke
+above from the same build.
 
 ## It does not keep the intended state active
 
@@ -68,12 +85,15 @@ active_hours_end_minute=1080
 
 ## Installation and startup
 
-Run the installer with `-WhatIf` first. Startup is disabled by default; if enabled, the installer
-creates only the selected per-user Task Scheduler, Startup-folder, or HKCU Run entry. A matching
-uninstaller removes entries and files only when its ownership marker proves they belong to
-IdleHarbor. Caught install/update failures restore the previous managed files and startup state.
-Linked managed paths are rejected rather than followed outside the install root. Settings are
-preserved unless `-PurgeData` is explicitly supplied.
+Run the installer with `-WhatIf` first. A Start Menu launcher is created by default; automatic
+startup is disabled by default and, if enabled, creates only the selected per-user Task Scheduler,
+Startup-folder, or HKCU Run entry. Use `-StartMenu None` to remove only an unchanged launcher
+claimed by the install marker. A matching uninstaller preserves a changed or foreign launcher with
+a warning and removes entries/files only when ownership is proven. The Start Menu link is checked
+before mutation: directories, reparse points, multiply-linked files, and foreign links are refused
+where ownership cannot be proven. Caught install/update failures restore the previous managed files,
+startup state, and exact Start Menu shortcut bytes. Linked managed paths are rejected rather than
+followed outside the install root. Settings are preserved unless `-PurgeData` is explicitly supplied.
 
 ## Report a bug
 

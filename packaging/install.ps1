@@ -8,6 +8,9 @@ param(
     [ValidateSet('TaskScheduler', 'StartupFolder', 'RunKey', 'None')]
     [string]$Startup = 'None',
 
+    [ValidateSet('Create', 'None')]
+    [string]$StartMenu = 'Create',
+
     [switch]$NoLaunch,
 
     [ValidateSet('AfterCopy', 'AfterMarker', 'AfterStartupRemoval', 'AfterStartup')]
@@ -201,6 +204,10 @@ function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
 }
 
+function Get-StartMenuLinkPath() {
+    return Join-Path ([Environment]::GetFolderPath('Programs')) 'IdleHarbor.lnk'
+}
+
 function Assert-SafeManagedFile([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -213,6 +220,21 @@ function Assert-SafeManagedFile([string]$Path) {
     $linkCount = [IdleHarbor.Packaging.FileIdentity]::GetLinkCount($item.FullName)
     if ($linkCount -ne 1) {
         throw "Managed install path has $linkCount hard links; refusing to cross the install boundary: $Path"
+    }
+}
+
+function Assert-SafeShortcutFile([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item) { return }
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Managed shortcut may not be a junction or symbolic link: $Path"
+    }
+    if ($item.PSIsContainer -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Managed shortcut is not a regular file: $Path"
+    }
+    $linkCount = [IdleHarbor.Packaging.FileIdentity]::GetLinkCount($item.FullName)
+    if ($linkCount -ne 1) {
+        throw "Managed shortcut has $linkCount hard links; refusing to cross the user profile boundary: $Path"
     }
 }
 
@@ -289,6 +311,156 @@ function Test-StartupShortcutOwned([object]$Shortcut, [string]$Executable) {
         ([string]$Shortcut.Arguments -ceq '--start --minimized') -and
         (Test-SamePath ([string]$Shortcut.WorkingDirectory) (Split-Path -Parent $Executable))
     )
+}
+
+function Test-StartMenuShortcutOwned([object]$Shortcut, [string]$Executable) {
+    return (
+        (Test-SamePath ([string]$Shortcut.TargetPath) $Executable) -and
+        ([string]$Shortcut.Arguments -ceq '--show') -and
+        (Test-SamePath ([string]$Shortcut.WorkingDirectory) (Split-Path -Parent $Executable)) -and
+        ([string]$Shortcut.Description -ceq 'Shows IdleHarbor settings.') -and
+        ([string]$Shortcut.IconLocation -ieq ('{0},0' -f $Executable))
+    )
+}
+
+function Test-ByteArraysEqual([byte[]]$Left, [byte[]]$Right) {
+    if ($null -eq $Left -or $null -eq $Right -or $Left.Length -ne $Right.Length) { return $false }
+    for ($index = 0; $index -lt $Left.Length; $index++) {
+        if ($Left[$index] -ne $Right[$index]) { return $false }
+    }
+    return $true
+}
+
+function Assert-StartMenuPreflight {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [string]$Mode,
+
+        [Parameter(Mandatory)]
+        [bool]$PreviouslyOwned,
+
+        [string]$Link = (Get-StartMenuLinkPath)
+    )
+
+    if ($Mode -eq 'None' -and -not $PreviouslyOwned) { return }
+    $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($null -eq $linkItem) { return }
+    Assert-SafeShortcutFile $link
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($link)
+    $exact = Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable
+    if ($Mode -eq 'Create' -and -not $exact) {
+        throw "A different Start Menu shortcut already owns ${link}; refusing to overwrite it."
+    }
+    if ($Mode -eq 'None' -and $PreviouslyOwned -and -not $exact) {
+        Write-Warning "Preserving changed or foreign Start Menu shortcut and relinquishing installer ownership: $link"
+    }
+}
+
+function Set-StartMenu {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [string]$Mode,
+
+        [Parameter(Mandatory)]
+        [bool]$PreviouslyOwned,
+
+        [string]$Link = (Get-StartMenuLinkPath)
+    )
+
+    if ($Mode -eq 'None') {
+        if (-not $PreviouslyOwned) { return $false }
+        $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        if ($null -eq $linkItem) { return $false }
+        Assert-SafeShortcutFile $link
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($link)
+        if ($PreviouslyOwned -and (Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable)) {
+            if ($PSCmdlet.ShouldProcess($link, 'Remove installer-owned Start Menu shortcut')) {
+                Remove-Item -LiteralPath $link -Force
+                return $false
+            }
+            return $true
+        }
+        return $false
+    }
+
+    $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($null -ne $linkItem) {
+        Assert-SafeShortcutFile $link
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($link)
+        if (-not (Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable)) {
+            throw "A different Start Menu shortcut already owns ${link}; refusing to overwrite it."
+        }
+        return $PreviouslyOwned
+    }
+
+    if ($PSCmdlet.ShouldProcess($link, 'Create Start Menu shortcut')) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $link) -Force | Out-Null
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($link)
+        $shortcut.TargetPath = $Executable
+        $shortcut.Arguments = '--show'
+        $shortcut.WorkingDirectory = Split-Path -Parent $Executable
+        $shortcut.Description = 'Shows IdleHarbor settings.'
+        $shortcut.IconLocation = '{0},0' -f $Executable
+        $shortcut.Save()
+        return $true
+    }
+    return $false
+}
+
+function Get-StartMenuSnapshot([string]$Link = (Get-StartMenuLinkPath)) {
+    $linkItem = Get-Item -LiteralPath $Link -Force -ErrorAction SilentlyContinue
+    if ($null -eq $linkItem) { return $null }
+    Assert-SafeShortcutFile $Link
+    return ,([IO.File]::ReadAllBytes($Link))
+}
+
+function Restore-StartMenuSnapshot {
+    param(
+        [AllowNull()]
+        [byte[]]$Bytes,
+
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [string]$Link = (Get-StartMenuLinkPath)
+    )
+
+    $linkItem = Get-Item -LiteralPath $Link -Force -ErrorAction SilentlyContinue
+    if ($null -ne $Bytes) {
+        if ($null -ne $linkItem) {
+            Assert-SafeShortcutFile $Link
+            if (Test-ByteArraysEqual ([IO.File]::ReadAllBytes($Link)) $Bytes) { return }
+            $shell = New-Object -ComObject WScript.Shell
+            $current = $shell.CreateShortcut($Link)
+            if (-not (Test-StartMenuShortcutOwned -Shortcut $current -Executable $Executable)) {
+                throw "Rollback found a changed or foreign Start Menu shortcut: $Link"
+            }
+            Remove-Item -LiteralPath $Link -Force
+        }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $Link) -Force | Out-Null
+        [IO.File]::WriteAllBytes($Link, $Bytes)
+        return
+    }
+
+    if ($null -eq $linkItem) { return }
+    Assert-SafeShortcutFile $Link
+    $shell = New-Object -ComObject WScript.Shell
+    $current = $shell.CreateShortcut($Link)
+    if (-not (Test-StartMenuShortcutOwned -Shortcut $current -Executable $Executable)) {
+        throw "Rollback found a changed or foreign Start Menu shortcut: $Link"
+    }
+    Remove-Item -LiteralPath $Link -Force
 }
 
 function Get-OwnedTask([string]$Executable) {
@@ -517,7 +689,10 @@ function Get-StartupSnapshot {
         [string]$Executable,
 
         [Parameter(Mandatory)]
-        [bool]$CaptureTaskFolder
+        [bool]$CaptureTaskFolder,
+
+        [Parameter(Mandatory)]
+        [bool]$CaptureStartMenu
     )
 
     $taskXml = $null
@@ -532,6 +707,8 @@ function Get-StartupSnapshot {
         $shortcutBytes = [IO.File]::ReadAllBytes($link)
     }
 
+    $startMenuLinkBytes = $(if ($CaptureStartMenu) { Get-StartMenuSnapshot } else { $null })
+
     $runCommand = Get-RunCommand
     $runKind = $null
     if ($null -ne $runCommand) {
@@ -543,6 +720,8 @@ function Get-StartupSnapshot {
         taskXml = $taskXml
         taskFolderExisted = $(if ($CaptureTaskFolder) { Test-TaskFolderExists } else { $true })
         shortcutBytes = $shortcutBytes
+        startMenuCaptured = $CaptureStartMenu
+        startMenuLinkBytes = $startMenuLinkBytes
         runCommand = $runCommand
         runKind = $runKind
     }
@@ -568,6 +747,11 @@ function Restore-StartupSnapshot {
         $link = Get-StartupLinkPath
         New-Item -ItemType Directory -Path (Split-Path -Parent $link) -Force | Out-Null
         [IO.File]::WriteAllBytes($link, [byte[]]$Snapshot.shortcutBytes)
+    }
+    if ($Snapshot.startMenuCaptured) {
+        Restore-StartMenuSnapshot `
+            -Bytes $Snapshot.startMenuLinkBytes `
+            -Executable $Executable
     }
     if ($null -ne $Snapshot.runCommand) {
         $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
@@ -599,13 +783,22 @@ $sourceIsInstallRoot = Test-SamePath $sourceRoot $safeRoot
 $installSnapshot = $null
 $startupSnapshot = $null
 $previousTaskFolderOwned = $false
+$previousStartMenuOwned = $false
 $retainTransactionBackup = $false
 if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
     $existingMarker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
     if (@($existingMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') {
         $previousTaskFolderOwned = ($existingMarker.taskFolderOwned -eq $true)
     }
+    if (@($existingMarker.PSObject.Properties.Name) -contains 'startMenuLinkOwned' -and
+        @($existingMarker.PSObject.Properties.Name) -contains 'startMenuLinkPath' -and
+        $existingMarker.startMenuLinkOwned -eq $true -and
+        (Test-SamePath ([string]$existingMarker.startMenuLinkPath) (Get-StartMenuLinkPath))) {
+        $previousStartMenuOwned = $true
+    }
 }
+
+Assert-StartMenuPreflight -Executable $destinationExecutable -Mode $StartMenu -PreviouslyOwned $previousStartMenuOwned
 
 if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Stop-OwnedApplicationIfRunning $destinationExecutable
@@ -613,7 +806,11 @@ if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $des
 
 if (-not $WhatIfPreference) {
     $captureTaskFolder = ($Startup -eq 'TaskScheduler' -or $previousTaskFolderOwned)
-    $startupSnapshot = Get-StartupSnapshot -Executable $destinationExecutable -CaptureTaskFolder $captureTaskFolder
+    $captureStartMenu = ($StartMenu -eq 'Create' -or $previousStartMenuOwned)
+    $startupSnapshot = Get-StartupSnapshot `
+        -Executable $destinationExecutable `
+        -CaptureTaskFolder $captureTaskFolder `
+        -CaptureStartMenu $captureStartMenu
     $installSnapshot = New-InstallSnapshot -InstallRoot $safeRoot -RelativeFiles @($KnownFiles + $MarkerName)
 }
 
@@ -638,6 +835,11 @@ try {
 
     Set-Startup $destinationExecutable $Startup
 
+    $startMenuLinkOwned = Set-StartMenu `
+        -Executable $destinationExecutable `
+        -Mode $StartMenu `
+        -PreviouslyOwned $previousStartMenuOwned
+
     $taskFolderOwned = $previousTaskFolderOwned
     if (-not $WhatIfPreference) {
         if ($Startup -eq 'TaskScheduler' -and -not $startupSnapshot.taskFolderExisted) {
@@ -659,6 +861,8 @@ try {
             executable = $destinationExecutable
             managedFiles = $installedFiles
             taskFolderOwned = $taskFolderOwned
+            startMenuLinkPath = Get-StartMenuLinkPath
+            startMenuLinkOwned = $startMenuLinkOwned
             installedAtUtc = [DateTime]::UtcNow.ToString('o')
         }
         $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8

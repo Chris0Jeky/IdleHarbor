@@ -76,8 +76,8 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
   control reachable on compact or highly scaled displays.
 - **Two complementary mechanisms:** motion modes address applications that observe input; power
   requests address Windows idle transitions. They can be configured independently.
-- **Conservative automation:** startup is opt-in, per-user, least-privilege, and paired with an
-  ownership-aware uninstall path.
+- **Conservative automation:** the per-user Start Menu launcher is ownership-safe by default;
+  automatic startup remains opt-in, least-privilege, and paired with an ownership-aware uninstall path.
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
@@ -87,14 +87,16 @@ resource measurements are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)
 
 ## Build and test from source
 
-Use a Windows developer PowerShell with Visual Studio 2022 and CMake. For a Visual Studio generator
-build:
+Use a Windows developer PowerShell with Visual Studio 2019 or newer and CMake. This machine's
+validated Visual Studio 2019 Build Tools command is:
 
 ```powershell
-cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 ```
+
+With Visual Studio 2022, use generator `Visual Studio 17 2022` instead.
 
 The project is Windows-only. CI also builds ARM64 and Win32; release packaging currently produces
 x64 and ARM64 archives. The packaging parser and ownership tests can be run independently:
@@ -197,7 +199,7 @@ URL. The release workflow is prepared to produce architecture-labelled portable 
 - GitHub artifact attestations;
 - package manifest with source revision and architecture.
 
-The optional per-user installer and startup helpers are documented in
+The optional per-user installer, Start Menu launcher, and startup helpers are documented in
 [`packaging/README.md`](packaging/README.md). Signing is not claimed until a human-owned
 Authenticode decision is made; the licence is also still pending in [`HUMAN_TODO.md`](HUMAN_TODO.md).
 

@@ -49,8 +49,17 @@ Install to the default `%LOCALAPPDATA%\Programs\IdleHarbor` destination:
 .\install.ps1 -Startup TaskScheduler
 ```
 
-Installation is per-user and does not require elevation. Startup is disabled by default. Supported
-startup choices are:
+Installation is per-user and does not require elevation. The Start Menu launcher is created by
+default; automatic startup remains disabled by default and is configured independently. Use
+`-StartMenu None` when no launcher is wanted:
+
+```powershell
+.\install.ps1 -StartMenu None -Startup None
+```
+
+The default launcher is `%APPDATA%\Microsoft\Windows\Start Menu\Programs\IdleHarbor.lnk` and
+opens the installed executable with `--show`, using the installation directory as its working
+directory and the executable as its icon. Supported automatic-startup choices are:
 
 - `TaskScheduler` — recommended least-privilege interactive task;
 - `StartupFolder` — per-user `IdleHarbor.lnk`;
@@ -58,12 +67,18 @@ startup choices are:
 - `None` — no startup registration.
 
 Each startup choice runs `--start --minimized`. The installer removes only entries that point to the
-same executable and refuses to overwrite a non-owned destination. A first install invoked with the
+same executable and refuses to overwrite a non-owned destination. The Start Menu path is preflighted
+before any installation mutation: directories, reparse points, multiply-linked files, and foreign
+shortcuts are rejected when creation is requested. An exact shortcut found without a prior installer
+ownership claim is never claimed by the marker. `-StartMenu None` removes only a marker-claimed
+shortcut that is still an exact match; changed or foreign shortcuts are preserved with a warning.
+A first install invoked with the
 source and destination set to the same directory also requires an already-valid IdleHarbor ownership
 marker; this prevents a marker from claiming unrelated files in an extracted directory. Once that
 marker exists, a same-directory reinstall remains supported. The installer writes an ownership marker
-and can be run repeatedly from Windows PowerShell 5.1 or PowerShell 7. Install and update operations
-snapshot managed files and owned startup state, then restore them after a caught failure. A complete
+including the Start Menu path and ownership bit, and can be run repeatedly from Windows PowerShell
+5.1 or PowerShell 7. Install and update operations snapshot managed files and owned startup state,
+including exact Start Menu shortcut bytes, then restore them after a caught failure. A complete
 rollback or successful commit removes the temporary transaction directory. If managed-file restoration
 is incomplete, the installer retains that directory and reports its exact recovery path so the prior
 bytes remain available for manual repair. Managed paths that are symbolic links, junctions, or

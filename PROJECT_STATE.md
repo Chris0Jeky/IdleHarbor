@@ -5,102 +5,67 @@ Last updated: 2026-08-20
 ## Current milestone
 
 IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral policy core,
-validated INI settings, strict CLI, upstream-compatible motion patterns, genuine-input observation,
-power requests, battery/fullscreen/session safeguards, visible tray controls, an emergency stop
-path, recoverable settings handling, and transactional per-user installation. No licence, tag, or
-release has been created or published.
+validated local settings, strict CLI, upstream-compatible motion patterns, Windows power requests,
+genuine-input observation, battery/fullscreen/session safeguards, visible tray controls, an
+emergency stop, and transactional per-user installation. It has no telemetry or network service.
+No licence, tag, or release has been created or published.
 
-The live merged baseline is `origin/main` at
-`6fa05cdcd8722bb1f675974c76f1bf990802de1a`. PRs
-[#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
-[#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8),
-[#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10),
-[#13](https://github.com/Chris0Jeky/IdleHarbor/pull/13),
-[#16](https://github.com/Chris0Jeky/IdleHarbor/pull/16),
-[#17](https://github.com/Chris0Jeky/IdleHarbor/pull/17),
-[#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18),
-[#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), and
-[#25](https://github.com/Chris0Jeky/IdleHarbor/pull/25),
-[#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29),
-[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30), and
-[#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) landed dependency pinning, settings recovery,
-installer/release trust, the high-DPI viewport, rollback recovery, fixed viewport safety regions,
-upstream motion-multiplier parity, final viewport accessibility polish, and packaging-test isolation.
-Issues #2, #3, #4, #5, #9, #11, #12, #14, #15, #19, #20, #21, #22, #23, #26, #27, #28, and #32 are closed.
+The current merged baseline is `origin/main` at
+`4be21adfe69b299739b451a255e69d268757b668`. PRs
+[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
+[#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
+scroll-range convergence, and inherited-scrollbar fixes. PR
+[#35](https://github.com/Chris0Jeky/IdleHarbor/pull/35) closed issue
+[#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) with the descendant-repaint fix and native
+192-DPI smoke. PR [#36](https://github.com/Chris0Jeky/IdleHarbor/pull/36) added the ownership-safe
+per-user Start Menu launcher. Earlier merged work established the runtime, settings recovery,
+installer rollback and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and
+packaging isolation.
 
-The landed installer evidence includes x64 CTest plus complete packaging and real rollback matrices
-under PowerShell 7 and Windows PowerShell 5.1. It covers each startup mechanism, fresh failure
-cleanup, exact update restoration, preservation of unknown files, Task Scheduler folder ownership,
-hard-link rejection, successful update, uninstall, and retained recovery material only when
-managed-file restoration is incomplete.
+## Repaint follow-up
 
-PR #24 passed exact-head hosted x64/ARM64/x86, CodeQL, and C++ analysis plus Visual Studio 2019 x64
-Release CTest 7/7. Its descendant-aware desktop harness passed under PowerShell 7 and Windows
-PowerShell 5.1 at 192 DPI: viewport-owned scrollbar geometry, fixed status/Start/Stop rectangles,
-wheel/combo/line/page routing, resize-triggered focus reveal, state-aware forward and reverse
-keyboard navigation, keyboard Start/Stop focus handoff, lifecycle states, and tray restore all
-passed. A true cross-monitor mixed-DPI transition remains unverified because only one display is
-attached.
+Issue [#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) records a 192-DPI Running-state
+settings-body artifact: disabled controls can leave stale fragments after viewport movement, while
+resizing temporarily clears the display. The cause seam is the manually moved child controls inside
+a nested `WS_CLIPCHILDREN` viewport without a final explicit descendant repaint.
 
-## Active integration queue
+The merged fix repaints the settings viewport and all descendants after final layout convergence,
+scroll-position changes, and Running/Stopped enabled-state changes. The native interactive smoke
+starts a safe motion-free session, proves that body controls are disabled, drives real wheel input,
+and compares natural frames with explicit descendant-repaint references at this desktop's 192 DPI.
+The smoke passes on the fixed x64 Release build. The supplied screenshot remains the reliable
+pre-fix reproduction: repeated automation against the old binary did not reproduce the intermittent
+artifact deterministically, so a red-old/green-new image comparison is not claimed.
 
-### Release workflow
+## Installer follow-up
 
-PR [#16](https://github.com/Chris0Jeky/IdleHarbor/pull/16), branch
-`agent/v0.1.0-release-tag-data`, merged into `main` at
-`90977a9be9804a719c853912cca9b0aeaf3524b0` and closed issue
-[#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12). Its release-tag workflow contract and
-Windows PowerShell 5.1-compatible tests are now part of the merged baseline. No real release is
-part of PR #16.
+The merged installer creates a per-user Start Menu shortcut as its default launch surface.
+It opens the visible settings window with `--show`; automatic startup remains an independent,
+explicit choice. The installer records ownership only for a shortcut it created, restores exact
+prior bytes on rollback, and rejects unsafe or foreign shortcut leaves. `-StartMenu None` and the
+uninstaller remove only an exact, marker-owned shortcut; changed or unowned shortcuts are
+preserved. The lifecycle suite uses temporary injected shortcut paths, so the actual per-user Start
+Menu path remains reserved for the final machine installation. Issue
+[#37](https://github.com/Chris0Jeky/IdleHarbor/issues/37) tracks safe migration if Windows redirects
+the Programs known folder after installation.
 
-### Portfolio and publication
+## Portfolio and publication queue
 
 Issue [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks final exact-build Running,
 Paused, full-window, viewport, and tray captures plus the repository social preview. This branch
-starts from merged main `6fa05cd` and records the privacy-safe capture set, high-contrast social
-SVG/PNG, and exact x64 demo evidence. The unsigned 0.1.0 executable is 516,608 bytes with SHA-256
-`750a5c5d2ad7ec021284ce21536565973c6dacdf926f566958b1947c1dccb878`; three 60-second stopped and
-active system-request runs are documented in `docs/BENCHMARKS.md`. The GitHub social-preview upload
-remains a pre-merge publication action and is not claimed complete here.
+is now based on final merged main `4be21ad` and is refreshing the privacy-safe capture set,
+high-contrast social SVG/PNG, exact x64 executable evidence, and three-run resource baseline. PR
+[#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) remains open until that evidence is current
+and the repository social-preview image is uploaded and visually checked on GitHub.
 
-PR [#29](https://github.com/Chris0Jeky/IdleHarbor/pull/29) merged the issue
-[#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) fix into `main` at
-`1aa55b754239e1899b09bb6f785299ed2550879b`. A bounded, abandoned-owner-safe Local mutex serializes
-the PowerShell 7 and 5.1 packaging suites while retaining global transaction-residue assertions.
-SBOM and checksum generation use in-process .NET hashing. The final concurrent proof returned exit
-code `0` for both runtimes with empty stderr and no transaction residue; sequential proofs also
-returned exit code `0` under both runtimes.
+The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
+modes; exact rollback after fresh and update failures; preservation of unexpected files and
+pre-existing scheduler folders; linked-file rejection; uninstall; and bounded concurrent execution
+under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visible.
 
-Issue [#27](https://github.com/Chris0Jeky/IdleHarbor/issues/27) tracks redundant Stop requests that
-can change internal action focus without a state transition. Issue
-[#28](https://github.com/Chris0Jeky/IdleHarbor/issues/28) tracks control sizing when Windows uses a
-scrollbar wider than IdleHarbor's logical body inset. Both were classified non-blocking in PR #24's
-bounded final review.
+## Human decisions
 
-The merged UI-final changes implement both bounded UI fixes: deferred Start focus
-is now posted only after an actual active-to-stopped transition, and body layout measures the
-settings viewport after sizing it, using its effective client width for breakpoint and fill-width
-decisions. `UpdateViewport` now converges layout and scroll-range publication across native
-scrollbar-driven reflow, so a 560-logical-pixel breakpoint transition cannot leave a stale thumb
-range or unreachable bottom controls. Deterministic layout tests cover 96/120/144/168/192 DPI, the
-560 logical boundary, and a 48-logical-pixel scrollbar case. The Visual Studio 2019 x64 Release
-build and CTest 7/7 passed. The reusable native desktop harness passed under PowerShell 7 and
-Windows PowerShell 5.1 at 192 DPI, including every real body control staying within the viewport
-client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
-mixed-DPI verification.
-
-PR [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) merged issue #32 into `main` at
-`6fa05cdcd8722bb1f675974c76f1bf990802de1a`. `UpdateViewport` now begins each convergence pass
-from a scrollbar-free candidate, explicitly republishes scrollbar visibility and range, ignores
-re-entrant `WM_SIZE` notifications, and preserves the requested scroll position until the final
-stable layout before applying the clamp/SIF_POS publication. Deterministic layout coverage models
-the 570-to-700 logical boundary across supported DPI values. On this desktop, the native harness
-preserved position 24 through a 570-to-580 height-only resize, then cleared the range, hid the
-scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Windows PowerShell
-5.1. The physical near-boundary width was 587 logical pixels due to the application minimum; exact
-560-576 logical native behavior remains unverified, with deterministic model coverage only.
-
-`HUMAN_TODO.md` remains authoritative:
+`HUMAN_TODO.md` is authoritative:
 
 - q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a
   copyright holder, create a tag, publish a release, or submit package manifests until the user
@@ -110,26 +75,28 @@ scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Wi
 
 ## Resume order
 
-1. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
-   and the uploaded GitHub social preview.
-2. Run the final native runtime, packaging, installer, performance, security, accessibility, and
-   release-artifact audit.
-3. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
-   derive package-manager manifests from verified real URLs and hashes.
+1. Refresh issue #6 from the final exact build, including genuine captures, README/benchmark truth,
+   and the uploaded GitHub social preview; prove, review, and merge PR #31.
+2. Run final native runtime, packaging, installer, performance, security, accessibility, and
+   release-artifact QA; preserve a dated demonstration bundle and configure this laptop.
+3. Resolve q-1 and q-2 with the user. Only then add the approved licence, tag/publish `v0.1.0`, and
+   derive package-manager manifests from verified release URLs and hashes.
 
 ## Proving commands
 
-On this machine use Visual Studio Build Tools 2019:
+On this machine, Visual Studio Build Tools 2019 is installed:
 
 ```powershell
 cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
+.\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
 ```
 
-Run the packaging and release-workflow checks sequentially under PowerShell 7 and Windows
-PowerShell 5.1. CI additionally builds ARM64 and Win32. Hosted ARM64 evidence proves build/test, not
-representative ARM64 runtime behavior. `powercfg /requests` remains unverified locally because it
-requires elevation.
+Use generator `Visual Studio 17 2022` where Visual Studio 2022 is installed. Run packaging and
+release-workflow checks sequentially under PowerShell 7 and Windows PowerShell 5.1. CI additionally
+builds ARM64 and Win32. Hosted ARM64 evidence proves build/test, not representative ARM64 runtime
+behavior. A true cross-monitor mixed-DPI transition remains unverified because only one display is
+attached. `powercfg /requests` also requires an elevated verification run on this machine.

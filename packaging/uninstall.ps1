@@ -15,6 +15,59 @@ $RunValueName = 'IdleHarbor'
 $MarkerName = '.idleharbor-managed.json'
 $DataMarkerName = '.idleharbor-data.json'
 
+if (-not ('IdleHarbor.Packaging.FileIdentity' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace IdleHarbor.Packaging
+{
+    public static class FileIdentity
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ByHandleFileInformation
+        {
+            public uint FileAttributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public uint VolumeSerialNumber;
+            public uint FileSizeHigh;
+            public uint FileSizeLow;
+            public uint NumberOfLinks;
+            public uint FileIndexHigh;
+            public uint FileIndexLow;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetFileInformationByHandle(
+            SafeFileHandle file,
+            out ByHandleFileInformation information);
+
+        public static uint GetLinkCount(string path)
+        {
+            using (FileStream stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete))
+            {
+                ByHandleFileInformation information;
+                if (!GetFileInformationByHandle(stream.SafeFileHandle, out information))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                return information.NumberOfLinks;
+            }
+        }
+    }
+}
+'@
+}
+
 function Confirm-Change {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -82,6 +135,25 @@ function Stop-OwnedApplicationIfRunning([string]$Executable) {
 
 function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
+}
+
+function Get-StartMenuLinkPath() {
+    return Join-Path ([Environment]::GetFolderPath('Programs')) 'IdleHarbor.lnk'
+}
+
+function Assert-SafeShortcutFile([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item) { return }
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Managed shortcut may not be a junction or symbolic link: $Path"
+    }
+    if ($item.PSIsContainer -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Managed shortcut is not a regular file: $Path"
+    }
+    $linkCount = [IdleHarbor.Packaging.FileIdentity]::GetLinkCount($item.FullName)
+    if ($linkCount -ne 1) {
+        throw "Managed shortcut has $linkCount hard links; refusing to cross the user profile boundary: $Path"
+    }
 }
 
 function Test-TaskFolderExists {
@@ -158,6 +230,50 @@ function Test-StartupShortcutOwned([object]$Shortcut, [string]$Executable) {
     )
 }
 
+function Test-StartMenuShortcutOwned([object]$Shortcut, [string]$Executable) {
+    return (
+        (Test-SamePath ([string]$Shortcut.TargetPath) $Executable) -and
+        ([string]$Shortcut.Arguments -ceq '--show') -and
+        (Test-SamePath ([string]$Shortcut.WorkingDirectory) (Split-Path -Parent $Executable)) -and
+        ([string]$Shortcut.Description -ceq 'Shows IdleHarbor settings.') -and
+        ([string]$Shortcut.IconLocation -ieq ('{0},0' -f $Executable))
+    )
+}
+
+function Assert-StartMenuPreflight {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [bool]$MarkerOwned,
+
+        [string]$Link = (Get-StartMenuLinkPath)
+    )
+
+    $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($null -eq $linkItem) { return }
+    try {
+        Assert-SafeShortcutFile $link
+    }
+    catch {
+        Write-Warning "Preserving unsafe or foreign Start Menu path: $link ($($_.Exception.Message))"
+        return
+    }
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($link)
+    $exact = Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable
+    if ($MarkerOwned -and -not $exact) {
+        Write-Warning "Preserving changed or foreign Start Menu shortcut and relinquishing installer ownership: $link"
+    }
+    elseif (-not $MarkerOwned -and $exact) {
+        Write-Warning "Preserving an exact Start Menu shortcut that this installer did not create: $link"
+    }
+    elseif (-not $exact) {
+        Write-Warning "Preserving foreign Start Menu shortcut: $link"
+    }
+}
+
 function Get-OwnedDataMarker([string]$DataRoot) {
     $markerPath = Join-Path $DataRoot $DataMarkerName
     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) { return $null }
@@ -209,6 +325,45 @@ function Remove-OwnedStartup {
     }
 }
 
+function Remove-OwnedStartMenu {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [bool]$MarkerOwned,
+
+        [string]$Link = (Get-StartMenuLinkPath)
+    )
+
+    $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($null -eq $linkItem) { return }
+    try {
+        Assert-SafeShortcutFile $link
+    }
+    catch {
+        Write-Warning "Preserved unsafe or foreign Start Menu path: $link ($($_.Exception.Message))"
+        return
+    }
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($link)
+    if ($MarkerOwned -and (Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable)) {
+        if ($PSCmdlet.ShouldProcess($link, 'Remove installer-owned Start Menu shortcut')) {
+            Remove-Item -LiteralPath $link -Force
+        }
+    }
+    elseif ($MarkerOwned) {
+        Write-Warning "Preserved changed or foreign Start Menu shortcut: $link"
+    }
+    elseif (Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable) {
+        Write-Warning "Preserved an exact Start Menu shortcut that this installer did not create: $link"
+    }
+    else {
+        Write-Warning "Preserved foreign Start Menu shortcut: $link"
+    }
+}
+
 $safeRoot = Assert-SafeInstallRoot $InstallRoot
 $markerPath = Join-Path $safeRoot $MarkerName
 if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
@@ -228,9 +383,17 @@ $executable = Get-FullPath ([string]$marker.executable)
 if (-not (Test-SamePath (Split-Path -Parent $executable) $safeRoot)) {
     throw "Ownership marker points outside the installation directory; refusing to continue."
 }
+$startMenuLinkOwned = (
+    @($marker.PSObject.Properties.Name) -contains 'startMenuLinkOwned' -and
+    @($marker.PSObject.Properties.Name) -contains 'startMenuLinkPath' -and
+    $marker.startMenuLinkOwned -eq $true -and
+    (Test-SamePath ([string]$marker.startMenuLinkPath) (Get-StartMenuLinkPath))
+)
 
+Assert-StartMenuPreflight -Executable $executable -MarkerOwned $startMenuLinkOwned
 Stop-OwnedApplicationIfRunning $executable
 Remove-OwnedStartup $executable
+Remove-OwnedStartMenu -Executable $executable -MarkerOwned $startMenuLinkOwned
 if ($taskFolderOwned) {
     $folderRemoved = Remove-EmptyOwnedTaskFolder -Owned $true
     if (-not $WhatIfPreference -and -not $folderRemoved -and (Test-TaskFolderExists)) {

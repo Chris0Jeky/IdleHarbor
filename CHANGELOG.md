@@ -8,6 +8,9 @@ where practical.
 
 ### Added
 
+- Ownership-safe per-user Start Menu launcher creation (enabled by default) with independent
+  `-StartMenu Create|None` control, exact-link preflight, marker ownership, and transactional byte
+  rollback; automatic startup remains independently disabled by default.
 - Native visible Win32 window and notification-area controls with explicit Start, Stop, Show, and Exit paths.
 - Motion modes: Off, Normal, Zen, Circle, and Linear.
 - Named Balanced, Long Task, Presentation, Compatibility, Visible, Battery Saver, and Custom profiles.
@@ -82,6 +85,8 @@ where practical.
   while preserving transaction-residue assertions.
 - Use in-process .NET hashing for SBOM and checksum generation so concurrent Windows PowerShell
   5.1 and PowerShell 7 packaging runs do not depend on command auto-loading.
+- Repaint the settings viewport and all descendant controls after scrolling, layout convergence,
+  and Running/Stopped enabled-state changes so stale control fragments do not survive until resize.
 
 ### Release boundary
 

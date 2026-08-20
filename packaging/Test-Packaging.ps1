@@ -106,9 +106,35 @@ function Assert-StartupOwnershipPredicates([string]$ScriptPath, [string]$TestRoo
         'Customized Run command was recognized as owned.'
 }
 
+function Assert-StartMenuOwnershipPredicates([string]$ScriptPath, [string]$TestRoot) {
+    foreach ($name in @('Get-FullPath', 'Test-SamePath', 'Test-StartMenuShortcutOwned')) {
+        . (Get-ScriptFunctionDefinition $ScriptPath $name)
+    }
+
+    $executable = Join-Path $TestRoot 'IdleHarbor\IdleHarbor.exe'
+    $owned = [pscustomobject]@{
+        TargetPath = $executable
+        Arguments = '--show'
+        WorkingDirectory = Split-Path -Parent $executable
+        Description = 'Shows IdleHarbor settings.'
+        IconLocation = '{0},0' -f $executable
+    }
+    Assert-True (Test-StartMenuShortcutOwned $owned $executable) `
+        'Exact Start Menu shortcut was not recognized as owned.'
+    foreach ($property in @('TargetPath', 'Arguments', 'WorkingDirectory', 'Description', 'IconLocation')) {
+        $changed = $owned.PSObject.Copy()
+        $changed.$property = $(if ($property -eq 'Arguments') { '--start' } else { 'foreign' })
+        Assert-True (-not (Test-StartMenuShortcutOwned $changed $executable)) `
+            "Start Menu shortcut with changed $property was recognized as owned."
+    }
+}
+
 function Assert-InstallerOwnershipPreflight([string]$ScriptPath) {
     $contents = Get-Content -Raw -LiteralPath $ScriptPath
     $preflight = $contents.IndexOf('Assert-StartupEntriesOwned $destinationExecutable', [StringComparison]::Ordinal)
+    $startMenuPreflight = $contents.IndexOf(
+        'Assert-StartMenuPreflight -Executable $destinationExecutable',
+        [StringComparison]::Ordinal)
     $stop = $contents.IndexOf('Stop-OwnedApplicationIfRunning $destinationExecutable', [StringComparison]::Ordinal)
     $copy = $contents.IndexOf('foreach ($fileName in $KnownFiles)', [StringComparison]::Ordinal)
     $marker = $contents.IndexOf("if (Confirm-Change `$markerPath 'Write ownership marker')", [StringComparison]::Ordinal)
@@ -116,6 +142,167 @@ function Assert-InstallerOwnershipPreflight([string]$ScriptPath) {
     Assert-True ($preflight -lt $stop) 'Installer stops the application before its startup ownership preflight.'
     Assert-True ($preflight -lt $copy) 'Installer copies files before its startup ownership preflight.'
     Assert-True ($preflight -lt $marker) 'Installer rewrites its marker before its startup ownership preflight.'
+    Assert-True ($startMenuPreflight -ge 0) 'Installer lacks its Start Menu ownership preflight.'
+    Assert-True ($startMenuPreflight -lt $stop) 'Installer stops the application before its Start Menu ownership preflight.'
+    Assert-True ($startMenuPreflight -lt $copy) 'Installer copies files before its Start Menu ownership preflight.'
+    Assert-True ($startMenuPreflight -lt $marker) 'Installer rewrites its marker before its Start Menu ownership preflight.'
+    Assert-True ($contents -match "(?s)\[ValidateSet\('Create', 'None'\)\]\s*\[string\]\`$StartMenu = 'Create'") `
+        'Installer does not create the non-persistent Start Menu launcher by default.'
+}
+
+function Assert-StartMenuLifecycle(
+    [string]$InstallScript,
+    [string]$UninstallScript,
+    [string]$TestRoot,
+    [string]$Executable) {
+    foreach ($name in @(
+        'Get-FullPath',
+        'Test-SamePath',
+        'Assert-SafeShortcutFile',
+        'Test-StartMenuShortcutOwned',
+        'Test-ByteArraysEqual',
+        'Assert-StartMenuPreflight',
+        'Set-StartMenu',
+        'Get-StartMenuSnapshot',
+        'Restore-StartMenuSnapshot'
+    )) {
+        . (Get-ScriptFunctionDefinition $InstallScript $name)
+    }
+
+    $linkRoot = Join-Path $TestRoot 'start-menu-functions'
+    $link = Join-Path $linkRoot 'IdleHarbor.lnk'
+    New-Item -ItemType Directory -Path $linkRoot -Force | Out-Null
+    $shell = New-Object -ComObject WScript.Shell
+
+    $whatIfOwned = Set-StartMenu `
+        -Executable $Executable `
+        -Mode Create `
+        -PreviouslyOwned:$false `
+        -Link $link `
+        -WhatIf 6>$null
+    Assert-True (-not $whatIfOwned) 'Start Menu -WhatIf claimed a shortcut it did not create.'
+    Assert-True (-not (Test-Path -LiteralPath $link)) 'Start Menu -WhatIf created a shortcut.'
+
+    $createdOwned = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    Assert-True $createdOwned 'New Start Menu shortcut was not marked installer-owned.'
+    Assert-True (Test-Path -LiteralPath $link -PathType Leaf) 'Start Menu shortcut was not created.'
+    $createdShortcut = $shell.CreateShortcut($link)
+    Assert-True (Test-StartMenuShortcutOwned $createdShortcut $Executable) `
+        'Created Start Menu shortcut does not match the exact ownership contract.'
+    $createdBytes = [IO.File]::ReadAllBytes($link)
+    $preexistingOwned = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    Assert-True (-not $preexistingOwned) 'An exact pre-existing Start Menu shortcut was incorrectly claimed.'
+    Assert-True (Test-ByteArraysEqual $createdBytes ([IO.File]::ReadAllBytes($link))) `
+        'Reinstall rewrote an exact pre-existing Start Menu shortcut.'
+
+    $snapshot = Get-StartMenuSnapshot -Link $link
+    $whatIfRetained = Set-StartMenu `
+        -Executable $Executable `
+        -Mode None `
+        -PreviouslyOwned:$true `
+        -Link $link `
+        -WhatIf 6>$null
+    Assert-True $whatIfRetained 'Start Menu removal -WhatIf relinquished existing ownership.'
+    Assert-True (Test-Path -LiteralPath $link -PathType Leaf) `
+        'Start Menu removal -WhatIf removed the shortcut.'
+    $removedOwned = Set-StartMenu -Executable $Executable -Mode None -PreviouslyOwned:$true -Link $link
+    Assert-True (-not $removedOwned) 'Removing the Start Menu shortcut retained installer ownership.'
+    Assert-True (-not (Test-Path -LiteralPath $link)) 'Owned Start Menu shortcut was not removed.'
+    Restore-StartMenuSnapshot -Bytes $snapshot -Executable $Executable -Link $link
+    Assert-True (Test-ByteArraysEqual $createdBytes ([IO.File]::ReadAllBytes($link))) `
+        'Rollback did not restore exact prior Start Menu shortcut bytes.'
+
+    Remove-Item -LiteralPath $link -Force
+    $emptySnapshot = Get-StartMenuSnapshot -Link $link
+    Assert-True ($null -eq $emptySnapshot) 'Missing Start Menu shortcut produced a non-empty snapshot.'
+    $null = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    Restore-StartMenuSnapshot -Bytes $emptySnapshot -Executable $Executable -Link $link
+    Assert-True (-not (Test-Path -LiteralPath $link)) `
+        'Fresh-install rollback retained a newly created Start Menu shortcut.'
+
+    $null = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    $changed = $shell.CreateShortcut($link)
+    $changed.Arguments = '--start'
+    $changed.Save()
+    $foreignRejected = $false
+    try {
+        Assert-StartMenuPreflight -Executable $Executable -Mode Create -PreviouslyOwned:$true -Link $link
+    }
+    catch { $foreignRejected = $_.Exception.Message -like '*different Start Menu shortcut*' }
+    Assert-True $foreignRejected 'Installer preflight accepted a changed Start Menu shortcut.'
+    Remove-Item -LiteralPath $link -Force
+
+    New-Item -ItemType Directory -Path $link | Out-Null
+    $directoryRejected = $false
+    try {
+        Assert-StartMenuPreflight -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    }
+    catch { $directoryRejected = $_.Exception.Message -like '*not a regular file*' }
+    Assert-True $directoryRejected 'Installer preflight accepted a directory at the Start Menu link path.'
+    Remove-Item -LiteralPath $link -Force
+
+    $junctionTarget = Join-Path $TestRoot 'start-menu-junction-target'
+    New-Item -ItemType Directory -Path $junctionTarget -Force | Out-Null
+    New-Item -ItemType Junction -Path $link -Target $junctionTarget | Out-Null
+    $junctionRejected = $false
+    try {
+        Assert-StartMenuPreflight -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    }
+    catch { $junctionRejected = $_.Exception.Message -like '*junction or symbolic link*' }
+    Assert-True $junctionRejected 'Installer preflight accepted a reparse point at the Start Menu link path.'
+    Remove-Item -LiteralPath $link -Force
+    Assert-True (Test-Path -LiteralPath $junctionTarget -PathType Container) `
+        'Start Menu reparse-point check changed its target directory.'
+
+    $hardLinkPeer = Join-Path $TestRoot 'start-menu-hard-link-peer.bin'
+    [IO.File]::WriteAllBytes($hardLinkPeer, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
+    New-Item -ItemType HardLink -Path $link -Target $hardLinkPeer | Out-Null
+    $hardLinkRejected = $false
+    try {
+        Assert-StartMenuPreflight -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    }
+    catch { $hardLinkRejected = $_.Exception.Message -like '*hard links*' }
+    Assert-True $hardLinkRejected 'Installer preflight accepted a multiply linked Start Menu path.'
+    Remove-Item -LiteralPath $link -Force
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardLinkPeer))) -ceq 'foreign') `
+        'Start Menu hard-link check changed the external peer.'
+
+    $setStartMenu = ${function:Set-StartMenu}
+    foreach ($name in @(
+        'Get-FullPath',
+        'Test-SamePath',
+        'Assert-SafeShortcutFile',
+        'Test-StartMenuShortcutOwned',
+        'Remove-OwnedStartMenu'
+    )) {
+        . (Get-ScriptFunctionDefinition $UninstallScript $name)
+    }
+
+    $null = & $setStartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    Remove-OwnedStartMenu -Executable $Executable -MarkerOwned:$true -Link $link
+    Assert-True (-not (Test-Path -LiteralPath $link)) `
+        'Uninstaller retained a marker-owned exact Start Menu shortcut.'
+
+    $null = & $setStartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    Remove-OwnedStartMenu -Executable $Executable -MarkerOwned:$false -Link $link 3>$null
+    Assert-True (Test-Path -LiteralPath $link -PathType Leaf) `
+        'Uninstaller removed an exact Start Menu shortcut not claimed by its marker.'
+    Remove-Item -LiteralPath $link -Force
+
+    $null = & $setStartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    $changed = $shell.CreateShortcut($link)
+    $changed.Description = 'User-customized shortcut'
+    $changed.Save()
+    Remove-OwnedStartMenu -Executable $Executable -MarkerOwned:$true -Link $link 3>$null
+    Assert-True (Test-Path -LiteralPath $link -PathType Leaf) `
+        'Uninstaller removed a changed Start Menu shortcut.'
+    Remove-Item -LiteralPath $link -Force
+
+    New-Item -ItemType Directory -Path $link | Out-Null
+    Remove-OwnedStartMenu -Executable $Executable -MarkerOwned:$true -Link $link 3>$null
+    Assert-True (Test-Path -LiteralPath $link -PathType Container) `
+        'Uninstaller removed an unsafe foreign Start Menu path.'
+    Remove-Item -LiteralPath $link -Force
 }
 
 $packagingRoot = $PSScriptRoot
@@ -147,6 +334,8 @@ $packagingTestMutex = $null
 $packagingTestMutexOwned = $false
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
+Assert-StartMenuOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
+Assert-StartMenuOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
 Assert-InstallerOwnershipPreflight (Join-Path $packagingRoot 'install.ps1')
 New-Item -ItemType Directory -Path $sourceRoot, $buildRoot, $outputRoot -Force | Out-Null
 try {
@@ -163,12 +352,17 @@ try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x00, 0x01, 0x02, 0x03))
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch -WhatIf | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer -WhatIf created files.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -NoLaunch -WhatIf | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -NoLaunch -WhatIf | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
+    Assert-StartMenuLifecycle `
+        -InstallScript (Join-Path $packagingRoot 'install.ps1') `
+        -UninstallScript (Join-Path $packagingRoot 'uninstall.ps1') `
+        -TestRoot $tempRoot `
+        -Executable $fakeExecutable
 
     $sameSourceRoot = Join-Path $tempRoot 'same-source\IdleHarbor'
     $sameSourceExecutable = Join-Path $sameSourceRoot 'IdleHarbor.exe'
@@ -178,7 +372,7 @@ try {
     Set-Content -LiteralPath $sameSourceUnrelated -Value 'do not change' -Encoding ASCII
     $sameSourceFailureMessage = $null
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $sameSourceRoot -InstallRoot $sameSourceRoot -Startup None -NoLaunch | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $sameSourceRoot -InstallRoot $sameSourceRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     }
     catch { $sameSourceFailureMessage = $_.Exception.Message }
     Assert-True ($sameSourceFailureMessage -like '*no valid IdleHarbor ownership marker*') `
@@ -201,6 +395,7 @@ try {
             -SourcePath $buildRoot `
             -InstallRoot $transactionRoot `
             -Startup None `
+            -StartMenu None `
             -NoLaunch `
             -InjectFailureAt AfterCopy | Out-Null
     }
@@ -215,7 +410,7 @@ try {
     New-Item -ItemType Directory -Path $preexistingTransactionRoot -Force | Out-Null
     $preexistingFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
     }
     catch { $preexistingFailure = $true }
     Assert-True $preexistingFailure 'Injected failure in a pre-existing empty root did not fail.'
@@ -225,7 +420,7 @@ try {
         'Rollback left managed residue in a pre-existing empty install root.'
 
     $successfulCommitTransactions = @(Get-TransactionDirectories)
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch | Out-Null
     Assert-NoNewTransactionDirectories $successfulCommitTransactions `
         'Successful commit left transaction backup material behind.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
@@ -248,7 +443,7 @@ try {
     $completeRollbackTransactions = @(Get-TransactionDirectories)
     $updateFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
     }
     catch { $updateFailure = $true }
     Assert-True $updateFailure 'Injected update failure did not fail.'
@@ -270,6 +465,7 @@ try {
             -SourcePath $buildRoot `
             -InstallRoot $installRoot `
             -Startup None `
+            -StartMenu None `
             -NoLaunch `
             -InjectFailureAt AfterMarker `
             -InjectRestoreFailureAt Files | Out-Null
@@ -296,6 +492,7 @@ try {
             -SourcePath $buildRoot `
             -InstallRoot $installRoot `
             -Startup None `
+            -StartMenu None `
             -NoLaunch `
             -InjectFailureAt AfterMarker `
             -InjectRestoreFailureAt Startup | Out-Null
@@ -309,7 +506,7 @@ try {
     Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -ceq $startupRollbackBytes) `
         'Startup-only rollback failure did not preserve the restored executable bytes.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -cne $originalExecutable) `
         'Successful update did not install the new executable.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'README.md') -PathType Leaf) `
@@ -320,16 +517,16 @@ try {
     $sameDirectoryMarker = Get-Content -Raw -LiteralPath $installedMarker
     $sameDirectoryFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
     }
     catch { $sameDirectoryFailure = $true }
     Assert-True $sameDirectoryFailure 'Injected same-directory marker failure did not fail.'
     Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $sameDirectoryMarker) `
         'Same-directory rollback did not restore the ownership marker.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
     Remove-Item -LiteralPath $unexpectedFile -Force
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
@@ -337,14 +534,14 @@ try {
 
     $hardlinkRoot = Join-Path $tempRoot 'hardlink-boundary\IdleHarbor'
     $hardlinkSentinel = Join-Path $tempRoot 'hardlink-boundary-sentinel.bin'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
     $hardlinkExecutable = Join-Path $hardlinkRoot 'IdleHarbor.exe'
     Remove-Item -LiteralPath $hardlinkExecutable -Force
     [IO.File]::WriteAllBytes($hardlinkSentinel, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
     New-Item -ItemType HardLink -Path $hardlinkExecutable -Target $hardlinkSentinel | Out-Null
     $hardlinkRejected = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
     }
     catch { $hardlinkRejected = $_.Exception.Message -like '*hard links*' }
     Assert-True $hardlinkRejected 'Installer accepted a multiply linked managed destination file.'
@@ -356,7 +553,7 @@ try {
     Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
         'Uninstaller changed the external peer of an in-root hard link.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -NoLaunch | Out-Null
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -StartMenu None -NoLaunch | Out-Null
     $savedAppData = $env:APPDATA
     $savedLocalAppData = $env:LOCALAPPDATA
     $testAppData = Join-Path $tempRoot 'appdata'
@@ -385,7 +582,7 @@ try {
     [IO.File]::WriteAllBytes($foreignExecutable, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
     $foreignRejected = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $foreignRoot -NoLaunch | Out-Null
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $foreignRoot -StartMenu None -NoLaunch | Out-Null
     }
     catch { $foreignRejected = $true }
     Assert-True $foreignRejected 'Installer accepted a non-empty destination without an ownership marker.'
