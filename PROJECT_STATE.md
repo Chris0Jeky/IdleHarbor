@@ -37,19 +37,21 @@ Ready-for-review PR [#24](https://github.com/Chris0Jeky/IdleHarbor/pull/24), bra
 `agent/v0.1.0-ui-polish`, is open and unmerged. It implements issues #19-#22:
 
 - keyboard traversal follows visual order, with Save before fixed Start/Stop;
+- keyboard activation transfers focus to the newly enabled Stop or Start action after a session
+  transition instead of leaving keyboard focus unset;
 - the native vertical scrollbar belongs to only the settings viewport;
 - resize/DPI layout changes re-reveal a still-focused clipped body control without reintroducing
   unchanged-focus wheel snap-back;
 - stacked body controls remain horizontally bounded at sub-100-logical-pixel widths.
 
-At the pre-base-merge head, hosted x64/ARM64/x86 and CodeQL checks were green; local Visual Studio
-2019 x64 Release build and CTest passed 7/7; and a fresh-context independent review found no
-CRITICAL/HIGH or MEDIUM defect. The branch has now incorporated `origin/main` after PR #25 and
-must be re-proved at its new exact head. The final descendant-aware desktop harness must verify the
-viewport-owned scrollbar, fixed status/Start/Stop rectangles, wheel/combo/line/page routing,
-resize-triggered focus reveal, Save/Start/Stop tab order in both directions, lifecycle states, and
-tray restore under PowerShell 7 and Windows PowerShell 5.1. A true cross-monitor mixed-DPI
-transition is not locally verifiable because only one display is attached.
+The branch has incorporated `origin/main` after PR #25. Its integrated pre-focus-fix head passed
+hosted x64/ARM64/x86, CodeQL, and C++ analysis; the current code passes a Visual Studio 2019 x64
+Release build and CTest 7/7. The descendant-aware desktop harness also passes under PowerShell 7 and
+Windows PowerShell 5.1 at 192 DPI: viewport-owned scrollbar geometry, fixed status/Start/Stop
+rectangles, wheel/combo/line/page routing, resize-triggered focus reveal, state-aware forward and
+reverse keyboard navigation, keyboard Start/Stop focus handoff, lifecycle states, and tray restore
+all passed. The final pushed head still needs hosted checks and a scoped fresh-context review. A true
+cross-monitor mixed-DPI transition is not locally verifiable because only one display is attached.
 
 ### Release workflow
 

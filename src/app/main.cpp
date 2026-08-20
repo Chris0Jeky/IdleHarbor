@@ -58,6 +58,7 @@ constexpr int kIconResourceId = 101;
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
 constexpr UINT kDeferredCommandMessage = WM_APP + 3;
+constexpr UINT kDeferredFocusMessage = WM_APP + 4;
 constexpr UINT kTimerId = 1;
 constexpr UINT_PTR kChildSubclassId = 1;
 constexpr int kEmergencyHotkeyId = 1;
@@ -1255,11 +1256,20 @@ class Application final {
     }
 
     void UpdateButtons() {
-        if (start_ != nullptr) {
-            EnableWindow(start_, session_active_ ? FALSE : TRUE);
-        }
-        if (stop_ != nullptr) {
-            EnableWindow(stop_, session_active_ ? TRUE : FALSE);
+        if (session_active_) {
+            if (stop_ != nullptr) {
+                EnableWindow(stop_, TRUE);
+            }
+            if (start_ != nullptr) {
+                EnableWindow(start_, FALSE);
+            }
+        } else {
+            if (start_ != nullptr) {
+                EnableWindow(start_, TRUE);
+            }
+            if (stop_ != nullptr) {
+                EnableWindow(stop_, FALSE);
+            }
         }
         for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
                                    lock_pause_, disconnect_pause_, battery_, pause_on_battery_, fullscreen_,
@@ -1494,6 +1504,9 @@ class Application final {
         }
         Evaluate(false);
         UpdateButtons();
+        if (stop_ != nullptr) {
+            PostMessageW(window_, kDeferredFocusMessage, reinterpret_cast<WPARAM>(stop_), 0);
+        }
     }
 
     void StopSession() {
@@ -1521,6 +1534,9 @@ class Application final {
             ShowSafetyNotification(L"IdleHarbor session stopped", L"The configured maximum duration was reached.");
         }
         UpdateButtons();
+        if (start_ != nullptr) {
+            PostMessageW(window_, kDeferredFocusMessage, reinterpret_cast<WPARAM>(start_), 0);
+        }
     }
 
     void FailSession(const std::wstring& message) {
@@ -1810,6 +1826,13 @@ class Application final {
         case kDeferredCommandMessage:
             ProcessDeferredCommand();
             return 0;
+        case kDeferredFocusMessage: {
+            const HWND target = reinterpret_cast<HWND>(w_param);
+            if (target != nullptr && IsChild(window_, target) != FALSE && IsWindowEnabled(target) != FALSE) {
+                SetFocus(target);
+            }
+            return 0;
+        }
         case WM_HOTKEY:
             if (w_param == kEmergencyHotkeyId) {
                 StopSession();

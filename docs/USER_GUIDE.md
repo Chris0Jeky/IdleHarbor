@@ -34,7 +34,8 @@ areas.
   before the fixed Start and Stop actions. The body viewport automatically reveals the focused setting
   when focus changes or a resize/DPI reflow clips the still-focused setting; scrolling with the
   pointer or scrollbar does not snap back. Start and Stop remain visible in the fixed safety region,
-  while Save stays in the scrollable body.
+  while Save stays in the scrollable body. Starting or stopping from the keyboard transfers focus to
+  the newly enabled opposite action, keeping the immediate control path intact.
 
 Moving the window between monitors reapplies the destination DPI and constrains the suggested size
 to that monitor's usable work area.

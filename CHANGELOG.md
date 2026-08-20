@@ -21,8 +21,9 @@ where practical.
   work areas now reflow settings and wrap or stack actions, and focus reveal no longer undoes pointer
   or scrollbar scrolling when focus is unchanged.
 - Confined the native scrollbar track to the settings viewport, aligned Tab and Shift+Tab with visual
-  order (including Save before fixed Start/Stop), re-revealed a still-focused setting after resize or
-  DPI reflow, and adapted stacked controls to unusually narrow work areas.
+  order (including Save before fixed Start/Stop), transferred keyboard focus to the newly enabled
+  Start/Stop action after session changes, re-revealed a still-focused setting after resize or DPI
+  reflow, and adapted stacked controls to unusually narrow work areas.
 
 ### Changed
 
