@@ -65,10 +65,11 @@ constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
 constexpr std::size_t kMaximumDeferredCommands = 32;
 constexpr int kBaseWindowWidth = 600;
 constexpr int kBaseWindowHeight = 700;
-constexpr int kBaseContentHeight = 670;
 constexpr int kBaseWindowMargin = 12;
 constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
+constexpr int kBaseBodyOrigin = 52;
+constexpr int kBaseBodyContentHeight = 570;
 
 enum ControlId : int {
     kStatus = 100,
@@ -405,7 +406,46 @@ class Application final {
 
     [[nodiscard]] HWND window() const noexcept { return window_; }
 
-    void MaintainFocusedControlVisibility() { EnsureFocusedControlVisible(); }
+    void MaintainFocusedControlVisibility() {
+        ObserveFocusChange();
+    }
+
+    void ObserveFocusChange() {
+        const HWND focused = GetFocus();
+        const auto previous = reinterpret_cast<std::uintptr_t>(last_focus_);
+        const auto current = reinterpret_cast<std::uintptr_t>(focused);
+        if (!idleharbor::app::FocusChanged(previous, current)) {
+            return;
+        }
+        last_focus_ = focused;
+        EnsureFocusedControlVisible();
+    }
+
+    [[nodiscard]] bool HandleTabNavigation(const MSG& message) {
+        if (message.message != WM_KEYDOWN || message.wParam != VK_TAB) {
+            return false;
+        }
+        std::vector<HWND> focusable;
+        for (const auto& child : child_layouts_) {
+            if ((GetWindowLongPtrW(child.window, GWL_STYLE) & WS_TABSTOP) != 0 &&
+                IsWindowVisible(child.window) != FALSE && IsWindowEnabled(child.window) != FALSE) {
+                focusable.push_back(child.window);
+            }
+        }
+        if (focusable.empty()) {
+            return false;
+        }
+        const auto current = std::find(focusable.begin(), focusable.end(), GetFocus());
+        const bool reverse = (GetKeyState(VK_SHIFT) & static_cast<SHORT>(0x8000)) != 0;
+        std::size_t index = current == focusable.end() ? 0 : static_cast<std::size_t>(current - focusable.begin());
+        if (reverse) {
+            index = index == 0 ? focusable.size() - 1 : index - 1;
+        } else {
+            index = (index + 1) % focusable.size();
+        }
+        SetFocus(focusable[index]);
+        return true;
+    }
 
     static LRESULT CALLBACK WindowProc(
         const HWND window,
@@ -435,6 +475,10 @@ class Application final {
         auto* application = reinterpret_cast<Application*>(reference_data);
         if (message == WM_NCDESTROY) {
             RemoveWindowSubclass(window, ChildWindowProc, subclass_id);
+        } else if (message == WM_COMMAND && application != nullptr) {
+            return application->HandleMessage(message, w_param, l_param);
+        } else if (message == WM_SETFOCUS && application != nullptr) {
+            application->ObserveFocusChange();
         } else if (message == WM_MOUSEWHEEL && application != nullptr) {
             if (application->IsDroppedComboBox(window)) {
                 return DefSubclassProc(window, message, w_param, l_param);
@@ -451,6 +495,19 @@ class Application final {
         Fill,
     };
 
+    enum class LayoutRegion {
+        Body,
+        FixedTop,
+        FixedBottom,
+    };
+
+    enum class BodyControlKind {
+        Generic,
+        Label,
+        Field,
+        Check,
+    };
+
     struct ChildLayout {
         HWND window = nullptr;
         int x = 0;
@@ -459,6 +516,11 @@ class Application final {
         int height = 0;
         int focus_height = 0;
         ChildWidthMode width_mode = ChildWidthMode::Fixed;
+        LayoutRegion region = LayoutRegion::Body;
+        BodyControlKind kind = BodyControlKind::Generic;
+        int arranged_x = 0;
+        int arranged_y = 0;
+        int arranged_width = 0;
     };
 
     [[nodiscard]] int Scale(const int value) const noexcept { return ScaleForDpi(value, dpi_); }
@@ -534,36 +596,127 @@ class Application final {
         const int width,
         const int height,
         const int focus_height,
-        const ChildWidthMode width_mode = ChildWidthMode::Fixed) {
-        child_layouts_.push_back({window, x, y, width, height, focus_height, width_mode});
+        const ChildWidthMode width_mode = ChildWidthMode::Fixed,
+        const LayoutRegion region = LayoutRegion::Body,
+        const BodyControlKind kind = BodyControlKind::Generic) {
+        child_layouts_.push_back({window, x, y, width, height, focus_height, width_mode, region, kind});
         SetWindowSubclass(window, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
     }
 
-    [[nodiscard]] int ContentHeight() const noexcept { return Scale(kBaseContentHeight); }
+    [[nodiscard]] int ContentHeight() const noexcept { return body_content_height_; }
 
     [[nodiscard]] int ViewportHeight() const noexcept {
-        RECT client{};
-        return GetClientRect(window_, &client) != FALSE
-                   ? std::max(static_cast<int>(client.bottom - client.top), 0)
+        RECT viewport{};
+        return settings_viewport_ != nullptr && GetClientRect(settings_viewport_, &viewport) != FALSE
+                   ? std::max(static_cast<int>(viewport.bottom - viewport.top), 0)
                    : 0;
     }
 
+    [[nodiscard]] idleharbor::app::SafetyRegions SafetyRegionsFor(const RECT& client) const noexcept {
+        return idleharbor::app::ComputeSafetyRegions(client.right, client.bottom, static_cast<int>(dpi_));
+    }
+
+    [[nodiscard]] bool IsSettingsViewportPoint(const LPARAM l_param) const noexcept {
+        if (settings_viewport_ == nullptr) {
+            return false;
+        }
+        POINT point{
+            static_cast<short>(LOWORD(l_param)),
+            static_cast<short>(HIWORD(l_param)),
+        };
+        if (ScreenToClient(window_, &point) == FALSE) {
+            return false;
+        }
+        RECT viewport{};
+        if (GetWindowRect(settings_viewport_, &viewport) == FALSE) {
+            return false;
+        }
+        POINT top_left{viewport.left, viewport.top};
+        POINT bottom_right{viewport.right, viewport.bottom};
+        if (ScreenToClient(window_, &top_left) == FALSE || ScreenToClient(window_, &bottom_right) == FALSE) {
+            return false;
+        }
+        const RECT client_viewport{top_left.x, top_left.y, bottom_right.x, bottom_right.y};
+        return PtInRect(&client_viewport, point) != FALSE;
+    }
+
     void LayoutControls() {
-        if (child_layouts_.empty()) {
+        if (child_layouts_.empty() || window_ == nullptr) {
             return;
         }
         RECT client{};
         if (GetClientRect(window_, &client) == FALSE) {
             return;
         }
+        const auto regions = SafetyRegionsFor(client);
+        const auto settings_layout = idleharbor::app::DetermineSettingsLayout(static_cast<int>(client.right), static_cast<int>(dpi_));
+        const bool stacked = settings_layout == idleharbor::app::SettingsLayoutMode::Stacked;
+        const int logical_client_width = std::max(
+            idleharbor::app::LogicalPixels(static_cast<int>(client.right), static_cast<int>(dpi_)),
+            1);
+        const int body_width = std::max(logical_client_width - 40, 80);
+        int narrow_y = 0;
+        int body_bottom = 0;
+        for (auto& child : child_layouts_) {
+            if (child.region != LayoutRegion::Body) {
+                continue;
+            }
+            if (stacked) {
+                child.arranged_x = 20;
+                child.arranged_y = narrow_y;
+                child.arranged_width = body_width;
+                if (child.kind == BodyControlKind::Label) {
+                    narrow_y += 28;
+                } else if (child.kind == BodyControlKind::Field) {
+                    narrow_y += 38;
+                } else {
+                    narrow_y += 34;
+                }
+            } else {
+                child.arranged_x = child.x;
+                child.arranged_y = child.y - kBaseBodyOrigin;
+                child.arranged_width = child.width_mode == ChildWidthMode::Fill
+                                           ? std::max(80, logical_client_width - child.x - 20)
+                                           : child.width;
+            }
+            body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
+        }
+        body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
+        if (settings_viewport_ != nullptr) {
+            SetWindowPos(
+                settings_viewport_,
+                nullptr,
+                regions.viewport.left,
+                regions.viewport.top,
+                std::max(regions.viewport.right - regions.viewport.left, 1),
+                std::max(regions.viewport.bottom - regions.viewport.top, 0),
+                SWP_NOACTIVATE | SWP_NOZORDER);
+        }
         for (const auto& child : child_layouts_) {
-            const int x = Scale(child.x);
-            const int y = Scale(child.y) - scroll_position_;
-            const int fixed_width = Scale(child.width);
-            const int width = child.width_mode == ChildWidthMode::Fill
-                                  ? std::max(Scale(80), static_cast<int>(client.right) - x - Scale(20))
-                                  : fixed_width;
-            const int height = Scale(child.height);
+            int x = 0;
+            int y = 0;
+            int width = 0;
+            int height = Scale(child.height);
+            if (child.region == LayoutRegion::FixedTop) {
+                x = regions.status.left;
+                y = regions.status.top;
+                width = std::max(regions.status.right - regions.status.left, Scale(80));
+                height = std::max(regions.status.bottom - regions.status.top, Scale(24));
+            } else if (child.region == LayoutRegion::FixedBottom) {
+                const auto action_buttons = idleharbor::app::ComputeActionButtonRects(
+                    static_cast<int>(client.right),
+                    static_cast<int>(client.bottom),
+                    static_cast<int>(dpi_));
+                const auto& action = child.window == stop_ ? action_buttons.stop : action_buttons.start;
+                x = action.left;
+                y = action.top;
+                width = action.right - action.left;
+                height = action.bottom - action.top;
+            } else {
+                x = Scale(child.arranged_x);
+                y = Scale(child.arranged_y) - scroll_position_;
+                width = Scale(child.arranged_width);
+            }
             SetWindowPos(
                 child.window,
                 nullptr,
@@ -577,6 +730,7 @@ class Application final {
     }
 
     void UpdateViewport() {
+        LayoutControls();
         const int viewport_height = ViewportHeight();
         scroll_position_ = idleharbor::app::ClampScrollPosition(
             scroll_position_,
@@ -682,7 +836,10 @@ class Application final {
         if (layout == child_layouts_.end()) {
             return;
         }
-        const int top = Scale(layout->y);
+        if (layout->region != LayoutRegion::Body) {
+            return;
+        }
+        const int top = Scale(layout->arranged_y);
         const int bottom = top + Scale(layout->focus_height);
         ScrollTo(idleharbor::app::ScrollPositionToReveal(
             scroll_position_,
@@ -729,6 +886,23 @@ class Application final {
         ui_font_ = CreateUiFont(dpi_);
         const HFONT font = ui_font_ != nullptr ? ui_font_ : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
         const auto scale = [&](const int value) { return ScaleForDpi(value, dpi_); };
+        settings_viewport_ = CreateWindowExW(
+            WS_EX_CONTROLPARENT,
+            L"STATIC",
+            nullptr,
+            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+            0,
+            0,
+            0,
+            0,
+            window_,
+            nullptr,
+            instance_,
+            nullptr);
+        if (settings_viewport_ != nullptr) {
+            SetWindowSubclass(settings_viewport_, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
+        }
+        const HWND body_parent = settings_viewport_ != nullptr ? settings_viewport_ : window_;
         const auto add_label = [&](const wchar_t* text, const int y) {
             const HWND control = CreateWindowExW(
                 0,
@@ -739,12 +913,12 @@ class Application final {
                 scale(y),
                 scale(270),
                 scale(24),
-                window_,
+                body_parent,
                 nullptr,
                 instance_,
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-            TrackChild(control, 20, y, 270, 24, 24);
+            TrackChild(control, 20, y, 270, 24, 24, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Label);
         };
         const auto add_combo = [&](HWND& target, const int y, const int id) {
             target = CreateWindowExW(
@@ -756,12 +930,21 @@ class Application final {
                 scale(y - 3),
                 scale(245),
                 scale(260),
-                window_,
+                body_parent,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-            TrackChild(target, 300, y - 3, 245, 260, 26, ChildWidthMode::Fill);
+            TrackChild(
+                target,
+                300,
+                y - 3,
+                245,
+                260,
+                26,
+                ChildWidthMode::Fill,
+                LayoutRegion::Body,
+                BodyControlKind::Field);
         };
         const auto add_edit = [&](HWND& target, const int y, const int id) {
             target = CreateWindowExW(
@@ -773,12 +956,12 @@ class Application final {
                 scale(y - 3),
                 scale(145),
                 scale(26),
-                window_,
+                body_parent,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-            TrackChild(target, 300, y - 3, 145, 26, 26);
+            TrackChild(target, 300, y - 3, 145, 26, 26, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Field);
         };
         const auto add_check = [&](HWND& target, const wchar_t* text, const int y, const int id) {
             target = CreateWindowExW(
@@ -790,12 +973,21 @@ class Application final {
                 scale(y),
                 scale(525),
                 scale(26),
-                window_,
+                body_parent,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-            TrackChild(target, 20, y, 525, 26, 26, ChildWidthMode::Fill);
+            TrackChild(
+                target,
+                20,
+                y,
+                525,
+                26,
+                26,
+                ChildWidthMode::Fill,
+                LayoutRegion::Body,
+                BodyControlKind::Check);
         };
 
         status_ = CreateWindowExW(
@@ -812,7 +1004,7 @@ class Application final {
             instance_,
             nullptr);
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-        TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill);
+        TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
         add_label(L"Profile", 56);
         add_combo(profile_, 56, kProfile);
@@ -871,12 +1063,21 @@ class Application final {
                 scale(618),
                 scale(115),
                 scale(32),
-                window_,
+                id == kSave ? body_parent : window_,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-            TrackChild(target, x, 618, 115, 32, 32);
+            TrackChild(
+                target,
+                x,
+                618,
+                115,
+                32,
+                32,
+                ChildWidthMode::Fixed,
+                id == kSave ? LayoutRegion::Body : LayoutRegion::FixedBottom,
+                id == kSave ? BodyControlKind::Check : BodyControlKind::Generic);
         };
         add_button(start_, L"Start", 20, kStart);
         add_button(stop_, L"Stop", 145, kStop);
@@ -1622,7 +1823,9 @@ class Application final {
             HandleVerticalScroll(w_param);
             return 0;
         case WM_MOUSEWHEEL:
-            HandleMouseWheel(w_param);
+            if (IsSettingsViewportPoint(l_param)) {
+                HandleMouseWheel(w_param);
+            }
             return 0;
         case WM_DPICHANGED:
             ApplyDpiChange(
@@ -1667,6 +1870,7 @@ class Application final {
 
     HINSTANCE instance_ = nullptr;
     HWND window_ = nullptr;
+    HWND settings_viewport_ = nullptr;
     HWND status_ = nullptr;
     HWND profile_ = nullptr;
     HWND motion_ = nullptr;
@@ -1703,7 +1907,9 @@ class Application final {
     bool locked_ = false;
     bool disconnected_ = false;
     bool exiting_ = false;
+    HWND last_focus_ = nullptr;
     int scroll_position_ = 0;
+    int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
     int wheel_delta_remainder_ = 0;
     std::uint64_t next_pulse_tick_ = 0;
     ULONGLONG next_input_hook_refresh_tick_ = 0;
@@ -1829,7 +2035,7 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
 
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
-        if (IsDialogMessageW(application.window(), &message) == FALSE) {
+        if (!application.HandleTabNavigation(message) && IsDialogMessageW(application.window(), &message) == FALSE) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }

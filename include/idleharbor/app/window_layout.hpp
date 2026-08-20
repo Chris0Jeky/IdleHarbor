@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace idleharbor::app {
 
 struct PixelRect {
@@ -14,6 +16,28 @@ struct WheelDeltaResult {
     int remainder = 0;
 };
 
+enum class ActionLayoutMode {
+    Wide,
+    Wrapped,
+    Stacked,
+};
+
+enum class SettingsLayoutMode {
+    Columns,
+    Stacked,
+};
+
+struct SafetyRegions {
+    PixelRect status;
+    PixelRect actions;
+    PixelRect viewport;
+};
+
+struct ActionButtonRects {
+    PixelRect start;
+    PixelRect stop;
+};
+
 [[nodiscard]] PixelRect ClampWindowRect(PixelRect desired, PixelRect work_area, int margin) noexcept;
 [[nodiscard]] int MaximumScrollPosition(int content_height, int viewport_height) noexcept;
 [[nodiscard]] int ClampScrollPosition(int position, int content_height, int viewport_height) noexcept;
@@ -24,5 +48,12 @@ struct WheelDeltaResult {
     int content_height,
     int viewport_height) noexcept;
 [[nodiscard]] WheelDeltaResult ConsumeWheelDelta(int remainder, int delta) noexcept;
+[[nodiscard]] int LogicalPixels(int physical_pixels, int dpi) noexcept;
+[[nodiscard]] int PhysicalPixels(int logical_pixels, int dpi) noexcept;
+[[nodiscard]] ActionLayoutMode DetermineActionLayout(int client_width, int dpi) noexcept;
+[[nodiscard]] SettingsLayoutMode DetermineSettingsLayout(int client_width, int dpi) noexcept;
+[[nodiscard]] SafetyRegions ComputeSafetyRegions(int client_width, int client_height, int dpi) noexcept;
+[[nodiscard]] ActionButtonRects ComputeActionButtonRects(int client_width, int client_height, int dpi) noexcept;
+[[nodiscard]] bool FocusChanged(std::uintptr_t previous_focus, std::uintptr_t current_focus) noexcept;
 
 }  // namespace idleharbor::app

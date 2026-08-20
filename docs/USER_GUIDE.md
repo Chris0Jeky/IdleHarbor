@@ -20,15 +20,18 @@ shown so a user can understand why a pulse is not being emitted.
 ## Window, scaling, and keyboard navigation
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
-area. When the available height is smaller than the settings content, a native vertical scrollbar
-keeps every option and action reachable.
+area. The live Running/Paused/Stopped status and immediate Start/Stop actions remain in fixed safety
+regions while the settings body uses a native vertical scrollbar. On narrow or highly scaled work
+areas, settings reflow into a single column and the action row wraps or stacks so every control stays
+visible and keyboard reachable.
 
 - Turn the mouse wheel over the window or any closed control to move the settings viewport.
 - An open profile, motion, or power list keeps native wheel handling so its choices can be browsed.
 - Precision touchpads and high-resolution wheels retain partial input until a complete wheel step is
   reached; IdleHarbor also follows the Windows wheel-lines/page setting.
-- Use **Tab** and **Shift+Tab** to traverse controls. The viewport automatically reveals the focused
-  control, including Start, Stop, and Save at the bottom.
+- Use **Tab** and **Shift+Tab** to traverse controls. The body viewport automatically reveals the
+  focused setting when focus changes; scrolling with the pointer or scrollbar does not snap back.
+  Start and Stop remain visible in the fixed safety region, while Save stays in the scrollable body.
 
 Moving the window between monitors reapplies the destination DPI and constrains the suggested size
 to that monitor's usable work area.

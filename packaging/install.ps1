@@ -11,7 +11,11 @@ param(
     [switch]$NoLaunch,
 
     [ValidateSet('AfterCopy', 'AfterMarker', 'AfterStartupRemoval', 'AfterStartup')]
-    [string]$InjectFailureAt
+    [string]$InjectFailureAt,
+
+    # Test-only deterministic rollback fault injection; normal release invocations leave it unset.
+    [ValidateSet('Files', 'Startup')]
+    [string]$InjectRestoreFailureAt
 )
 
 Set-StrictMode -Version Latest
@@ -167,10 +171,13 @@ function Stop-OwnedApplicationIfRunning([string]$Executable) {
 }
 
 function Assert-OwnedOrEmptyDestination([string]$Root, [string]$SourceRoot) {
-    if (Test-SamePath $Root $SourceRoot) { return }
+    $markerPath = Join-Path $Root $MarkerName
+    if ((Test-SamePath $Root $SourceRoot) -and
+        -not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+        throw "SourcePath and InstallRoot are the same directory but have no valid IdleHarbor ownership marker; refusing to continue: $markerPath"
+    }
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return }
 
-    $markerPath = Join-Path $Root $MarkerName
     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
         $entries = @(Get-ChildItem -LiteralPath $Root -Force)
         if ($entries.Count -ne 0) {
@@ -402,6 +409,12 @@ function Invoke-InjectedFailure([string]$Location) {
     }
 }
 
+function Invoke-InjectedRestoreFailure([string]$Location) {
+    if (-not $WhatIfPreference -and $InjectRestoreFailureAt -eq $Location) {
+        throw "Injected installer rollback failure at $Location."
+    }
+}
+
 function Remove-TransactionBackup([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Container)) {
         return
@@ -467,6 +480,7 @@ function Restore-InstallSnapshot {
         [string]$InstallRoot
     )
 
+    Invoke-InjectedRestoreFailure 'Files'
     foreach ($entry in @($Snapshot.entries)) {
         if ($entry.existed) {
             if (-not (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
@@ -543,6 +557,7 @@ function Restore-StartupSnapshot {
         [string]$Executable
     )
 
+    Invoke-InjectedRestoreFailure 'Startup'
     Assert-StartupEntriesOwned $Executable
     Remove-OwnedStartup -Executable $Executable -Confirm:$false
 
@@ -584,6 +599,7 @@ $sourceIsInstallRoot = Test-SamePath $sourceRoot $safeRoot
 $installSnapshot = $null
 $startupSnapshot = $null
 $previousTaskFolderOwned = $false
+$retainTransactionBackup = $false
 if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
     $existingMarker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
     if (@($existingMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') {
@@ -657,6 +673,7 @@ catch {
             Restore-InstallSnapshot -Snapshot $installSnapshot -InstallRoot $safeRoot
         }
         catch {
+            $retainTransactionBackup = $true
             $rollbackErrors += "files: $($_.Exception.Message)"
         }
     }
@@ -669,14 +686,20 @@ catch {
         }
     }
     if ($rollbackErrors.Count -ne 0) {
-        throw "$($failure.Exception.Message) Rollback was incomplete ($($rollbackErrors -join '; '))."
+        $message = "$($failure.Exception.Message) Rollback was incomplete ($($rollbackErrors -join '; '))."
+        if ($retainTransactionBackup) {
+            $message += " Recovery backup retained at: $([string]$installSnapshot.backupRoot)."
+        }
+        throw $message
     }
     throw $failure
 }
 finally {
     if ($null -ne $installSnapshot) {
         try {
-            Remove-TransactionBackup ([string]$installSnapshot.backupRoot)
+            if (-not $retainTransactionBackup) {
+                Remove-TransactionBackup ([string]$installSnapshot.backupRoot)
+            }
         }
         catch {
             Write-Warning "Installer transaction backup cleanup failed: $($_.Exception.Message)"
