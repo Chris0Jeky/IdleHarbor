@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Current milestone
 
@@ -13,8 +13,29 @@ The distribution lane has also landed portable archive generation, per-user inst
 uninstallation scripts, ownership checks, opt-in Task Scheduler/Startup-folder/HKCU Run startup
 choices, checksums, SPDX SBOM generation, pinned CI, CodeQL, and GitHub attestation workflows.
 
-No release has been published. Local release QA and measured performance evidence are recorded;
-hosted exact-head CI, human licence approval, and optional Authenticode signing remain open.
+No release has been published. Local release QA and measured performance evidence are recorded.
+Pull request [#1](https://github.com/Chris0Jeky/IdleHarbor/pull/1) remains open on
+`agent/v0.1.0-native-release`; human licence approval and optional Authenticode signing remain open.
+
+## 2026-08-20 session checkpoint
+
+The single bounded review-fix round is integrated as seven focused commits after `21ea6e4`. It
+addresses all eight concrete connector findings: current battery/session state now fails closed,
+forwarded commands are deferred outside synchronous `WM_COPYDATA`, installer startup ownership is
+checked before mutation, the data marker precedes settings data, release tags must match every
+embedded version, SPDX output includes the required SHA-1/package verification code, and the README
+INI example is directly copyable.
+
+Fresh local evidence at this checkpoint:
+
+- x64 Release built successfully and all 6 CTest tests passed.
+- x86 Release built successfully and all 6 CTest tests passed.
+- `packaging/Test-Packaging.ps1` passed, including matching/mismatched release tags and SPDX checks.
+- `git diff --check` passed before this state update.
+
+The previous PR head `21ea6e4` was green in hosted x64, ARM64, x86, CodeQL analysis, and CodeQL
+scanning. Hosted CI has not yet proved the review-fix head. Review threads have not yet been replied
+to or resolved; preserve them until the corresponding commit and verification evidence are posted.
 
 ## Authority and publication
 
@@ -37,8 +58,18 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 CI additionally configures ARM64 and Win32. The release workflow packages x64 and ARM64 on SemVer
 tags and generates checksums, SPDX SBOMs, and GitHub attestations.
 
-## Next slice
+## Next safe slice
 
-Complete Windows release QA: exercise the visible UI at supported DPI scales, verify input/session/
-power cleanup on real Windows sessions, run packaging and artifact checks, record benchmark evidence,
-and resolve the human-owned licence/signing decisions before publishing a release.
+1. Push the checkpoint on `agent/v0.1.0-native-release` and wait for exact-head x64, ARM64, x86,
+   CodeQL analysis, and CodeQL scanning results.
+2. Exercise the deferred forwarded-command path and installer collision preflight on a real Windows
+   desktop, then reply to and resolve each of the eight review threads with commit/check evidence.
+3. Recheck the PR diff, zero open code-scanning alerts, mergeability, and the three-minute head-age
+   floor. Merge PR #1 with a merge commit only when every required check is green.
+4. At the next workflow checkpoint, inspect PR #1 once for late review feedback and triage it once.
+5. Do not create `v0.1.0` or publish a release until q-1 in `HUMAN_TODO.md` is explicitly answered.
+   If MIT is approved, add the licence and update SBOM licence fields in a focused reviewed change;
+   q-2 may remain explicitly unsigned for v0.1.0.
+6. Before claiming release-quality runtime coverage, still exercise lock/unlock, remote-session
+   disconnect/reconnect, Explorer restart, mixed-DPI monitor movement, and power-request cleanup on
+   representative Windows hardware. Hosted ARM64 currently proves build/test only, not runtime.

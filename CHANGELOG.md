@@ -31,6 +31,12 @@ where practical.
 - Refuse to overwrite foreign scheduled tasks, Startup-folder shortcuts, or HKCU Run values that
   happen to use the IdleHarbor name.
 - Report partial input cleanup failures and keep forwarded status/minimize commands bounded and visible.
+- Establish the current lock and disconnect state before starting, and fail closed when Windows
+  cannot establish requested battery or session safeguards.
+- Defer every forwarded command outside `WM_COPYDATA`, preflight startup ownership before installer
+  mutations, and create the settings ownership marker before writing user data.
+- Reject release tags that disagree with embedded versions, emit the required SPDX SHA-1 file and
+  package-verification values, and keep documented INI examples directly copyable.
 
 ### Release boundary
 
