@@ -87,10 +87,13 @@ mixed-DPI verification.
 
 The follow-up branch `agent/v0.1.0-scrollbar-release` addresses issue #32 and the late PR #30 review:
 `UpdateViewport` begins each convergence pass from a scrollbar-free candidate, then explicitly
-republishes scrollbar visibility and range from content height versus viewport height. A native
-height-only transition at a 570-logical-pixel width exposes a short-window range and clears it after
-expansion to roughly a 700-logical-pixel viewport height under both PowerShell 7 and Windows
-PowerShell 5.1. The branch is pushed and awaiting review; it is not merged.
+republishes scrollbar visibility and range from content height versus viewport height. Its bounded
+transaction also ignores re-entrant `WM_SIZE` notifications and preserves the requested scroll
+position until the final stable layout is known, preventing a temporary columns probe from losing
+an in-range near-bottom position. A native height-only transition at a 570-logical-pixel width
+preserves an in-range position through a short stacked-bar resize, then clears it after expansion to
+roughly a 700-logical-pixel viewport height under both PowerShell 7 and Windows PowerShell 5.1.
+The branch is pushed and awaiting review; it is not merged.
 
 `HUMAN_TODO.md` remains authoritative:
 

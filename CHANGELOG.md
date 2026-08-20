@@ -71,6 +71,8 @@ where practical.
   viewport layout, keeping the bottom controls reachable after a breakpoint reflow.
 - Re-evaluate a scrollbar-free viewport candidate after height-only resizes so an inherited vertical
   scrollbar does not keep a tall, column-fit window in the narrow stacked layout.
+- Preserve the requested scroll position through re-entrant scrollbar/layout probing and clamp it
+  only after the final stable viewport state is known.
 - Serialize concurrent PowerShell packaging suites with a bounded, abandoned-owner-safe test lock
   while preserving transaction-residue assertions.
 - Use in-process .NET hashing for SBOM and checksum generation so concurrent Windows PowerShell

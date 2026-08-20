@@ -761,25 +761,33 @@ class Application final {
     }
 
     void UpdateViewport() {
+        if (updating_viewport_) {
+            return;
+        }
+        updating_viewport_ = true;
         constexpr int kMaxLayoutPasses = 4;
+        const int requested_scroll_position = scroll_position_;
         if (settings_viewport_ != nullptr) {
             // A visible scrollbar reduces GetClientRect(). Start each resize pass
             // from the scrollbar-free candidate so a height increase can shed an
             // inherited bar and return to the wider layout.
             ShowScrollBar(settings_viewport_, SB_VERT, FALSE);
         }
-        const auto publish_scroll_info = [&]() {
+        const auto publish_scroll_info = [&](const bool include_position) {
             const int viewport_height = ViewportHeight();
-            scroll_position_ = idleharbor::app::ClampScrollPosition(
-                scroll_position_,
-                ContentHeight(),
-                viewport_height);
             SCROLLINFO scroll_info{sizeof(scroll_info)};
-            scroll_info.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+            scroll_info.fMask = SIF_RANGE | SIF_PAGE;
             scroll_info.nMin = 0;
             scroll_info.nMax = std::max(ContentHeight() - 1, 0);
             scroll_info.nPage = static_cast<UINT>(viewport_height);
-            scroll_info.nPos = scroll_position_;
+            if (include_position) {
+                scroll_position_ = idleharbor::app::ClampScrollPosition(
+                    scroll_position_,
+                    ContentHeight(),
+                    viewport_height);
+                scroll_info.fMask |= SIF_POS;
+                scroll_info.nPos = scroll_position_;
+            }
             if (settings_viewport_ != nullptr) {
                 SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
                 ShowScrollBar(
@@ -790,26 +798,26 @@ class Application final {
             return viewport_height;
         };
         for (int pass = 0; pass < kMaxLayoutPasses; ++pass) {
+            scroll_position_ = requested_scroll_position;
             LayoutControls();
             const int content_height_before = ContentHeight();
-            const int viewport_height_before = publish_scroll_info();
+            const int viewport_height_before = publish_scroll_info(false);
 
             LayoutControls();
             const bool stable = content_height_before == ContentHeight() &&
-                                 viewport_height_before == ViewportHeight() &&
-                                 scroll_position_ == idleharbor::app::ClampScrollPosition(
-                                                             scroll_position_,
-                                                             ContentHeight(),
-                                                             ViewportHeight());
+                                 viewport_height_before == ViewportHeight();
             if (stable) {
-                return;
+                break;
             }
         }
 
-        // A bounded fallback keeps the native range synchronized even if a future
-        // platform-specific scrollbar policy does not converge within the normal passes.
+        // Clamp only after the final scrollbar/layout state is known, preserving a
+        // valid near-bottom request while a temporary probe uses a shorter layout.
+        scroll_position_ = requested_scroll_position;
         LayoutControls();
-        publish_scroll_info();
+        publish_scroll_info(true);
+        LayoutControls();
+        updating_viewport_ = false;
     }
 
     void ScrollTo(const int position) {
@@ -2002,6 +2010,7 @@ class Application final {
     bool exiting_ = false;
     HWND last_focus_ = nullptr;
     int scroll_position_ = 0;
+    bool updating_viewport_ = false;
     int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
     int wheel_delta_remainder_ = 0;
     std::uint64_t next_pulse_tick_ = 0;
