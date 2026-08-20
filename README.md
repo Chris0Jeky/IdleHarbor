@@ -45,6 +45,8 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Native footprint:** C++20 and Windows system libraries, without bundling an application runtime.
 - **Visible by design:** the window, tray state, status reason, settings, and stop controls remain
   available to the user.
+- **Viewport-safe:** per-monitor DPI scaling, resize, native scrolling, and focus reveal keep every
+  control reachable on compact or highly scaled displays.
 - **Two complementary mechanisms:** motion modes address applications that observe input; power
   requests address Windows idle transitions. They can be configured independently.
 - **Conservative automation:** startup is opt-in, per-user, least-privilege, and paired with an
@@ -52,8 +54,9 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The measured x64 Release executable is 493,056 bytes (481.5 KiB). A reproducible three-run local
-resource baseline and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+An earlier release-candidate x64 build measured 493,056 bytes (481.5 KiB); current release artifacts
+will be measured again before publication. The reproducible three-run local resource baseline and
+its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

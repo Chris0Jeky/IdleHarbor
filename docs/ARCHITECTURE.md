@@ -26,8 +26,9 @@ flowchart TD
 
 - **Core (`src/core`):** validates settings, supplies profiles, generates bounded motion plans and
   randomized intervals, and evaluates Running/Paused/Stopped policy decisions with reasons.
-- **Application (`src/app`):** owns the visible window, controls, tray menu, single-instance mutex,
-  command forwarding, settings load/save, timer, and clean shutdown.
+- **Application (`src/app`):** owns the visible per-monitor-DPI viewport, native control layout and
+  scrolling, tray menu, single-instance mutex, command forwarding, settings load/save, timer, and
+  clean shutdown.
 - **Windows platform (`src/platform/windows`):** observes genuine input, emits marked motion input,
   queries battery/fullscreen/session context, and owns the power request.
 - **Resources:** a per-monitor-DPI-aware manifest, native icon, and version metadata.
@@ -84,6 +85,12 @@ The application starts visible by default, can minimize to the notification area
 Start/Stop, and Exit from its tray menu. Close-to-tray is explicit. Shutdown handling stops an
 active session; destruction unregisters the hotkey and session notifications, removes the tray icon,
 stops the timer and hooks, and clears the power request.
+
+The top-level window scales canonical control geometry for its current monitor, clamps its preferred
+rectangle to the monitor work area, and exposes a vertical viewport when the content is taller than
+the client area. Child controls forward wheel input to that viewport unless a combo list is open;
+partial wheel deltas are retained and Windows' configured wheel-scroll amount is respected. Dialog
+keyboard navigation runs through the same focus-reveal path.
 
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.

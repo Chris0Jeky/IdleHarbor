@@ -17,6 +17,22 @@ use a future release archive only after checking its checksum and provenance.
 The status text and tray tooltip identify Running, Paused, and Stopped states. Pause reasons are
 shown so a user can understand why a pulse is not being emitted.
 
+## Window, scaling, and keyboard navigation
+
+The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
+area. When the available height is smaller than the settings content, a native vertical scrollbar
+keeps every option and action reachable.
+
+- Turn the mouse wheel over the window or any closed control to move the settings viewport.
+- An open profile, motion, or power list keeps native wheel handling so its choices can be browsed.
+- Precision touchpads and high-resolution wheels retain partial input until a complete wheel step is
+  reached; IdleHarbor also follows the Windows wheel-lines/page setting.
+- Use **Tab** and **Shift+Tab** to traverse controls. The viewport automatically reveals the focused
+  control, including Start, Stop, and Save at the bottom.
+
+Moving the window between monitors reapplies the destination DPI and constrains the suggested size
+to that monitor's usable work area.
+
 ## Motion and power are separate controls
 
 Motion determines whether and how IdleHarbor emits input. Power determines whether Windows receives
@@ -153,4 +169,5 @@ visible controls. A tray icon may be unavailable while Windows Explorer is resta
 - IdleHarbor is Windows-only and has no managed application runtime dependency.
 - Simulated input may be blocked or handled differently by applications and integrity boundaries.
 - Low-level input hooks and session notifications depend on Windows policy and availability.
+- Display scaling and monitor layouts vary; verify the viewport after changing a monitor's scale.
 - A release is not yet published; do not invent a download URL or assume signing.
