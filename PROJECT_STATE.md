@@ -4,96 +4,79 @@ Last updated: 2026-08-20
 
 ## Current milestone
 
-IdleHarbor `0.1.0` is a native, dependency-free Windows release candidate with a testable policy
-core, validated settings and CLI, bounded motion, genuine-input observation, power requests,
-battery/fullscreen/session safeguards, visible tray controls, and an immediate stop path.
+IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral policy core,
+validated INI settings, strict CLI, bounded motion, genuine-input observation, power requests,
+battery/fullscreen/session safeguards, visible tray controls, an emergency stop path, recoverable
+settings handling, and transactional per-user installation. No release or tag has been published.
 
-The distribution lane provides portable archives, transactional per-user install/update/uninstall,
-explicit Task Scheduler/Startup-folder/HKCU Run choices, ownership boundaries, checksums, SPDX
-SBOMs, pinned CI, CodeQL, and GitHub attestations. No release or tag has been published.
+`origin/main` is `71093ac16c20f5859f57e7ca54fb69fbf217199b`. Pull requests
+[#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
+[#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8), and
+[#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10) landed pinned action updates,
+settings-recovery safeguards, and installer/release-trust hardening. Each passed exact-head hosted
+checks, the required review gate, and the three-minute aging floor. Issues #3, #4, #5, and #9 are
+closed.
 
-## Landed base
+PR #10's local evidence included x64 CTest 6/6 plus complete packaging and real seven-scenario
+rollback matrices under both PowerShell 7.6.4 and Windows PowerShell 5.1. The matrix covered every
+startup mechanism, fresh failure cleanup, exact update restoration, preservation of unknown files,
+Task Scheduler folder ownership, hard-link rejection, successful update, and uninstall. Follow-up
+edge hardening is tracked in [#11](https://github.com/Chris0Jeky/IdleHarbor/issues/11) and
+[#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12).
 
-`origin/main` is `b4bf3dd850bf4abe408fbece4d473c2117bf2bef`, including the merged settings-recovery
-pull request [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8) and reviewed GitHub Actions
-dependency pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7). Issue
-[#3](https://github.com/Chris0Jeky/IdleHarbor/issues/3) is closed.
+## Active integration queue
 
-The settings-recovery change passed exact-head x64, ARM64, x86, CodeQL analysis, and CodeQL
-scanning; its review thread was fixed and resolved. A real UI Automation smoke proved warning
-visibility, blocking of automatic recovered starts, explicit Start, truthful Running/Stopped state,
-Save recovery, healthy relaunch, and clean exit. The post-merge sweep found no late feedback.
+### High-DPI viewport
 
-## Installer and release trust
+The current branch, `agent/v0.1.0-ui-viewport`, incorporates the latest `origin/main` and contains:
 
-Branch `agent/v0.1.0-installer-trust` contains:
+- `be6b42d`: canonical DPI-scaled geometry, work-area clamping, resize layout, vertical scrolling,
+  focus reveal, and pure layout/scroll tests;
+- `c6eaa53`: child-targeted wheel routing, native combo-popup preservation, system wheel-setting
+  support, and retained high-resolution wheel deltas.
 
-- transactional fresh-install and update rollback;
-- restoration of managed files, the ownership marker, and owned startup state after caught failure;
-- linked-file/reparse rejection before managed paths can cross the install-root boundary;
-- tracked ownership and cleanup of installer-created empty Task Scheduler folders while preserving
-  pre-existing or non-empty folders;
-- application-manifest version validation;
-- a tracked-root-`LICENSE` publication guard without inventing licence approval; and
-- an explicit contract keeping checksums and per-architecture SPDX files as release siblings;
-- a stable-only tag policy shared by the workflow and embedded-version validator; and
-- packaging/checksum verification compatible with PowerShell 7 and Windows PowerShell 5.1.
+The current local x64 Release build passes CTest 7/7. A real 200%-DPI desktop smoke resized the
+window, exercised three partial wheel messages over a child control, preserved native wheel handling
+for an open combo box, used native line/page scrolling, preserved an in-range scroll position across
+resize, revealed an off-screen control by direct focus and forward/reverse keyboard traversal,
+activated Save with Space, started/stopped a session, and hid/restored the window through the
+notification area. Only one display is attached, so a true cross-monitor mixed-DPI transition is
+not locally verifiable and must remain explicit.
 
-Verified before merging current `main`:
+Before issue [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) is closed, update user-facing
+docs and genuine screenshots, run a final exact-head native/desktop proof, obtain hosted CI and an
+independent review, and merge after normal aging.
 
-- native x64 Release build and CTest passed 6/6;
-- the complete packaging suite passed under PowerShell 7 and Windows PowerShell 5.1, including
-  normalized archive/checksum paths, stable-tag rejection, and hard-link boundary refusal;
-- the installer transaction smoke passed under PowerShell 7 and Windows PowerShell 5.1; and
-- a real rollback matrix passed under both shells for RunKey, Startup Folder, and Task Scheduler,
-  covering fresh failure cleanup, exact existing-startup restoration, file/marker rollback,
-  unexpected-file preservation, successful update, clean uninstall, and preservation of a
-  pre-existing scheduler folder.
+### Portfolio and publication
 
-A fresh-context independent review of `dd65ee8` found no confirmed CRITICAL/HIGH defect. Later live
-testing found the empty scheduler-folder residue and linked-file boundary defect; both now have
-direct regression coverage, but the final combined logic still needs one fresh-context review after
-current `main` is integrated.
+Issue [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks genuine Running, Paused, and
+tray captures plus the repository social-preview polish. The current preview asset is 1280x640 but
+needs a contrast pass. Repository description/topics, README presentation, and distribution
+instructions must be audited against the final shipped behavior.
 
-Intended merge issues are [#4](https://github.com/Chris0Jeky/IdleHarbor/issues/4),
-[#5](https://github.com/Chris0Jeky/IdleHarbor/issues/5), and
-[#9](https://github.com/Chris0Jeky/IdleHarbor/issues/9).
+`HUMAN_TODO.md` remains authoritative:
 
-## Remaining project queue
+- q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a
+  copyright holder, create a tag, publish a release, or submit package manifests until the user
+  supplies that decision.
+- q-2: Authenticode signing is optional. Without a signing identity, document `0.1.0` as unsigned
+  and rely on checksums, SBOMs, and GitHub provenance attestations.
 
-- Branch `agent/v0.1.0-ui-viewport` has the high-DPI layout implementation but still needs current
-  `main` integrated, child-target/high-resolution wheel routing, and real mixed-DPI UI evidence for
-  [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2).
-- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) passed exact-head CI and
-  a fresh-base review, then merged with a merge commit.
-- Portfolio visuals and the social preview remain under
-  [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6).
-- `powercfg /requests` remains NOT verified because this machine requires elevation and no elevation
-  was authorized. Hosted ARM64 evidence is build/test evidence only, not ARM64 runtime proof.
+After q-1 is answered, land the exact approved licence and SBOM metadata through a focused reviewed
+change. Only then may the release workflow create `v0.1.0`; verify every published archive,
+checksum, SBOM, attestation, and clean installation path before generating WinGet or Scoop manifests
+from real URLs and hashes.
 
-## Human and publication gates
+## Resume order
 
-- q-1 in `HUMAN_TODO.md` is an unresolved hard gate. Do not add `LICENSE`, infer a copyright holder,
-  tag, or publish without explicit approval.
-- q-2 Authenticode signing is optional. If no signing identity is supplied, v0.1.0 must be clearly
-  documented as unsigned with checksums and provenance attestations.
-
-After q-1, land the exact approved licence and matching SBOM metadata through a focused reviewed
-change. Only then create the annotated v0.1.0 tag, verify every published archive/checksum/SBOM/
-attestation and clean install path, and generate WinGet/Scoop manifests from real URLs and hashes.
-
-## Next safe slices
-
-1. Merge current `origin/main`, rerun the scoped two-shell packaging/startup tests plus native
-   CMake/CTest, and verify no startup residue remains.
-2. Obtain one fresh-context review of the final logic, open the #4/#5/#9 PR, and ship only after
-   exact-head hosted checks and the aging floor.
-3. Finish and ship the high-DPI viewport, dependency PR, and portfolio evidence.
-4. Resolve q-1/q-2, publish v0.1.0, and run the requirement-by-requirement completion audit.
+1. Finish and ship the viewport slice for #2 with native, hosted, review, and real desktop evidence.
+2. Complete #6 using genuine application captures and polish the GitHub presentation.
+3. Resolve the bounded #11/#12 release-hardening follow-ups.
+4. Resolve q-1 and q-2 with the user, then run the final tag/release/install/distribution audit.
 
 ## Proving commands
 
-This machine uses Visual Studio Build Tools 2019:
+On this machine use Visual Studio Build Tools 2019:
 
 ```powershell
 cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
@@ -102,4 +85,6 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-Packaging.ps1
 ```
 
-CI additionally builds ARM64 and Win32.
+CI additionally builds ARM64 and Win32. Hosted ARM64 evidence proves build/test, not representative
+ARM64 runtime behavior. `powercfg /requests` also remains not verified because it requires elevation
+on this machine.

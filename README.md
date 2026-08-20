@@ -7,7 +7,7 @@
 
 ![IdleHarbor social preview](docs/assets/idleharbor-social.svg)
 
-## Screenshot
+## Genuine UI
 
 <p align="center">
   <img src="docs/assets/idleharbor-window.png"
@@ -16,6 +16,15 @@
 </p>
 
 This is a real Release-QA capture at 200% Windows display scaling, not a mock-up.
+
+<p align="center">
+  <img src="docs/assets/idleharbor-viewport.png"
+       alt="IdleHarbor resized at 200 percent scaling with its native vertical scrollbar"
+       width="600">
+</p>
+
+The compact capture shows the same native window resized to a short work area. Wheel, scrollbar,
+and keyboard focus paths keep every control reachable.
 
 IdleHarbor is an independent C++20/Win32 utility for legitimate long-running work sessions,
 presentations, installations, and local dashboards. It combines optional motion input with Windows
@@ -45,6 +54,8 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Native footprint:** C++20 and Windows system libraries, without bundling an application runtime.
 - **Visible by design:** the window, tray state, status reason, settings, and stop controls remain
   available to the user.
+- **Viewport-safe:** per-monitor DPI scaling, resize, native scrolling, and focus reveal keep every
+  control reachable on compact or highly scaled displays.
 - **Two complementary mechanisms:** motion modes address applications that observe input; power
   requests address Windows idle transitions. They can be configured independently.
 - **Conservative automation:** startup is opt-in, per-user, least-privilege, and paired with an
@@ -52,8 +63,9 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The measured x64 Release executable is 493,056 bytes (481.5 KiB). A reproducible three-run local
-resource baseline and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+An earlier release-candidate x64 build measured 493,056 bytes (481.5 KiB); current release artifacts
+will be measured again before publication. The reproducible three-run local resource baseline and
+its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

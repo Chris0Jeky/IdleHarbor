@@ -16,6 +16,7 @@ where practical.
 - Strict command-line parsing with visible help, version, status, session commands, and bounded options.
 - Per-user installer, ownership marker, WhatIf preview, uninstall, and opt-in Task Scheduler/Startup-folder/HKCU Run choices.
 - CI build matrix, pinned actions, CodeQL workflow, portable release packaging, checksums, SPDX SBOMs, and GitHub attestations.
+- Per-monitor-DPI-aware resize and scrolling that keeps every setting and action keyboard reachable.
 
 ### Changed
 
@@ -39,6 +40,8 @@ where practical.
   mutations, and create the settings ownership marker before writing user data.
 - Reject release tags that disagree with embedded versions, emit the required SPDX SHA-1 file and
   package-verification values, and keep documented INI examples directly copyable.
+- Route wheel input over child controls into the settings viewport, retain precision-wheel partial
+  deltas, follow Windows wheel preferences, and preserve native behavior for open combo lists.
 - Roll back fresh-install files on failure, validate the application manifest version, require a
   tracked licence before publication, and document release-directory trust assets.
 - Keep the v0.1.0 publication lane stable-only by rejecting prerelease and build-metadata tags
