@@ -12,6 +12,9 @@ tray-controlled application, and emergency stop path.
 The distribution lane has also landed portable archive generation, per-user installation and
 uninstallation scripts, ownership checks, opt-in Task Scheduler/Startup-folder/HKCU Run startup
 choices, checksums, SPDX SBOM generation, pinned CI, CodeQL, and GitHub attestation workflows.
+Fresh-install rollback, application-manifest version validation, and a tracked-LICENSE publication
+guard are now part of that lane. Checksum and per-architecture SPDX files remain release-directory
+siblings rather than installer-managed archive contents.
 
 No release has been published. Local release QA and measured performance evidence are recorded.
 Pull request [#1](https://github.com/Chris0Jeky/IdleHarbor/pull/1) remains open on

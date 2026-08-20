@@ -18,6 +18,15 @@ The tag-triggered release workflow is prepared to produce:
 The workflow builds Win32 in CI for coverage, but the current release matrix publishes x64 and
 ARM64 archives. Do not use a download URL until a tagged release exists.
 
+### Trust-file asset contract
+
+The portable archive owns the executable, installer helpers, package documentation, manifest, and
+the `LICENSE` file once the release licence is approved. `SHA256SUMS.txt` and the versioned,
+per-architecture SPDX JSON files are release-directory siblings generated outside the archive;
+the installer does not copy them into the installed directory. Verify those sibling assets before
+extracting or installing. The publication workflow refuses to publish while the root `LICENSE`
+file is not tracked.
+
 ## Portable use
 
 Extract the architecture-matched archive and run `IdleHarbor.exe`. Portable use does not create a

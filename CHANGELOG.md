@@ -37,6 +37,8 @@ where practical.
   mutations, and create the settings ownership marker before writing user data.
 - Reject release tags that disagree with embedded versions, emit the required SPDX SHA-1 file and
   package-verification values, and keep documented INI examples directly copyable.
+- Roll back fresh-install files on failure, validate the application manifest version, require a
+  tracked licence before publication, and document release-directory trust assets.
 
 ### Release boundary
 

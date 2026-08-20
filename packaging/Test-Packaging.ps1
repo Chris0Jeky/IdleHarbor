@@ -108,6 +108,9 @@ foreach ($workflow in Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent 
         Assert-True ($line -match '@[0-9a-f]{40}(?:\s|$)') "Workflow action is not pinned in $($workflow.Name): $line"
     }
 }
+$releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) '.github\workflows\release.yml')
+Assert-True ($releaseWorkflow -match 'Test-ReleaseLicense\.ps1') `
+    'Release workflow lacks its tracked-LICENSE publication guard.'
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-packaging-test-$([Guid]::NewGuid().ToString('N'))"
 $sourceRoot = Join-Path $tempRoot 'source'
@@ -213,6 +216,10 @@ try {
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
+        Assert-True ($entryNames -notcontains 'IdleHarbor-0.1.0-test-windows-x64-portable/SHA256SUMS.txt') `
+            'Archive unexpectedly owns the release-directory checksum manifest.'
+        Assert-True (@($entryNames | Where-Object { $_ -match '\.spdx\.json$' }).Count -eq 0) `
+            'Archive unexpectedly owns a release-directory SPDX asset.'
         $manifestEntry = $zip.GetEntry('IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json')
         Assert-True ($null -ne $manifestEntry) 'Archive lacks its package manifest.'
         $reader = New-Object IO.StreamReader($manifestEntry.Open())
@@ -255,6 +262,34 @@ try {
     try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.1' | Out-Null }
     catch { $versionMismatchRejected = $true }
     Assert-True $versionMismatchRejected 'Release version validator accepted a mismatched tag.'
+
+    $versionFixture = Join-Path $tempRoot 'version-fixture'
+    New-Item -ItemType Directory -Path (Join-Path $versionFixture 'include\idleharbor'), (Join-Path $versionFixture 'resources') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'CMakeLists.txt') -Destination $versionFixture
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'include\idleharbor\version.hpp') -Destination (Join-Path $versionFixture 'include\idleharbor')
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\IdleHarbor.rc') -Destination (Join-Path $versionFixture 'resources')
+    $fixtureManifest = Join-Path $versionFixture 'resources\app.manifest'
+    (Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\app.manifest')) -replace 'version="0\.1\.0\.0"', 'version="9.9.9.9"' |
+        Set-Content -LiteralPath $fixtureManifest -Encoding UTF8
+    $manifestMismatchRejected = $false
+    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.0' -SourceRoot $versionFixture | Out-Null }
+    catch { $manifestMismatchRejected = $true }
+    Assert-True $manifestMismatchRejected 'Release version validator accepted a mismatched app.manifest version.'
+
+    $licenseScript = Join-Path $packagingRoot 'Test-ReleaseLicense.ps1'
+    $licenseFixture = Join-Path $tempRoot 'license-fixture'
+    $missingLicenseFixture = Join-Path $tempRoot 'missing-license-fixture'
+    foreach ($fixture in @($licenseFixture, $missingLicenseFixture)) {
+        New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+        & git -C $fixture init --quiet 2>$null | Out-Null
+    }
+    Set-Content -LiteralPath (Join-Path $licenseFixture 'LICENSE') -Value 'fixture licence'
+    & git -C $licenseFixture add -- LICENSE | Out-Null
+    & $licenseScript -RepositoryRoot $licenseFixture | Out-Null
+    $missingLicenseRejected = $false
+    try { & $licenseScript -RepositoryRoot $missingLicenseFixture | Out-Null }
+    catch { $missingLicenseRejected = $true }
+    Assert-True $missingLicenseRejected 'Release licence guard accepted a repository without a tracked LICENSE.'
 
     $checksums = Join-Path $outputRoot 'SHA256SUMS.txt'
     & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $outputRoot -OutputPath $checksums | Out-Null

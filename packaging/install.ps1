@@ -29,9 +29,7 @@ $KnownFiles = @(
     'install.cmd',
     'README.md',
     'DISTRIBUTION.md',
-    'LICENSE',
-    'SHA256SUMS.txt',
-    'sbom.spdx.json'
+    'LICENSE'
 )
 
 function Confirm-Change {
