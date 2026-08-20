@@ -261,7 +261,9 @@ class Application final {
 
     bool Initialize(const CommandLineOptions& options) {
         settings_path_ = idleharbor::app::ResolveSettingsPath(options.portable, options.config_path);
-        settings_ = idleharbor::app::LoadSettings(settings_path_).settings;
+        const auto loaded_settings = idleharbor::app::LoadSettings(settings_path_);
+        settings_ = loaded_settings.settings;
+        settings_load_warnings_ = loaded_settings.warnings;
         ApplyCommandLineOptions(options);
         taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
         dpi_ = GetDpiForSystem();
@@ -310,7 +312,9 @@ class Application final {
 
         RefreshControls();
         std::wstring initial_status = L"Stopped: ready";
-        if (!tray_added_) {
+        if (!settings_load_warnings_.empty()) {
+            initial_status = L"Stopped: settings recovered; review and save before automatic start";
+        } else if (!tray_added_) {
             initial_status = L"Stopped: notification icon unavailable; window kept visible";
         } else if (settings_.emergency_hotkey && !hotkey_registered_) {
             initial_status = L"Stopped: emergency hotkey unavailable";
@@ -322,22 +326,35 @@ class Application final {
             }
         }
         SetStatus(initial_status);
-        if ((options.minimized || settings_.start_minimized) && tray_added_) {
+        if (settings_load_warnings_.empty() && (options.minimized || settings_.start_minimized) && tray_added_) {
             ShowWindow(window_, SW_HIDE);
         } else {
             ShowWindow(window_, SW_SHOW);
             UpdateWindow(window_);
         }
+        ShowSettingsLoadWarnings();
         return true;
     }
 
     void HandleCommand(const CommandLineOptions& options) {
         const bool restart_for_overrides = session_active_ && HasRuntimeOverrides(options);
+        const bool automatic_start_blocked =
+            !settings_load_warnings_.empty() &&
+            (options.command == RequestedCommand::Start ||
+             (options.command == RequestedCommand::Toggle && !session_active_));
         ApplyCommandLineOptions(options);
         RefreshControls();
+        if (automatic_start_blocked) {
+            ShowWindow(window_, SW_SHOW);
+            SetForegroundWindow(window_);
+            if (!session_active_) {
+                SetStatus(L"Stopped: settings recovered; review and save before automatic start");
+            }
+            return;
+        }
         switch (options.command) {
         case RequestedCommand::Launch:
-            if (options.minimized && tray_added_) {
+            if (options.minimized && tray_added_ && settings_load_warnings_.empty()) {
                 ShowWindow(window_, SW_HIDE);
             } else {
                 ShowWindow(window_, SW_SHOW);
@@ -1125,11 +1142,26 @@ class Application final {
             MessageBoxW(window_, wide.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONERROR);
             return;
         }
+        settings_load_warnings_.clear();
         if (settings_.emergency_hotkey && !hotkey_registered_) {
             SetStatus(L"Stopped: settings saved; emergency hotkey unavailable");
         } else {
             SetStatus(session_active_ ? L"Running: settings saved; restart to apply changes" : L"Stopped: settings saved");
         }
+    }
+
+    void ShowSettingsLoadWarnings() const {
+        if (settings_load_warnings_.empty()) {
+            return;
+        }
+
+        std::wstring message =
+            L"IdleHarbor recovered safe settings from the configuration file. Review the values and "
+            L"save a corrected file before relying on automatic start:\r\n\r\n";
+        for (const auto& warning : settings_load_warnings_) {
+            message += L"- " + Widen(warning) + L"\r\n";
+        }
+        MessageBoxW(window_, message.c_str(), L"IdleHarbor settings recovered", MB_OK | MB_ICONWARNING);
     }
 
     void ShowTrayMenu() {
@@ -1396,6 +1428,7 @@ class Application final {
     ULONGLONG next_input_hook_refresh_tick_ = 0;
     std::wstring status_text_ = L"Stopped: ready";
     std::filesystem::path settings_path_;
+    std::vector<std::string> settings_load_warnings_;
     std::deque<std::wstring> deferred_commands_;
     idleharbor::app::AppSettings settings_{};
     Settings runtime_settings_{};

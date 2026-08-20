@@ -4,50 +4,93 @@ Last updated: 2026-08-20
 
 ## Current milestone
 
-IdleHarbor `0.1.0` is a release candidate with a landed native Win32 runtime, platform-neutral
-policy core, validated INI settings store, strict command-line model, bounded motion emitter,
-genuine-input observer, power request, battery/fullscreen/session safeguards, visible
-tray-controlled application, and emergency stop path.
+IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral policy core,
+validated INI settings, strict CLI, bounded motion, genuine-input observation, power requests,
+battery/fullscreen/session safeguards, visible tray controls, and an emergency stop path.
 
-The distribution lane has also landed portable archive generation, per-user installation and
-uninstallation scripts, ownership checks, opt-in Task Scheduler/Startup-folder/HKCU Run startup
-choices, checksums, SPDX SBOM generation, pinned CI, CodeQL, and GitHub attestation workflows.
+The distribution lane includes portable archives, per-user install/uninstall scripts, explicit
+Task Scheduler/Startup-folder/HKCU Run choices, ownership checks, checksums, SPDX SBOMs, pinned CI,
+CodeQL, and GitHub attestations. No release or tag has been published.
 
-No release has been published. Local release QA and measured performance evidence are recorded.
-Pull request [#1](https://github.com/Chris0Jeky/IdleHarbor/pull/1) remains open on
-`agent/v0.1.0-native-release`; human licence approval and optional Authenticode signing remain open.
+## Landed base
 
-## 2026-08-20 session checkpoint
+Pull request [#1](https://github.com/Chris0Jeky/IdleHarbor/pull/1) merged into `main` at
+`986cb011ea645f73e0d806f623c15e454bd740c1`. Its exact head passed x64, ARM64, x86, CodeQL
+analysis, and CodeQL scanning. All 11 review threads were resolved, and the post-merge review sweep
+found no untriaged late feedback.
 
-The single bounded review-fix round is integrated as seven focused commits after `21ea6e4`. It
-addresses all eight concrete connector findings: current battery/session state now fails closed,
-forwarded commands are deferred outside synchronous `WM_COPYDATA`, installer startup ownership is
-checked before mutation, the data marker precedes settings data, release tags must match every
-embedded version, SPDX output includes the required SHA-1/package verification code, and the README
-INI example is directly copyable.
+Real Windows smokes on that base covered foreign startup-entry collision rejection, deferred
+forwarded commands, visible Running/Stopped lifecycle control, keyboard traversal, and clean exit.
+`powercfg /requests` remains unverified because it requires an elevated shell on this machine.
 
-Fresh local evidence at this checkpoint:
+## Active integration queue
 
-- x64 Release built successfully and all 6 CTest tests passed.
-- x86 Release built successfully and all 6 CTest tests passed.
-- `packaging/Test-Packaging.ps1` passed, including matching/mismatched release tags and SPDX checks.
-- `git diff --check` passed before this state update.
+### Settings recovery — pull request #8
 
-The review-fix checkpoint is pushed to `origin/agent/v0.1.0-native-release`. The previous PR head
-`21ea6e4` was green in hosted x64, ARM64, x86, CodeQL analysis, and CodeQL scanning; hosted CI has
-not yet proved the new head. Review threads have not yet been replied to or resolved; preserve them
-until the corresponding commit and verification evidence are posted.
+Branch `agent/v0.1.0-settings-safety` preserves and displays every recovery warning, keeps
+automatic start/toggle stopped until a successful Save, and retains explicit user control.
 
-## Authority and publication
+Local x64 Release build and CTest pass 6/6. A real Windows UI Automation smoke proved:
 
-- Declared posture: T1 sandbox, public synthetic publication, no sensitive data.
-- Public remote: `Chris0Jeky/IdleHarbor`.
-- Release: none.
-- Human decisions: see `HUMAN_TODO.md`; do not infer or close those decisions.
+- all recovery warnings were visible;
+- initial and forwarded automatic starts/toggle stayed stopped and restored the visible window;
+- explicit Start reached Running, and a redundant blocked start preserved that truthful status;
+- Save cleared the gate, a safe power-only start ran, Stop/Exit completed, and a healthy relaunch
+  showed `Stopped: ready`.
+
+The first independent review found and fixed a healthy-launch empty-status regression in `16e016b`.
+Exact-head connector review found and fixed the active-session status mismatch in `a7ed48e`.
+Issue [#3](https://github.com/Chris0Jeky/IdleHarbor/issues/3) is linked for closure on merge.
+
+### Installer and release trust
+
+Remote branch `agent/v0.1.0-installer-trust` at
+`a8d84c5facda76fb265df402fba59f2aeacd4515` contains transactional fresh-install rollback,
+manifest-version validation, a tracked-root-`LICENSE` publication guard, and the external
+trust-asset contract for checksums/SBOMs.
+
+Native x64 Release build and CTest pass 6/6. The PowerShell 7 packaging suite passes. Real installs
+under both PowerShell 7 and Windows PowerShell 5 proved injected rollback, exact-boundary sentinel
+preservation, executable hash equality, ownership-marker validation, installed executable
+launch/exit, and clean uninstall. The broader packaging suite's ZIP entry-name assertions fail
+under Windows PowerShell 5 but pass under the release workflow's PowerShell 7; this compatibility
+gap is not a release artifact failure and is tracked in
+[#9](https://github.com/Chris0Jeky/IdleHarbor/issues/9).
+
+### High-DPI viewport
+
+Remote branch `agent/v0.1.0-ui-viewport` includes implementation commit `be6b42d` plus the prior
+stop-safe handoff. It adds canonical DPI geometry, work-area clamping, resizing, scrolling, focus
+reveal, and pure tests. Local CTest passed 7/7. Child-targeted/high-resolution wheel routing and
+real resize/focus/mixed-DPI desktop QA remain before issue
+[#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) is merge-ready.
+
+The viewport and settings branches both change `src/app/main.cpp`. Preserve both histories and
+merge the newly landed `main` into the viewport branch before resolving that overlap.
+
+## GitHub and publication gates
+
+- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) is green but has not
+  yet been reviewed.
+- Milestone issues [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) through
+  [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) remain the v0.1.0 closeout queue.
+- q-1 in `HUMAN_TODO.md` remains a hard release gate. Do not add a licence, tag, or release
+  without explicit approval. q-2 signing is optional and may be documented as unsigned.
+- The 1280x640 social-preview asset is committed, but browser automation could not attach it in
+  repository settings. No setting was changed.
+
+## Next safe slices
+
+1. Finish exact-head CI/review aging for PR #8, merge with a merge commit, and perform one late-review
+   sweep.
+2. Reconcile the installer branch with the new main, finish its independent review, open the #4/#5
+   PR, and ship only after exact-head gates.
+3. Merge the new main into the viewport branch, finish wheel routing and real DPI/resize QA, update
+   docs/screenshots, and ship #2.
+4. Complete #6 portfolio visuals and social preview, then resolve q-1/q-2 and run the final
+   tag/release/install/distribution audit.
 
 ## Proving commands
-
-From a Windows developer PowerShell:
 
 ```powershell
 cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
@@ -56,26 +99,6 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-Packaging.ps1
 ```
 
-CI additionally configures ARM64 and Win32. The release workflow packages x64 and ARM64 on SemVer
-tags and generates checksums, SPDX SBOMs, and GitHub attestations.
-
-## Next safe slice
-
-1. Wait for exact-head x64, ARM64, x86, CodeQL analysis, and CodeQL scanning results on
-   `agent/v0.1.0-native-release`.
-2. Exercise the deferred forwarded-command path and installer collision preflight on a real Windows
-   desktop, then reply to and resolve each of the eight review threads with commit/check evidence.
-3. Recheck the PR diff, zero open code-scanning alerts, mergeability, and the three-minute head-age
-   floor. Merge PR #1 with a merge commit only when every required check is green.
-4. At the next workflow checkpoint, inspect PR #1 once for late review feedback and triage it once.
-5. Do not create `v0.1.0` or publish a release until q-1 in `HUMAN_TODO.md` is explicitly answered.
-   If MIT is approved, add the licence and update SBOM licence fields in a focused reviewed change;
-   q-2 may remain explicitly unsigned for v0.1.0.
-6. Before claiming release-quality runtime coverage, still exercise lock/unlock, remote-session
-   disconnect/reconnect, Explorer restart, mixed-DPI monitor movement, and power-request cleanup on
-   representative Windows hardware. Hosted ARM64 currently proves build/test only, not runtime.
-7. Upload `docs/assets/idleharbor-social.png` under GitHub Settings > General > Social preview. The
-   signed-in browser reached the upload control, but its file chooser denied automated attachment;
-   the finished 1280x640 asset is committed and no repository setting was changed.
-8. After a real release exists, add WinGet/Scoop distribution manifests only from the published
-   asset URLs and verified checksums; do not invent pre-release download locations or hashes.
+This machine has Visual Studio Build Tools 2019 rather than Visual Studio 2022, so local proving
+uses generator `Visual Studio 16 2019`. CI additionally builds ARM64 and Win32. Hosted ARM64
+evidence proves build/test, not representative ARM64 runtime behavior.

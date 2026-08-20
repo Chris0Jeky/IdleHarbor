@@ -33,6 +33,8 @@ where practical.
 - Report partial input cleanup failures and keep forwarded status/minimize commands bounded and visible.
 - Establish the current lock and disconnect state before starting, and fail closed when Windows
   cannot establish requested battery or session safeguards.
+- Preserve and display every settings-recovery warning, keep the window visible and stopped, and
+  block automatic starts until recovered values are reviewed and saved.
 - Defer every forwarded command outside `WM_COPYDATA`, preflight startup ownership before installer
   mutations, and create the settings ownership marker before writing user data.
 - Reject release tags that disagree with embedded versions, emit the required SPDX SHA-1 file and
