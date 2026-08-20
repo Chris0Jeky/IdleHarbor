@@ -4,81 +4,81 @@ Last updated: 2026-08-20
 
 ## Current milestone
 
-IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral policy core,
-validated local settings, strict CLI, independently designed bounded motion patterns, Windows power
-requests, genuine-input observation, battery/fullscreen/session safeguards, visible tray controls,
-an emergency stop, and transactional per-user installation. It has no telemetry or network service.
-The polished native interface uses themed Windows controls, a dedicated status card, visible
-Start/Stop/Save actions, and a scrollable high-DPI settings body. The source and release artifacts
-are licensed `GPL-3.0-only`. No tag or release has been published.
+IdleHarbor `0.1.0` is the published first stable release. It is a native C++20/Win32 Windows
+mouse-jiggler and keep-awake utility with a platform-neutral policy core, validated local settings,
+strict CLI, bounded motion patterns, Windows power requests, genuine-input observation,
+battery/fullscreen/session safeguards, visible notification-area controls, an emergency stop, and
+transactional per-user installation. It has no telemetry, network service, managed runtime, hidden
+mode, or implicit persistence.
 
-The current merged baseline is `origin/main` at
-`14daadf64fd1c895b2721ccfb7006e48a29635ad`. PRs
-[#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
-[#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
-scroll-range convergence, and inherited-scrollbar fixes. PR
-[#35](https://github.com/Chris0Jeky/IdleHarbor/pull/35) closed issue
-[#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) with the descendant-repaint fix and native
-192-DPI smoke. PR [#36](https://github.com/Chris0Jeky/IdleHarbor/pull/36) then landed the default,
-ownership-safe Start Menu launcher. Earlier merged work established the runtime, settings recovery,
-installer rollback and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and
-packaging isolation. PR [#41](https://github.com/Chris0Jeky/IdleHarbor/pull/41) landed the polished
-native interface and whole-window resize repaint proof.
+The immutable annotated tag
+[`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) resolves to merge commit
+`d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`. Release workflow
+[run 32423221779](https://github.com/Chris0Jeky/IdleHarbor/actions/runs/32423221779) published x64 and
+ARM64 portable ZIPs, per-architecture SPDX 2.3 SBOMs, `SHA256SUMS.txt`, and GitHub/Sigstore
+provenance attestations. All five public assets were downloaded and independently verified against
+their release digests, SBOM contents, tagged source revision, and attestations.
 
-## Repaint follow-up
+PR [#47](https://github.com/Chris0Jeky/IdleHarbor/pull/47) merged the release UI, exact-build capture
+tooling, PowerShell 5.1 release checks, documentation, GPLv3 distribution, and final review fixes.
+PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) was closed as superseded.
 
-Issue [#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) records a 192-DPI Running-state
-settings-body artifact: disabled controls can leave stale fragments after viewport movement, while
-resizing temporarily clears the display. The cause seam is the manually moved child controls inside
-a nested `WS_CLIPCHILDREN` viewport without a final explicit descendant repaint.
+## Installed release on the development PC
 
-The fix repaints the settings viewport and all descendants after scrolling and state changes, then
-repaints the parent plus descendants after layout convergence so newly exposed footer pixels cannot
-retain clipped body controls. The native interactive smoke starts a safe motion-free session, proves
-that body controls are disabled, drives real wheel input, and compares both the whole client and the
-scrolled viewport with explicit repaint references at this desktop's 192 DPI. Natural and reference
-captures are pixel-identical on the fixed x64 Release build. The original user-supplied screenshot
-remains the pre-fix reproduction; the post-fix stopped, running, paused, scrolled, and tray states
-are recorded in `docs/assets/capture-manifest.json` with exact PNG and executable hashes.
+The verified public x64 build is installed per-user at
+`%LOCALAPPDATA%\Programs\IdleHarbor\IdleHarbor.exe`. Its SHA-256 is
+`e28bf9d739c9c7d7a20f66f41cf1c6015053d9b3277a5686ea3b5e8219d552e9`, matching the x64 SPDX
+SBOM. Existing settings were preserved byte-for-byte. The explicit Task Scheduler action remains
+`--start --minimized`, the Start Menu launcher remains visible, and exactly one released process
+was restored after final screenshot QA. The executable is intentionally `NotSigned`.
 
-## Current release-preparation follow-up
+## Repaint fix and final visual evidence
 
-The merged installer adds a per-user Start Menu shortcut as its default launch surface.
-It opens the visible settings window with `--show`; automatic startup remains an independent,
-explicit choice. The installer records ownership only for a shortcut it created, restores exact
-prior bytes on rollback, and rejects unsafe or foreign shortcut leaves. `-StartMenu None` and the
-uninstaller remove only an exact, marker-owned shortcut; changed or unowned shortcuts are
-preserved. The lifecycle suite uses temporary injected shortcut paths, and the actual per-user Start
-Menu path was exercised successfully during the local release-candidate installation.
+Issue [#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) recorded disabled controls leaving
+stale fragments after viewport movement at 192 DPI, while resizing temporarily cleared the display.
+The fix explicitly repaints the settings viewport and descendants after scrolling/state changes and
+repaints the parent after layout convergence. The native smoke drives real wheel input and proves
+natural and explicit-reference repaint captures are pixel-identical.
 
-PR [#39](https://github.com/Chris0Jeky/IdleHarbor/pull/39) removed the only direct upstream
-motion-coordinate dependency, recorded the historical inspiration in `THIRD-PARTY-NOTICES.md`, and
-applied `GPL-3.0-only` consistently to the repository, portable archive, package manifest, and SPDX
-SBOM metadata.
+The stopped, running, safety-paused, scrolled, and tray-menu screenshots were recaptured from the
+installed public release at 192 DPI and visually inspected. `docs/assets/capture-manifest.json`
+records release source `d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`, the released executable
+hash, exact PNG dimensions, and hashes. The original reported corruption is absent in every state.
 
-The release-preparation branch restores Windows PowerShell 5.1 release checks, keeps first-owner and
-forwarded CLI overrides explicitly saveable without silent INI persistence, and provides a
-deterministic exact-build screenshot harness. Issues
-[#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
+## Distribution status
+
+- **GitHub Release:** published and verified at
+  [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
+- **WinGet:** three schema-1.12 manifests were independently reviewed and submitted as
+  [microsoft/winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663). Local
+  `winget validate` passes without warnings. A full local WinGet lifecycle was not run because
+  `LocalManifestFiles` is an administrator setting on this PC; upstream validation and moderation
+  remain authoritative.
+- **Chocolatey:** reproducible x64 package source is tracked in `packaging/chocolatey`.
+  `choco pack` succeeds; the generated package contains the complete GPL text and verification
+  instructions, and its no-op plan selects the correct script. Community publication still needs
+  an owner Chocolatey account/API key and an appropriate isolated install/uninstall test.
+- **Scoop Extras:** no request was submitted. Its current required request criteria ask for
+  popularity evidence (for example, 100 stars or 50 forks), which this new project cannot truthfully
+  claim yet.
+- **GitHub social preview:** the 1280 x 640 PNG is ready and issue
+  [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) records the remaining upload. GitHub accepts
+  the file selection, then its own Settings JavaScript throws in
+  `attachmentUploadDidComplete`; repeated attempts leave the preview blank.
+
+## Follow-up queue
+
+Issues [#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
 [#44](https://github.com/Chris0Jeky/IdleHarbor/issues/44), and
-[#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) are expected to close when that branch
-lands. Issue [#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42) remains open for a deterministic
-tray-failure transition test even though the accessible-text composition fix is implemented. Issue
-[#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46) records two non-blocking status refresh
-follow-ups outside the `v0.1.0` release boundary.
+[#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) closed with PR #47. The bounded post-release
+queue remains:
 
-## Portfolio and publication queue
-
-PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains pre-redesign portfolio text and
-captures and is superseded rather than merged. The release-preparation branch replaces it with five
-privacy-reviewed exact-build screenshots, a reproducible capture manifest, refreshed social-preview
-artwork, and current publication metadata. Issue
-[#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks the remaining publication boundary.
-
-The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
-modes; exact rollback after fresh and update failures; preservation of unexpected files and
-pre-existing scheduler folders; linked-file rejection; uninstall; and bounded concurrent execution
-under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visible.
+- [#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42): deterministic tray-failure dirty-state test;
+- [#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46): tray recovery/status refresh follow-up;
+- [#48](https://github.com/Chris0Jeky/IdleHarbor/issues/48): restore the scheduler command after packaging tests;
+- [#49](https://github.com/Chris0Jeky/IdleHarbor/issues/49): make documentation capture more portable;
+- [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50): sanitize rounded screenshot corners;
+- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation.
 
 ## Human decisions
 
@@ -87,15 +87,17 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 - q-1: resolved 2026-08-20 as `GPL-3.0-only`; no copyright holder was inferred.
 - q-2: resolved 2026-08-20 as an explicitly unsigned `v0.1.0`, relying on checksums, SPDX SBOMs,
   and GitHub provenance attestations. Signing can be reconsidered for a later release.
+- q-3: open for the owner-only Chocolatey account/API key needed to submit the prepared package;
+  the credential must remain outside the repository and public logs.
 
 ## Resume order
 
-1. Finish and merge exact-build screenshots, documentation, repository metadata, and social-preview
-   artwork.
-2. Run final native runtime, packaging, installer, performance, security, accessibility, and
-   release-artifact QA; preserve a dated demonstration bundle.
-3. Tag and publish unsigned `v0.1.0`, then derive and submit package-manager manifests from its
-   immutable release URLs and hashes.
+1. Monitor WinGet PR #421663 and complete the Microsoft CLA if its status check requests owner action.
+2. Retry issue #6's social-preview upload after GitHub changes or fixes the Settings UI.
+3. Run the Chocolatey install/uninstall test in a suitable environment and publish with the owner's
+   Chocolatey API key.
+4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
+5. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
 
 ## Proving commands
 
@@ -108,10 +110,12 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
+.\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0
+choco pack .\packaging\chocolatey\idleharbor.nuspec --output-directory .\out\chocolatey
 ```
 
-Use generator `Visual Studio 17 2022` where Visual Studio 2022 is installed. Run packaging and
-release-workflow checks sequentially under PowerShell 7 and Windows PowerShell 5.1. CI additionally
-builds ARM64 and Win32. Hosted ARM64 evidence proves build/test, not representative ARM64 runtime
-behavior. A true cross-monitor mixed-DPI transition remains unverified because only one display is
-attached. `powercfg /requests` also requires an elevated verification run on this machine.
+Run packaging and release-workflow checks sequentially under PowerShell 7 and Windows PowerShell 5.1.
+CI additionally builds ARM64 and Win32. Hosted ARM64 evidence proves cross-build packaging, not
+representative ARM64 runtime behavior. A true cross-monitor mixed-DPI transition remains unverified
+because only one display is attached. `powercfg /requests` also requires an elevated verification
+run on this machine.

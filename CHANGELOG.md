@@ -6,7 +6,7 @@ where practical.
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-08-20
 
 ### Added
 
@@ -38,7 +38,7 @@ where practical.
 
 ### Changed
 
-- Documentation now describes the implemented release candidate rather than the original foundation stub.
+- Documentation now describes the implemented first stable release rather than the original foundation stub.
 - Motion distance remains a multiplier, while Normal, Circle, and Linear now use independently
   designed IdleHarbor paths that preserve bounded safe-anchor restoration.
 
@@ -105,7 +105,7 @@ where practical.
 
 ### Distribution
 
-- Prepared for publication under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives
+- Published under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives
   accompanied by SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
 
 [Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.1.0...HEAD

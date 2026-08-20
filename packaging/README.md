@@ -2,13 +2,12 @@
 
 IdleHarbor is distributed as a native Windows executable with no application runtime or network
 dependency. The portable archive is the canonical package; the PowerShell installer is an optional
-per-user convenience layer around that archive. Once available, download only from the
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). If that page is
-unavailable, the tag workflow has not published a verified release artifact.
+per-user convenience layer around that archive. Download only from the canonical
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
 
 ## Release artifacts
 
-The `v0.1.0` tag workflow publishes these exact assets:
+The `v0.1.0` release includes these exact assets:
 
 - [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip);
 - [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip);
@@ -120,6 +119,10 @@ Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The tag workflow publishes SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+The release publishes SHA-256, SBOM, and attestation evidence. `v0.1.0` is
 intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
 and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.
+
+Package-manager submission status is documented in the main README. Chocolatey package source and
+its verification instructions live in [`chocolatey`](chocolatey); it installs the portable x64
+build without enabling startup.

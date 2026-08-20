@@ -1,12 +1,13 @@
 # Benchmark evidence
 
 IdleHarbor includes a reproducible local measurement script rather than telemetry. Results below
-are a release-candidate baseline for one Windows machine, not a universal resource guarantee.
+are a `v0.1.0` local baseline for one Windows machine, not a universal resource guarantee.
 
 ## v0.1.0 x64 local baseline
 
-Measured on 2026-08-20 from native source commit `f011f7a` (the following commit added only the
-capture tool and generated documentation images). The exact executable is identified by SHA-256 so
+Measured on 2026-08-20 from native source commit `f011f7a`. Later release-preparation commits changed
+tests, documentation, and capture tooling without changing the measured runtime source. The exact
+executable is identified by SHA-256 so
 the result remains auditable.
 
 | Property | Value |
