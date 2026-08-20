@@ -1,5 +1,9 @@
 #include <windows.h>
 
+#define IDI_IDLEHARBOR 101
+
+IDI_IDLEHARBOR ICON "IdleHarbor.ico"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0
  PRODUCTVERSION 0,1,0,0
@@ -19,11 +23,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Cristian Tcaci\0"
             VALUE "FileDescription", "IdleHarbor\0"
-            VALUE "FileVersion", "0.1.0-dev\0"
+            VALUE "FileVersion", "0.1.0\0"
             VALUE "InternalName", "IdleHarbor\0"
             VALUE "OriginalFilename", "IdleHarbor.exe\0"
             VALUE "ProductName", "IdleHarbor\0"
-            VALUE "ProductVersion", "0.1.0-dev\0"
+            VALUE "ProductVersion", "0.1.0\0"
         END
     END
     BLOCK "VarFileInfo"

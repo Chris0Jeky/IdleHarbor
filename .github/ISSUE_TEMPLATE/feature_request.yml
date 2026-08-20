@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a focused, user-visible improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests must preserve a visible status, immediate stop path, and the project's safety boundary.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What legitimate workflow is currently difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe controls, defaults, failure behavior, and how a user stops it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Safety boundary
+      options:
+        - label: This request does not add concealment, process hiding, monitoring bypass, or misleading identity.
+          required: true
+        - label: This request keeps behavior visible and user-controlled.
+          required: true

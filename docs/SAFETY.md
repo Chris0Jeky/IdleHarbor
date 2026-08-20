@@ -1,0 +1,50 @@
+# Safety and acceptable use
+
+IdleHarbor is a visible, user-controlled utility for legitimate work sessions where Windows idle
+behavior is inconvenient. It is not a way to defeat security controls, conceal activity, or
+misrepresent a person's presence.
+
+## Boundaries
+
+IdleHarbor does not provide stealth, process hiding, misleading identity, monitoring bypasses,
+undetectability claims, elevation without consent, network telemetry, or remote control. Simulated
+input can be detected, blocked, logged, or ignored by Windows and other software. It is never proof
+that a person is working or present.
+
+## User-visible controls
+
+The application exposes Running, Paused, and Stopped states, pause reasons, a tray menu, a visible
+window, and immediate Stop actions. The emergency hotkey is an additional escape path. Minimize to
+the notification area is a visibility choice, not concealment.
+
+Safeguards include genuine-input cooldown, lock/session pause, low-battery and battery policy,
+fullscreen policy, active hours, and maximum duration. They are conservative compatibility features,
+not security guarantees; test them in the actual Windows session where the utility will run.
+
+## Managed devices
+
+Read the rules for the device, account, network, and work environment before installing or running
+IdleHarbor. If a policy prohibits simulated input or third-party utilities, do not run it. The
+project cannot determine or approve an employer's policy on a user's behalf.
+
+## Privacy and privilege
+
+The current application has no network service or telemetry path. It stores validated local
+preferences and does not need an elevated process or Windows service. It should not collect input
+content, screenshots, window titles, or browsing history.
+
+Low-level hooks and injected input are Windows compatibility mechanisms. They may be unavailable at
+some integrity boundaries or under endpoint policy; IdleHarbor must not be treated as a guarantee
+that a safeguard or pulse will work in every application.
+
+## Distribution trust
+
+There is no published release yet. When artifacts are published, verify the architecture, SHA-256
+manifest, SPDX SBOM, and GitHub attestation before running them. Authenticode signing is not claimed
+until the human signing decision is made. Do not disable endpoint protection to run an unverified
+build.
+
+## Vulnerabilities
+
+Do not post undisclosed security issues publicly. Use the private advisory form described in
+[`SECURITY.md`](../SECURITY.md).
