@@ -336,14 +336,17 @@ $global:IdleHarborPackagingTestScheduledTask = $null
 
 # Keep the lifecycle suite isolated from a real per-user IdleHarbor task. The installer scripts run
 # in child scopes and resolve this deterministic test double before the ScheduledTasks cmdlet.
-function Get-ScheduledTask {
-    [CmdletBinding()]
-    param(
-        [string]$TaskPath,
-        [string]$TaskName
-    )
-    return $global:IdleHarborPackagingTestScheduledTask
+function Install-ScheduledTaskTestDouble {
+    function global:Get-ScheduledTask {
+        [CmdletBinding()]
+        param(
+            [string]$TaskPath,
+            [string]$TaskName
+        )
+        return $global:IdleHarborPackagingTestScheduledTask
+    }
 }
+Install-ScheduledTaskTestDouble
 
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
@@ -371,6 +374,10 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
+    # Windows PowerShell 5.1 replaces a same-named global function when the
+    # ScheduledTasks module auto-loads above. Reinstall the deterministic shim
+    # before the remaining child-script lifecycle checks.
+    Install-ScheduledTaskTestDouble
 
     $global:IdleHarborPackagingTestScheduledTask = [pscustomobject]@{
         Actions = @([pscustomobject]@{
@@ -765,6 +772,7 @@ finally {
         }
         finally {
             if ($null -ne $packagingTestMutex) { $packagingTestMutex.Dispose() }
+            Remove-Item -LiteralPath Function:\Get-ScheduledTask -ErrorAction SilentlyContinue
             Remove-Variable -Name IdleHarborPackagingTestScheduledTask -Scope Global -ErrorAction SilentlyContinue
         }
     }
