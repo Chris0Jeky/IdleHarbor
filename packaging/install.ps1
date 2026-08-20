@@ -10,7 +10,7 @@ param(
 
     [switch]$NoLaunch,
 
-    [ValidateSet('AfterCopy')]
+    [ValidateSet('AfterCopy', 'AfterMarker', 'AfterStartupRemoval', 'AfterStartup')]
     [string]$InjectFailureAt
 )
 
@@ -247,7 +247,11 @@ function Set-Startup {
 
     Assert-StartupEntriesOwned $Executable
     Remove-OwnedStartup $Executable
-    if ($Mode -eq 'None') { return }
+    Invoke-InjectedFailure 'AfterStartupRemoval'
+    if ($Mode -eq 'None') {
+        Invoke-InjectedFailure 'AfterStartup'
+        return
+    }
 
     switch ($Mode) {
         'TaskScheduler' {
@@ -280,45 +284,165 @@ function Set-Startup {
             }
         }
     }
+    Invoke-InjectedFailure 'AfterStartup'
 }
 
 function Invoke-InjectedFailure([string]$Location) {
-    if ($InjectFailureAt -eq $Location) {
+    if (-not $WhatIfPreference -and $InjectFailureAt -eq $Location) {
         throw "Injected installer failure at $Location."
     }
 }
 
-function Remove-FreshInstallArtifacts {
+function Remove-TransactionBackup([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Container)) {
+        return
+    }
+
+    $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    if (-not $fullPath.StartsWith($temporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $fullPath) -notlike 'IdleHarbor-install-transaction-*') {
+        throw "Refusing to remove an invalid installer transaction directory: $fullPath"
+    }
+    Remove-Item -LiteralPath $fullPath -Recurse -Force
+}
+
+function New-InstallSnapshot {
     param(
-        [Parameter(Mandatory)]
-        [string[]]$CreatedFiles,
-
-        [Parameter(Mandatory)]
-        [string]$MarkerPath,
-
-        [Parameter(Mandatory)]
-        [bool]$MarkerCreated,
-
         [Parameter(Mandatory)]
         [string]$InstallRoot,
 
         [Parameter(Mandatory)]
-        [bool]$InstallRootCreated
+        [string[]]$RelativeFiles
     )
 
-    if ($MarkerCreated -and (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
-        Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue
-    }
-    foreach ($file in @($CreatedFiles | Sort-Object -Descending)) {
-        if (Test-Path -LiteralPath $file -PathType Leaf) {
-            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    $backupRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-install-transaction-$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $backupRoot | Out-Null
+    try {
+        $entries = @()
+        foreach ($relativeFile in @($RelativeFiles | Select-Object -Unique)) {
+            $destination = Join-Path $InstallRoot $relativeFile
+            $exists = Test-Path -LiteralPath $destination
+            if ($exists -and -not (Test-Path -LiteralPath $destination -PathType Leaf)) {
+                throw "Managed install path is not a regular file: $destination"
+            }
+
+            $backup = Join-Path $backupRoot $relativeFile
+            if ($exists) {
+                Copy-Item -LiteralPath $destination -Destination $backup
+            }
+            $entries += [pscustomobject]@{
+                relativeFile = $relativeFile
+                destination = $destination
+                existed = $exists
+                backup = $backup
+            }
+        }
+
+        return [pscustomobject]@{
+            backupRoot = $backupRoot
+            installRootExisted = (Test-Path -LiteralPath $InstallRoot -PathType Container)
+            entries = $entries
         }
     }
-    if ($InstallRootCreated -and (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
+    catch {
+        Remove-TransactionBackup $backupRoot
+        throw
+    }
+}
+
+function Restore-InstallSnapshot {
+    param(
+        [Parameter(Mandatory)]
+        [object]$Snapshot,
+
+        [Parameter(Mandatory)]
+        [string]$InstallRoot
+    )
+
+    foreach ($entry in @($Snapshot.entries)) {
+        if ($entry.existed) {
+            if (-not (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
+                New-Item -ItemType Directory -Path $InstallRoot | Out-Null
+            }
+            Copy-Item -LiteralPath ([string]$entry.backup) -Destination ([string]$entry.destination) -Force
+        }
+        elseif (Test-Path -LiteralPath ([string]$entry.destination) -PathType Leaf) {
+            Remove-Item -LiteralPath ([string]$entry.destination) -Force
+        }
+        elseif (Test-Path -LiteralPath ([string]$entry.destination)) {
+            throw "Rollback found a non-file at a managed path: $($entry.destination)"
+        }
+    }
+
+    if (-not $Snapshot.installRootExisted -and (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
+        $rootItem = Get-Item -LiteralPath $InstallRoot
+        if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Rollback will not remove a reparse-point install root: $InstallRoot"
+        }
         $remaining = @(Get-ChildItem -LiteralPath $InstallRoot -Force)
         if ($remaining.Count -eq 0) {
-            Remove-Item -LiteralPath $InstallRoot -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $InstallRoot -Force
         }
+    }
+}
+
+function Get-StartupSnapshot([string]$Executable) {
+    $taskXml = $null
+    $task = Get-OwnedTask $Executable
+    if ($null -ne $task) {
+        $taskXml = [string](Export-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName)
+    }
+
+    $shortcutBytes = $null
+    $link = Get-StartupLinkPath
+    if (Test-Path -LiteralPath $link -PathType Leaf) {
+        $shortcutBytes = [IO.File]::ReadAllBytes($link)
+    }
+
+    $runCommand = Get-RunCommand
+    $runKind = $null
+    if ($null -ne $runCommand) {
+        $runKey = Get-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+        $runKind = $runKey.GetValueKind($RunValueName)
+    }
+
+    return [pscustomobject]@{
+        taskXml = $taskXml
+        shortcutBytes = $shortcutBytes
+        runCommand = $runCommand
+        runKind = $runKind
+    }
+}
+
+function Restore-StartupSnapshot {
+    param(
+        [Parameter(Mandatory)]
+        [object]$Snapshot,
+
+        [Parameter(Mandatory)]
+        [string]$Executable
+    )
+
+    Assert-StartupEntriesOwned $Executable
+    Remove-OwnedStartup -Executable $Executable -Confirm:$false
+
+    if ($null -ne $Snapshot.taskXml) {
+        Register-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Xml ([string]$Snapshot.taskXml) -Force | Out-Null
+    }
+    if ($null -ne $Snapshot.shortcutBytes) {
+        $link = Get-StartupLinkPath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $link) -Force | Out-Null
+        [IO.File]::WriteAllBytes($link, [byte[]]$Snapshot.shortcutBytes)
+    }
+    if ($null -ne $Snapshot.runCommand) {
+        $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+        New-Item -Path $key -Force | Out-Null
+        Set-ItemProperty `
+            -Path $key `
+            -Name $RunValueName `
+            -Value ([string]$Snapshot.runCommand) `
+            -Type ([Microsoft.Win32.RegistryValueKind]$Snapshot.runKind)
     }
 }
 
@@ -332,19 +456,21 @@ Assert-OwnedOrEmptyDestination $safeRoot $sourceRoot
 Assert-StartupEntriesOwned $destinationExecutable
 
 $sourceIsInstallRoot = Test-SamePath $sourceRoot $safeRoot
-$freshInstall = (-not $sourceIsInstallRoot) -and (-not (Test-Path -LiteralPath $markerPath -PathType Leaf))
-$installRootCreated = $false
-$markerCreated = $false
-$createdFiles = @()
+$installSnapshot = $null
+$startupSnapshot = $null
 
 if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Stop-OwnedApplicationIfRunning $destinationExecutable
 }
 
+if (-not $WhatIfPreference) {
+    $startupSnapshot = Get-StartupSnapshot $destinationExecutable
+    $installSnapshot = New-InstallSnapshot -InstallRoot $safeRoot -RelativeFiles @($KnownFiles + $MarkerName)
+}
+
 try {
     if (-not $sourceIsInstallRoot) {
         if (Confirm-Change $safeRoot 'Create installation directory') {
-            $installRootCreated = -not (Test-Path -LiteralPath $safeRoot -PathType Container)
             New-Item -ItemType Directory -Path $safeRoot -Force | Out-Null
         }
     }
@@ -355,14 +481,12 @@ try {
         if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }
         $destinationFile = Join-Path $safeRoot $fileName
         if (Confirm-Change $destinationFile 'Install package file') {
-            if ($freshInstall) { $createdFiles += $destinationFile }
             Copy-Item -LiteralPath $sourceFile -Destination $destinationFile -Force
             Invoke-InjectedFailure 'AfterCopy'
         }
     }
 
     if (Confirm-Change $markerPath 'Write ownership marker') {
-        if ($freshInstall) { $markerCreated = $true }
         $installedFiles = @($KnownFiles | Where-Object { Test-Path -LiteralPath (Join-Path $safeRoot $_) -PathType Leaf })
         $marker = [ordered]@{
             product = $ProductName
@@ -372,25 +496,44 @@ try {
             installedAtUtc = [DateTime]::UtcNow.ToString('o')
         }
         $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
+        Invoke-InjectedFailure 'AfterMarker'
     }
 
     Set-Startup $destinationExecutable $Startup
 }
 catch {
-    if ($freshInstall) {
+    $failure = $_
+    $rollbackErrors = @()
+    if ($null -ne $installSnapshot) {
         try {
-            Remove-FreshInstallArtifacts `
-                -CreatedFiles $createdFiles `
-                -MarkerPath $markerPath `
-                -MarkerCreated $markerCreated `
-                -InstallRoot $safeRoot `
-                -InstallRootCreated $installRootCreated
+            Restore-InstallSnapshot -Snapshot $installSnapshot -InstallRoot $safeRoot
         }
         catch {
-            Write-Warning "Fresh-install rollback could not remove every artifact under ${safeRoot}: $($_.Exception.Message)"
+            $rollbackErrors += "files: $($_.Exception.Message)"
         }
     }
-    throw
+    if ($null -ne $startupSnapshot) {
+        try {
+            Restore-StartupSnapshot -Snapshot $startupSnapshot -Executable $destinationExecutable
+        }
+        catch {
+            $rollbackErrors += "startup: $($_.Exception.Message)"
+        }
+    }
+    if ($rollbackErrors.Count -ne 0) {
+        throw "$($failure.Exception.Message) Rollback was incomplete ($($rollbackErrors -join '; '))."
+    }
+    throw $failure
+}
+finally {
+    if ($null -ne $installSnapshot) {
+        try {
+            Remove-TransactionBackup ([string]$installSnapshot.backupRoot)
+        }
+        catch {
+            Write-Warning "Installer transaction backup cleanup failed: $($_.Exception.Message)"
+        }
+    }
 }
 
 Write-Output "Installed $ProductName to $safeRoot"

@@ -154,13 +154,70 @@ try {
     Assert-True ((Get-Content -Raw -LiteralPath $transactionSentinel).Trim() -eq 'preserve') `
         'Fresh-install rollback crossed its exact ownership boundary.'
 
+    $preexistingTransactionRoot = Join-Path $tempRoot 'PreexistingEmpty\IdleHarbor'
+    New-Item -ItemType Directory -Path $preexistingTransactionRoot -Force | Out-Null
+    $preexistingFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
+    }
+    catch { $preexistingFailure = $true }
+    Assert-True $preexistingFailure 'Injected failure in a pre-existing empty root did not fail.'
+    Assert-True (Test-Path -LiteralPath $preexistingTransactionRoot -PathType Container) `
+        'Rollback removed a pre-existing empty install root.'
+    Assert-True (@(Get-ChildItem -LiteralPath $preexistingTransactionRoot -Force).Count -eq 0) `
+        'Rollback left managed residue in a pre-existing empty install root.'
+
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
+
+    $installedExecutable = Join-Path $installRoot 'IdleHarbor.exe'
+    $installedMarker = Join-Path $installRoot '.idleharbor-managed.json'
+    $originalExecutable = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
+    $originalMarker = Get-Content -Raw -LiteralPath $installedMarker
+    $unexpectedFile = Join-Path $installRoot 'user-note.txt'
+    Set-Content -LiteralPath $unexpectedFile -Value 'preserve'
+    [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x09, 0x08, 0x07, 0x06))
+    Set-Content -LiteralPath (Join-Path $buildRoot 'README.md') -Value 'new managed file'
+
+    $updateFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+    }
+    catch { $updateFailure = $true }
+    Assert-True $updateFailure 'Injected update failure did not fail.'
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -ceq $originalExecutable) `
+        'Failed update did not restore the previous executable.'
+    Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $originalMarker) `
+        'Failed update did not restore the previous ownership marker.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $installRoot 'README.md'))) `
+        'Failed update left a newly introduced managed file.'
+    Assert-True ((Get-Content -Raw -LiteralPath $unexpectedFile).Trim() -ceq 'preserve') `
+        'Failed update changed an unexpected user file.'
+
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -cne $originalExecutable) `
+        'Successful update did not install the new executable.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'README.md') -PathType Leaf) `
+        'Successful update did not install the new managed file.'
+    Assert-True ((Get-Content -Raw -LiteralPath $unexpectedFile).Trim() -ceq 'preserve') `
+        'Successful update changed an unexpected user file.'
+
+    $sameDirectoryMarker = Get-Content -Raw -LiteralPath $installedMarker
+    $sameDirectoryFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+    }
+    catch { $sameDirectoryFailure = $true }
+    Assert-True $sameDirectoryFailure 'Injected same-directory marker failure did not fail.'
+    Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $sameDirectoryMarker) `
+        'Same-directory rollback did not restore the ownership marker.'
+
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
+    Remove-Item -LiteralPath $unexpectedFile -Force
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
 
