@@ -18,6 +18,15 @@ void Expect(const bool condition, std::string_view description) {
     }
 }
 
+bool ContainsWarning(const idleharbor::app::SettingsLoadResult& result, const std::string_view fragment) {
+    for (const auto& warning : result.warnings) {
+        if (warning.find(fragment) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 int main() {
@@ -72,13 +81,49 @@ int main() {
     const auto malformed_path = test_root / L"malformed.ini";
     {
         std::ofstream malformed(malformed_path, std::ios::binary);
-        malformed << "schema=999\nprofile=balanced\nmotion=off\npower=none\n"
+        malformed << "schema=999\nprofile=balanced\nmotion=zen\npower=system\n"
                      "distance=999\npause_when_locked=perhaps\nnot a setting\n";
     }
     const auto malformed = idleharbor::app::LoadSettings(malformed_path);
     Expect(malformed.file_found, "malformed file is found");
-    Expect(!malformed.warnings.empty(), "malformed values produce warnings");
+    Expect(malformed.warnings.size() == 4, "malformed values preserve every warning");
+    Expect(ContainsWarning(malformed, "schema is not supported"), "unsupported schema warning is preserved");
+    Expect(ContainsWarning(malformed, "out-of-range integer for 'distance'"), "range warning is preserved");
+    Expect(ContainsWarning(malformed, "invalid boolean for 'pause_when_locked'"), "boolean warning is preserved");
+    Expect(ContainsWarning(malformed, "malformed settings line"), "malformed-line warning is preserved");
     Expect(idleharbor::core::validate(malformed.settings.session).valid, "malformed file falls back validly");
+
+    const auto out_of_range_path = test_root / L"out-of-range.ini";
+    {
+        std::ofstream out_of_range(out_of_range_path, std::ios::binary);
+        out_of_range << "profile=balanced\ninterval_seconds=0\ndistance=121\n"
+                        "low_battery_threshold=101\nmax_duration_seconds=2592001\n";
+    }
+    const auto out_of_range = idleharbor::app::LoadSettings(out_of_range_path);
+    Expect(out_of_range.warnings.size() == 4, "out-of-range values preserve every warning");
+    Expect(ContainsWarning(out_of_range, "interval_seconds"), "interval range warning is preserved");
+    Expect(ContainsWarning(out_of_range, "distance"), "distance range warning is preserved");
+    Expect(ContainsWarning(out_of_range, "low_battery_threshold"), "battery range warning is preserved");
+    Expect(ContainsWarning(out_of_range, "max_duration_seconds"), "duration range warning is preserved");
+    Expect(idleharbor::core::validate(out_of_range.settings.session).valid, "out-of-range file returns valid settings");
+
+    const auto cross_field_path = test_root / L"cross-field.ini";
+    {
+        std::ofstream cross_field(cross_field_path, std::ios::binary);
+        cross_field << "profile=balanced\nmotion=off\npower=none\ninterval_seconds=60\n"
+                       "random_minimum_seconds=120\n";
+    }
+    const auto cross_field = idleharbor::app::LoadSettings(cross_field_path);
+    Expect(cross_field.warnings.size() == 2, "cross-field validation preserves every warning");
+    Expect(
+        ContainsWarning(cross_field, "motion Off with power None"),
+        "motion/power cross-field warning is preserved");
+    Expect(
+        ContainsWarning(cross_field, "random minimum must be between"),
+        "interval/random-minimum cross-field warning is preserved");
+    Expect(cross_field.settings.session.motion == MotionMode::Zen, "cross-field recovery restores profile motion");
+    Expect(cross_field.settings.session.power == PowerMode::System, "cross-field recovery restores profile power");
+    Expect(cross_field.settings.session.random_minimum == Seconds{1}, "cross-field recovery restores profile timing");
 
     const auto missing = idleharbor::app::LoadSettings(test_root / L"missing.ini");
     Expect(!missing.file_found, "missing file is not reported as loaded");
