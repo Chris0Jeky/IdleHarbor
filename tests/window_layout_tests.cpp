@@ -75,6 +75,39 @@ void test_wheel_delta_preserves_direction_and_remainder() {
     CHECK(result.remainder == 0);
 }
 
+void test_fixed_safety_regions_never_scroll_with_the_body() {
+    using idleharbor::app::ComputeSafetyRegions;
+    const auto regions = ComputeSafetyRegions(600, 700, 1);
+    CHECK(regions.status.top == 12);
+    CHECK(regions.status.bottom <= regions.viewport.top);
+    CHECK(regions.viewport.top == 58);
+    CHECK(regions.viewport.bottom == regions.actions.top);
+    CHECK(regions.actions.bottom == 700);
+    const auto compact = ComputeSafetyRegions(220, 320, 1);
+    CHECK(compact.status.left >= 0 && compact.status.right <= 220);
+    CHECK(compact.status.bottom <= compact.viewport.top);
+    CHECK(compact.viewport.bottom == compact.actions.top);
+}
+
+void test_focus_reveal_is_gated_by_actual_focus_change() {
+    using idleharbor::app::FocusChanged;
+    CHECK(!FocusChanged(0x10, 0x10));
+    CHECK(FocusChanged(0x10, 0x20));
+    CHECK(FocusChanged(0, 0x20));
+}
+
+void test_narrow_work_areas_reflow_settings_and_actions() {
+    using idleharbor::app::ActionLayoutMode;
+    using idleharbor::app::DetermineActionLayout;
+    using idleharbor::app::DetermineSettingsLayout;
+    using idleharbor::app::SettingsLayoutMode;
+    CHECK(DetermineSettingsLayout(600, 1) == SettingsLayoutMode::Columns);
+    CHECK(DetermineSettingsLayout(420, 1) == SettingsLayoutMode::Stacked);
+    CHECK(DetermineActionLayout(600, 1) == ActionLayoutMode::Wide);
+    CHECK(DetermineActionLayout(320, 1) == ActionLayoutMode::Wrapped);
+    CHECK(DetermineActionLayout(220, 1) == ActionLayoutMode::Stacked);
+}
+
 }  // namespace
 
 int main() {
@@ -84,5 +117,8 @@ int main() {
     test_focus_reveal_scrolls_only_when_needed();
     test_wheel_delta_accumulates_high_resolution_input();
     test_wheel_delta_preserves_direction_and_remainder();
+    test_fixed_safety_regions_never_scroll_with_the_body();
+    test_focus_reveal_is_gated_by_actual_focus_change();
+    test_narrow_work_areas_reflow_settings_and_actions();
     return failures == 0 ? 0 : 1;
 }

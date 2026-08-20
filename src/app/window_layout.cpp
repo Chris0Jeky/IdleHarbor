@@ -61,4 +61,39 @@ WheelDeltaResult ConsumeWheelDelta(const int remainder, const int delta) noexcep
     return {total / kWheelDeltaPerStep, total % kWheelDeltaPerStep};
 }
 
+ActionLayoutMode DetermineActionLayout(const int client_width, const int unit) noexcept {
+    const int safe_unit = std::max(unit, 1);
+    if (client_width >= 380 * safe_unit) {
+        return ActionLayoutMode::Wide;
+    }
+    if (client_width >= 245 * safe_unit) {
+        return ActionLayoutMode::Wrapped;
+    }
+    return ActionLayoutMode::Stacked;
+}
+
+SettingsLayoutMode DetermineSettingsLayout(const int client_width, const int unit) noexcept {
+    return client_width >= 560 * std::max(unit, 1) ? SettingsLayoutMode::Columns : SettingsLayoutMode::Stacked;
+}
+
+SafetyRegions ComputeSafetyRegions(const int client_width, const int client_height, const int unit) noexcept {
+    const int safe_unit = std::max(unit, 1);
+    const int width = std::max(client_width, 1);
+    const int height = std::max(client_height, 1);
+    const int header_height = 58 * safe_unit;
+    const auto action_layout = DetermineActionLayout(width, safe_unit);
+    const int footer_height = action_layout == ActionLayoutMode::Stacked ? 92 * safe_unit : 52 * safe_unit;
+    const int footer_top = std::max(header_height, height - footer_height);
+    const int horizontal_margin = std::min(20 * safe_unit, std::max((width - 1) / 2, 0));
+    return {
+        {horizontal_margin, 12 * safe_unit, width - horizontal_margin, std::min(42 * safe_unit, header_height)},
+        {0, footer_top, width, height},
+        {0, header_height, width, footer_top},
+    };
+}
+
+bool FocusChanged(const std::uintptr_t previous_focus, const std::uintptr_t current_focus) noexcept {
+    return previous_focus != current_focus;
+}
+
 }  // namespace idleharbor::app

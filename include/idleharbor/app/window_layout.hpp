@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace idleharbor::app {
 
 struct PixelRect {
@@ -14,6 +16,23 @@ struct WheelDeltaResult {
     int remainder = 0;
 };
 
+enum class ActionLayoutMode {
+    Wide,
+    Wrapped,
+    Stacked,
+};
+
+enum class SettingsLayoutMode {
+    Columns,
+    Stacked,
+};
+
+struct SafetyRegions {
+    PixelRect status;
+    PixelRect actions;
+    PixelRect viewport;
+};
+
 [[nodiscard]] PixelRect ClampWindowRect(PixelRect desired, PixelRect work_area, int margin) noexcept;
 [[nodiscard]] int MaximumScrollPosition(int content_height, int viewport_height) noexcept;
 [[nodiscard]] int ClampScrollPosition(int position, int content_height, int viewport_height) noexcept;
@@ -24,5 +43,9 @@ struct WheelDeltaResult {
     int content_height,
     int viewport_height) noexcept;
 [[nodiscard]] WheelDeltaResult ConsumeWheelDelta(int remainder, int delta) noexcept;
+[[nodiscard]] ActionLayoutMode DetermineActionLayout(int client_width, int unit) noexcept;
+[[nodiscard]] SettingsLayoutMode DetermineSettingsLayout(int client_width, int unit) noexcept;
+[[nodiscard]] SafetyRegions ComputeSafetyRegions(int client_width, int client_height, int unit) noexcept;
+[[nodiscard]] bool FocusChanged(std::uintptr_t previous_focus, std::uintptr_t current_focus) noexcept;
 
 }  // namespace idleharbor::app
