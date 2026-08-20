@@ -49,18 +49,18 @@ controlled. It does not provide concealment, monitoring bypasses, or claims of u
 
 ## Status
 
-The project is a pre-release `0.1.0` release candidate. The visible runtime, policy core, settings
-store, CLI, portable packaging scripts, per-user installer, startup choices, CI, CodeQL, SBOM, and
-attestation workflow are implemented. No GitHub release artifact has been published yet.
+The current stable release is [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
+The visible runtime, policy core, settings store, CLI, portable packaging scripts, per-user
+installer, startup choices, CI, CodeQL, SBOM, and attestation workflow are implemented.
 
-| Area | Landed now | Release boundary |
+| Area | Available now | Notes |
 | --- | --- | --- |
-| Runtime | Native Win32 window and notification-area controls | Windows release artifacts must pass release QA |
+| Runtime | Native Win32 window and notification-area controls | Windows-only |
 | Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
 | Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
 | Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
-| Distribution | Architecture-labelled portable archives and an optional per-user installer | No download link until a tagged release exists |
-| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | v0.1.0 will be unsigned |
+| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Download `v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
+| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.1.0` is unsigned |
 
 Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
 
@@ -78,9 +78,9 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The current x64 Release candidate is 521,728 bytes (509.5 KiB) with SHA-256
+The local Visual Studio 2019 x64 Release-QA executable is 521,728 bytes (509.5 KiB) with SHA-256
 `f39b280be248c84b6e625dcf5995673aee3949aea6a68967274554aabc0b62f2`. The reproducible three-run
-local resource baseline and its limitations are recorded in
+resource baseline and its limitations are recorded in
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
@@ -191,9 +191,13 @@ in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
 ## Download, install, and trust
 
-There is no published release yet, so this repository intentionally contains no guessed download
-URL. The release workflow is prepared to produce architecture-labelled portable archives such as
-`IdleHarbor-<version>-windows-x64-portable.zip` and the corresponding ARM64 archive, plus:
+Download the architecture-labelled portable archives from the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0):
+
+- [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip) for most Windows PCs;
+- [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip) for Windows on Arm.
+
+The release also provides:
 
 - `SHA256SUMS.txt` checksum manifest;
 - SPDX 2.3 SBOM JSON for each executable;
@@ -201,11 +205,9 @@ URL. The release workflow is prepared to produce architecture-labelled portable 
 - package manifest with source revision and architecture.
 
 The optional per-user installer, Start Menu launcher, and startup helpers are documented in
-[`packaging/README.md`](packaging/README.md). Once `v0.1.0` is tagged, its release page will be the
-source for architecture-labelled portable archives and their checksums; no download URL is guessed
-before that page exists. `v0.1.0` will be explicitly unsigned, so Windows may show a publisher
-warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify its
-artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
+[`packaging/README.md`](packaging/README.md). `v0.1.0` is explicitly unsigned, so Windows may show a
+publisher warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify
+its artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
 
 The recommended archive workflow is deliberately simple:
 
@@ -260,7 +262,7 @@ and obtain any required approval first. IdleHarbor does not bypass monitoring or
 claims on a user's behalf; installing it and configuring automatic startup may be separate policy
 decisions.
 
-### Is the first release code-signed?
+### Is v0.1.0 code-signed?
 
 No. `v0.1.0` is intentionally unsigned because no signing identity has been provided. Checksums,
 an SPDX SBOM, and GitHub provenance attestations provide release evidence, but they do not remove
@@ -287,7 +289,7 @@ for a managed device before installing or running it. See [`docs/SAFETY.md`](doc
 - [`packaging/README.md`](packaging/README.md) — portable archives, installation, and startup choices.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and review expectations.
 - [`SECURITY.md`](SECURITY.md) — private vulnerability reporting.
-- [`CHANGELOG.md`](CHANGELOG.md) — pre-release user-visible changes.
+- [`CHANGELOG.md`](CHANGELOG.md) — versioned user-visible changes.
 - [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) — implementation provenance and attribution.
 
 ## Licence

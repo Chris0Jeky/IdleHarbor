@@ -1,7 +1,7 @@
 # Security policy
 
-IdleHarbor is pre-release. The development branch and any future tagged release are handled on a
-best-effort basis until a support window is published.
+Security reports are accepted for the latest tagged release and the current `main` branch. Support
+is best-effort; no fixed response-time or maintenance window is promised for `v0.1.0`.
 
 ## Reporting a vulnerability
 
@@ -32,5 +32,5 @@ does not promise to bypass monitoring or security software.
 ## Response
 
 Maintainers will acknowledge accessible reports, reproduce or classify the concern, and coordinate a
-fix or mitigation. Timelines depend on evidence and the pre-release status. Please do not publish
+fix or mitigation. Timelines depend on the evidence and impact. Please do not publish
 exploit details until a fix and release communication are available.

@@ -1,8 +1,8 @@
 # User guide
 
-IdleHarbor is a visible, user-controlled Windows utility. The repository contains the native
-runtime and packaging workflows, but no tagged release has been published yet. Build from source or
-use the release archive after publication only after checking its checksum and provenance.
+IdleHarbor is a visible, user-controlled Windows utility. Download the architecture-matched archive
+from the [`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0), or
+build from source. Check the published checksum and provenance before running either release archive.
 
 ## First run
 
@@ -196,4 +196,5 @@ visible controls. A tray icon may be unavailable while Windows Explorer is resta
 - Simulated input may be blocked or handled differently by applications and integrity boundaries.
 - Low-level input hooks and session notifications depend on Windows policy and availability.
 - Display scaling and monitor layouts vary; verify the viewport after changing a monitor's scale.
-- A release is not yet published; do not invent a download URL or assume signing.
+- `v0.1.0` is unsigned; validate the published checksum and attestation and expect Windows to report
+  no Authenticode publisher identity.

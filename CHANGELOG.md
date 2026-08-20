@@ -6,6 +6,10 @@ where practical.
 
 ## [Unreleased]
 
+No user-visible changes have landed since `v0.1.0`.
+
+## [0.1.0] - 2026-08-20
+
 ### Added
 
 - GNU General Public License version 3 only (`GPL-3.0-only`), with the complete licence and a
@@ -101,13 +105,10 @@ where practical.
 - Keep the packaging test's deterministic scheduled-task shim isolated from the real per-user
   ScheduledTasks module and any installed IdleHarbor task.
 
-### Release boundary
+### Distribution
 
-- No version has been published. The licence is `GPL-3.0-only`; `v0.1.0` will be unsigned and
-  accompanied by checksums, SBOMs, and GitHub artifact attestations.
+- Published under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives accompanied by
+  SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
 
-## [0.1.0] - Unreleased
-
-This heading reserves the first release entry. It must not be dated or described as released until
-the tagged artifacts, release checks, checksums, SBOMs, attestations, and unsigned-release notice
-are verified.
+[Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0

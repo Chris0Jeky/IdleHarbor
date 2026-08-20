@@ -1,7 +1,7 @@
 # Contributing to IdleHarbor
 
-Thank you for helping make a small, trustworthy Windows utility. The project is pre-release, so
-behavior and interfaces may change. Keep changes focused, explain user-visible effects, and never
+Thank you for helping make a small, trustworthy Windows utility. The project is young, so behavior
+and interfaces may continue to evolve. Keep changes focused, explain user-visible effects, and never
 trade away an explicit stop path or truthful documentation for convenience.
 
 ## Before you start

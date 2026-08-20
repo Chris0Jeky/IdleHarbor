@@ -2,14 +2,15 @@
 
 IdleHarbor is distributed as a native Windows executable with no application runtime or network
 dependency. The portable archive is the canonical package; the PowerShell installer is an optional
-per-user convenience layer around that archive. No release archive has been published yet.
+per-user convenience layer around that archive. Download only from the
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
 
 ## Release artifacts
 
-The tag-triggered release workflow is prepared to produce:
+The `v0.1.0` release provides:
 
-- `IdleHarbor-<version>-windows-x64-portable.zip`;
-- `IdleHarbor-<version>-windows-arm64-portable.zip`;
+- [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip);
+- [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip);
 - `SHA256SUMS.txt` for the final asset directory;
 - per-architecture SPDX 2.3 SBOM JSON;
 - GitHub artifact attestations;
@@ -18,7 +19,6 @@ The tag-triggered release workflow is prepared to produce:
 The workflow builds Win32 in CI for coverage, but the current release matrix publishes x64 and
 ARM64 archives. It accepts only stable `v<major>.<minor>.<patch>` tags, passes the triggering tag
 through step-local environment data, and validates the same tag before packaging or publication.
-Do not use a download URL until a tagged release exists.
 
 ### Trust-file asset contract
 
@@ -112,13 +112,13 @@ proving it is empty; a pre-existing or non-empty folder is preserved.
 
 ## Verification and trust
 
-After a future release is published, verify the checksum manifest and inspect the signature state:
+After downloading, verify the checksum manifest and inspect the signature state:
 
 ```powershell
 Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The release workflow is configured to produce SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+The release provides SHA-256, SBOM, and attestation evidence. `v0.1.0` is
 intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
 and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.
