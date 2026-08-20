@@ -53,10 +53,13 @@ the Programs known folder after installation.
 
 Issue [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks final exact-build Running,
 Paused, full-window, viewport, and tray captures plus the repository social preview. This branch
-is now based on final merged main `4be21ad` and is refreshing the privacy-safe capture set,
-high-contrast social SVG/PNG, exact x64 executable evidence, and three-run resource baseline. PR
-[#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) remains open until that evidence is current
-and the repository social-preview image is uploaded and visually checked on GitHub.
+is based on final merged main `4be21ad` and records a freshly inspected privacy-safe capture set,
+high-contrast social SVG/PNG, and a three-run resource baseline. The unsigned x64 executable is
+516,608 bytes with SHA-256
+`d46b6b004a866ca0eed8eb02455ade1a769ac901e64c986e08f50f0720f54d6b`. PR
+[#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) remains open only until the repository
+social-preview image is uploaded and visually checked on GitHub and the refreshed head passes its
+final proof and review gate.
 
 The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
 modes; exact rollback after fresh and update failures; preservation of unexpected files and

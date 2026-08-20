@@ -30,8 +30,9 @@ where practical.
 - Added privacy-safe exact-build Running, Paused, full-window, compact-viewport, and tray captures;
   refreshed the social preview footer for stronger contrast and recorded the final x64 resource
   baseline.
-- Refreshed the portfolio evidence against merged main after the inherited-scrollbar resize fix;
-  the social-preview upload remains an explicit pre-merge publication gate.
+- Refreshed the portfolio evidence against final merged main after the descendant-repaint and
+  ownership-safe Start Menu fixes; the social-preview upload remains an explicit pre-merge
+  publication gate.
 
 ### Changed
 
