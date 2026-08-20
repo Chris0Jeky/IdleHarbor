@@ -71,7 +71,9 @@ active_hours_end_minute=1080
 Run the installer with `-WhatIf` first. Startup is disabled by default; if enabled, the installer
 creates only the selected per-user Task Scheduler, Startup-folder, or HKCU Run entry. A matching
 uninstaller removes entries and files only when its ownership marker proves they belong to
-IdleHarbor. Settings are preserved unless `-PurgeData` is explicitly supplied.
+IdleHarbor. Caught install/update failures restore the previous managed files and startup state.
+Linked managed paths are rejected rather than followed outside the install root. Settings are
+preserved unless `-PurgeData` is explicitly supplied.
 
 ## Report a bug
 

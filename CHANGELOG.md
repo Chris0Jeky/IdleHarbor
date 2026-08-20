@@ -39,6 +39,14 @@ where practical.
   mutations, and create the settings ownership marker before writing user data.
 - Reject release tags that disagree with embedded versions, emit the required SPDX SHA-1 file and
   package-verification values, and keep documented INI examples directly copyable.
+- Roll back fresh-install files on failure, validate the application manifest version, require a
+  tracked licence before publication, and document release-directory trust assets.
+- Keep the v0.1.0 publication lane stable-only by rejecting prerelease and build-metadata tags
+  consistently in both workflow and source-version validation.
+- Restore managed files, marker bytes, and owned startup state after failed updates; preserve
+  pre-existing scheduler folders; and clean up installer-created empty task folders.
+- Reject linked managed files before an update can write outside its ownership boundary, and make
+  packaging/checksum verification pass under both Windows PowerShell 5.1 and PowerShell 7.
 
 ### Release boundary
 

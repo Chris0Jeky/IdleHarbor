@@ -13,9 +13,14 @@ $root = (Resolve-Path -LiteralPath $InputDirectory).Path
 $output = [IO.Path]::GetFullPath($OutputPath)
 $entries = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object { [IO.Path]::GetFullPath($_.FullName) -ine $output } | Sort-Object FullName)
 if ($entries.Count -eq 0) { throw "No files found below $root." }
+$rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
 
 $lines = foreach ($entry in $entries) {
-    $relative = [IO.Path]::GetRelativePath($root, $entry.FullName).Replace('\', '/')
+    $fullName = [IO.Path]::GetFullPath($entry.FullName)
+    if (-not $fullName.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Checksum input escaped its declared root: $fullName"
+    }
+    $relative = $fullName.Substring($rootPrefix.Length).Replace('\', '/')
     $hash = (Get-FileHash -LiteralPath $entry.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     "${hash} *${relative}"
 }
