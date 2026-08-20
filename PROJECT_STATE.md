@@ -74,3 +74,8 @@ tags and generates checksums, SPDX SBOMs, and GitHub attestations.
 6. Before claiming release-quality runtime coverage, still exercise lock/unlock, remote-session
    disconnect/reconnect, Explorer restart, mixed-DPI monitor movement, and power-request cleanup on
    representative Windows hardware. Hosted ARM64 currently proves build/test only, not runtime.
+7. Upload `docs/assets/idleharbor-social.png` under GitHub Settings > General > Social preview. The
+   signed-in browser reached the upload control, but its file chooser denied automated attachment;
+   the finished 1280x640 asset is committed and no repository setting was changed.
+8. After a real release exists, add WinGet/Scoop distribution manifests only from the published
+   asset URLs and verified checksums; do not invent pre-release download locations or hashes.
