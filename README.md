@@ -7,7 +7,7 @@
 [![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
-![IdleHarbor social preview](docs/assets/idleharbor-social.svg)
+![IdleHarbor social preview](docs/assets/idleharbor-social.png)
 
 ## Genuine UI
 
@@ -17,7 +17,8 @@
        width="594">
 </p>
 
-This is a real x64 Release-QA capture at 200% Windows display scaling, not a mock-up.
+This is a real capture of the public `v0.1.0` x64 release at 200% Windows display scaling, not a
+mock-up.
 
 | Running | Intelligently paused |
 | --- | --- |
@@ -49,11 +50,10 @@ controlled. It does not provide concealment, monitoring bypasses, or claims of u
 
 ## Status
 
-Version `0.1.0` is prepared for the first stable tag. When the tag workflow succeeds, the canonical
-release page is [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). If that page
-is unavailable, no verified release artifact has been published yet. The visible runtime, policy
-core, settings store, CLI, portable packaging scripts, per-user installer, startup choices, CI,
-CodeQL, SBOM, and attestation workflow are implemented.
+Version `0.1.0` is the first stable release. Its canonical download and verification page is
+[`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). The visible runtime, policy
+core, settings store, CLI, portable packages, per-user installer, startup choices, CI, CodeQL,
+SBOMs, checksums, and GitHub provenance attestations are implemented and published.
 
 | Area | Available now | Notes |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ CodeQL, SBOM, and attestation workflow are implemented.
 | Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
 | Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
 | Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
-| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.1.0` page once published](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
+| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.1.0` release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
 | Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.1.0` is unsigned |
 
 Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
@@ -193,10 +193,9 @@ in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
 ## Download, install, and trust
 
-After the tag workflow succeeds, download the architecture-labelled portable archives from the
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). Until that page
-exists, build from source rather than using an unverified mirror. The workflow publishes these exact
-asset names:
+Download the architecture-labelled portable archives from the canonical
+[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0), not an
+unverified mirror. The release contains these exact asset names:
 
 - [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip) for most Windows PCs;
 - [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip) for Windows on Arm.
@@ -212,6 +211,20 @@ The optional per-user installer, Start Menu launcher, and startup helpers are do
 [`packaging/README.md`](packaging/README.md). `v0.1.0` is explicitly unsigned, so Windows may show a
 publisher warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify
 its artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
+
+Package-manager availability is deliberately reported rather than implied:
+
+- [WinGet PR #421663](https://github.com/microsoft/winget-pkgs/pull/421663) is submitted for upstream
+  validation and moderation; the package is not available through the public WinGet source until
+  that PR is accepted.
+- Reproducible Chocolatey package source is included in
+  [`packaging/chocolatey`](packaging/chocolatey); community publication still requires the owner's
+  Chocolatey account/API key and moderation.
+- Scoop Extras is not yet eligible for a package request because its current request template asks
+  new projects for popularity evidence that IdleHarbor does not yet have.
+
+Until a package-manager submission is accepted, the GitHub release page remains the supported
+installation source.
 
 The recommended archive workflow is deliberately simple:
 

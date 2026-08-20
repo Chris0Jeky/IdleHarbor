@@ -1,9 +1,8 @@
 # User guide
 
-IdleHarbor is a visible, user-controlled Windows utility. When the
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) is available,
-download its architecture-matched archive and check the published checksum and provenance. If the
-page is unavailable, no verified release artifact exists yet; build from source instead.
+IdleHarbor is a visible, user-controlled Windows utility. Download its architecture-matched archive
+from the canonical [`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0)
+and check the published checksum, SPDX SBOM, and GitHub provenance before running it.
 
 ## First run
 
