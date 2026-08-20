@@ -239,22 +239,22 @@ MotionPlan make_motion_plan(MotionMode mode, std::uint32_t distance) {
     const auto d = static_cast<int>(bounded_distance);
     MotionPlan plan{mode, bounded_distance, {}};
 
-    // These are cumulative safe-anchor points translated from the official Mouse Jiggler
-    // JigglePatterns.cs deltas: https://github.com/arkane-systems/mousejiggler/blob/master/MouseJiggler/JigglePatterns.cs
+    // IdleHarbor-owned cumulative paths. Every visible path is bounded and ends at
+    // the safe anchor so the emitter can restore the user's captured cursor position.
     switch (mode) {
     case MotionMode::Off:
         plan.relative_offsets = {};
         break;
     case MotionMode::Normal:
-        plan.relative_offsets = {{4 * d, 4 * d}, {0, 0}};
+        plan.relative_offsets = {{3 * d, 2 * d}, {1 * d, 4 * d}, {-2 * d, 1 * d}, {0, 0}};
         break;
     case MotionMode::Linear:
-        plan.relative_offsets = {{4 * d, 0}, {0, 0}};
+        plan.relative_offsets = {{3 * d, 0}, {-3 * d, 0}, {0, 0}};
         break;
     case MotionMode::Circle: {
         plan.relative_offsets = {
-            {3 * d, 2 * d}, {5 * d, 5 * d}, {3 * d, 8 * d}, {0, 10 * d},
-            {-3 * d, 8 * d}, {-5 * d, 5 * d}, {-3 * d, 2 * d}, {0, 0},
+            {2 * d, -1 * d}, {4 * d, 1 * d}, {4 * d, 4 * d}, {2 * d, 6 * d},
+            {-1 * d, 6 * d}, {-4 * d, 4 * d}, {-4 * d, 1 * d}, {-2 * d, -1 * d}, {0, 0},
         };
         break;
     }

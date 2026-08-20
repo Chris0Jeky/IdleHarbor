@@ -111,8 +111,9 @@ Motion modes are selectable independently of power requests:
 | Linear | Horizontal back-and-forth path, scaled by the distance multiplier |
 
 The distance setting is a multiplier from **1** to **120**, not a raw pixel radius. Visible motion
-uses the canonical Mouse Jiggler pattern deltas translated into cumulative safe-anchor points; the
-reference is [`JigglePatterns.cs`](https://github.com/arkane-systems/mousejiggler/blob/master/MouseJiggler/JigglePatterns.cs).
+uses independently designed IdleHarbor paths that remain bounded around a safe anchor and return
+the cursor to its captured position. Project provenance is recorded in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 Profiles provide named starting points and can be refined before saving:
 

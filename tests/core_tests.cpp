@@ -66,10 +66,10 @@ bool test_motion_plans_are_deterministic_and_return_home() {
     const auto off = idleharbor::core::make_motion_plan(MotionMode::Off, 12);
     CHECK(off.relative_offsets.empty());
 
-    const std::vector<Point> expected_normal{{4, 4}, {0, 0}};
-    const std::vector<Point> expected_linear{{4, 0}, {0, 0}};
+    const std::vector<Point> expected_normal{{3, 2}, {1, 4}, {-2, 1}, {0, 0}};
+    const std::vector<Point> expected_linear{{3, 0}, {-3, 0}, {0, 0}};
     const std::vector<Point> expected_circle{
-        {3, 2}, {5, 5}, {3, 8}, {0, 10}, {-3, 8}, {-5, 5}, {-3, 2}, {0, 0}};
+        {2, -1}, {4, 1}, {4, 4}, {2, 6}, {-1, 6}, {-4, 4}, {-4, 1}, {-2, -1}, {0, 0}};
     const std::vector<Point> expected_zen{{0, 0}};
     CHECK(idleharbor::core::make_motion_plan(MotionMode::Normal, 1).relative_offsets == expected_normal);
     CHECK(idleharbor::core::make_motion_plan(MotionMode::Linear, 1).relative_offsets == expected_linear);
@@ -80,18 +80,19 @@ bool test_motion_plans_are_deterministic_and_return_home() {
     CHECK(scaled.mode == MotionMode::Circle);
     CHECK(scaled.distance == 12);
     const std::vector<Point> expected_scaled{
-        {36, 24}, {60, 60}, {36, 96}, {0, 120}, {-36, 96}, {-60, 60}, {-36, 24}, {0, 0}};
+        {24, -12}, {48, 12}, {48, 48}, {24, 72}, {-12, 72},
+        {-48, 48}, {-48, 12}, {-24, -12}, {0, 0}};
     CHECK(scaled.relative_offsets == expected_scaled);
 
     const auto clamped = idleharbor::core::make_motion_plan(MotionMode::Linear, 1000);
     CHECK(clamped.distance == Settings::kMaximumDistance);
-    const std::vector<Point> expected_clamped{{480, 0}, {0, 0}};
+    const std::vector<Point> expected_clamped{{360, 0}, {-360, 0}, {0, 0}};
     CHECK(clamped.relative_offsets == expected_clamped);
     const auto overflow_safe = idleharbor::core::make_motion_plan(
         MotionMode::Circle, std::numeric_limits<std::uint32_t>::max());
     CHECK(overflow_safe.distance == Settings::kMaximumDistance);
     CHECK(overflow_safe.relative_offsets.back() == (Point{0, 0}));
-    CHECK(overflow_safe.relative_offsets.front() == (Point{360, 240}));
+    CHECK(overflow_safe.relative_offsets.front() == (Point{240, -120}));
     return true;
 }
 

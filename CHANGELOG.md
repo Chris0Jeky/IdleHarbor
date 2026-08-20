@@ -31,8 +31,8 @@ where practical.
 ### Changed
 
 - Documentation now describes the landed integration branch rather than the original foundation stub.
-- Motion distance now matches the upstream Mouse Jiggler multiplier semantics and canonical Normal,
-  Circle, and Linear patterns while preserving safe-anchor restoration.
+- Motion distance remains a multiplier, while Normal, Circle, and Linear now use independently
+  designed IdleHarbor paths that preserve bounded safe-anchor restoration.
 
 ### Fixed
 
