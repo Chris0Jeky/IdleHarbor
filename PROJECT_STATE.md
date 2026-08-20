@@ -84,15 +84,14 @@ bounded final review.
 
 ## Resume order
 
-1. Reproduce issue #26's concurrent Windows PowerShell 5.1 failure with separate stdout/stderr
-   capture, fix the smallest confirmed cause, then pass the sequential and concurrent matrix before
-   review or PR creation.
-2. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
+1. Review and merge the completed issue #26 branch, confirm the issue closes, and sweep late review
+   feedback once.
+2. Integrate, prove, review, and merge the `agent/v0.1.0-ui-final` fixes for issues #27 and #28.
+3. Finish issue #6 from the final exact build, including genuine captures, README/benchmark truth,
    and the uploaded GitHub social preview.
-3. Run the final native runtime, packaging, installer, performance, security, accessibility, and
-   release-artifact audit. Track or finish #26-#28 according to their bounded severity and release
-   impact.
-4. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
+4. Run the final native runtime, packaging, installer, performance, security, accessibility, and
+   release-artifact audit.
+5. Resolve q-1 and q-2 with the user; only then add the approved licence, tag/publish `v0.1.0`, and
    derive package-manager manifests from verified real URLs and hashes.
 
 ## Proving commands
