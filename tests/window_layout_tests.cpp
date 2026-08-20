@@ -128,6 +128,20 @@ void test_narrow_work_areas_reflow_settings_and_actions() {
     CHECK(DetermineActionLayout(220, 96) == ActionLayoutMode::Stacked);
 }
 
+void test_wrapped_footer_actions_do_not_overlap() {
+    using idleharbor::app::ComputeActionButtonRects;
+    using idleharbor::app::PhysicalPixels;
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int width = PhysicalPixels(320, dpi);
+        const int height = PhysicalPixels(320, dpi);
+        const auto buttons = ComputeActionButtonRects(width, height, dpi);
+        CHECK(buttons.start.right <= buttons.stop.left);
+        CHECK(buttons.start.bottom <= buttons.save.top);
+        CHECK(buttons.stop.bottom <= buttons.save.top);
+        CHECK(buttons.save.bottom <= height);
+    }
+}
+
 void test_fractional_dpi_layout_uses_true_logical_widths() {
     using idleharbor::app::ActionLayoutMode;
     using idleharbor::app::ComputeSafetyRegions;
@@ -274,6 +288,7 @@ int main() {
     test_tab_order_keeps_fixed_actions_after_the_settings_body();
     test_layout_change_reveals_only_when_focused_control_is_clipped();
     test_narrow_work_areas_reflow_settings_and_actions();
+    test_wrapped_footer_actions_do_not_overlap();
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_settings_layout_uses_the_viewport_client_width();
     test_scrollbar_boundary_reflows_and_keeps_bottom_reachable();

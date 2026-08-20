@@ -306,7 +306,7 @@ class Application final {
         settings_load_warnings_ = loaded_settings.warnings;
         ApplyCommandLineOptions(options);
         saved_settings_ = settings_;
-        dirty_ = false;
+        dirty_ = !settings_load_warnings_.empty();
         taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
         dpi_ = GetDpiForSystem();
 
@@ -1095,7 +1095,7 @@ class Application final {
                 0,
                 L"STATIC",
                 text,
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
                 scale(20),
                 scale(y),
                 scale(525),
@@ -1354,6 +1354,7 @@ class Application final {
     void SetStatus(const std::wstring& status) {
         status_text_ = status;
         if (status_ != nullptr) {
+            SetControlText(status_, DisplayStatusText());
             InvalidateRect(status_, nullptr, TRUE);
             UpdateWindow(status_);
         }
@@ -1364,11 +1365,16 @@ class Application final {
         return dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
     }
 
+    [[nodiscard]] bool SettingsNeedSave() const noexcept {
+        return !settings_load_warnings_.empty() || !AppSettingsEqual(settings_, saved_settings_);
+    }
+
     void UpdateDirtyPresentation() {
         if (save_ != nullptr) {
             SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
         }
         if (status_ != nullptr) {
+            SetControlText(status_, DisplayStatusText());
             InvalidateRect(status_, nullptr, TRUE);
             UpdateWindow(status_);
         }
@@ -1386,7 +1392,7 @@ class Application final {
             settings_ = before;
             dirty_ = true;
         } else {
-            dirty_ = !AppSettingsEqual(settings_, saved_settings_);
+            dirty_ = SettingsNeedSave();
         }
         UpdateDirtyPresentation();
     }
@@ -1645,6 +1651,7 @@ class Application final {
         settings_.session = idleharbor::core::settings_for_profile(kProfiles[static_cast<std::size_t>(index)]);
         settings_.start_minimized = app_start_minimized;
         settings_.close_to_tray = app_close_to_tray;
+        dirty_ = SettingsNeedSave();
         RefreshControls();
         SetStatus(L"Stopped: profile defaults loaded; press Save to persist them");
     }
@@ -1673,7 +1680,7 @@ class Application final {
             RefreshControls();
             return;
         }
-        dirty_ = !AppSettingsEqual(settings_, saved_settings_);
+        dirty_ = SettingsNeedSave();
         UpdateDirtyPresentation();
 
         ApplyEmergencyHotkeySetting();
