@@ -266,7 +266,7 @@ Commands (choose at most one):
   --start, -j                 Start an IdleHarbor session
   --stop                      Stop the current session
   --toggle                    Toggle running/stopped
-  --status                    Print the current state
+  --status                    Show the current state
   --show, --settings, -g      Open the settings window
   --exit                      Stop and exit the running instance
 
@@ -285,14 +285,14 @@ Session options:
   --battery-threshold N       Pause at or below N percent; 0 disables
   --pause-on-fullscreen       Pause while a full-screen app is foreground
   --no-pause-on-fullscreen    Disable that safeguard
-  --close-to-tray              Hide the close button to the notification area
+  --close-to-tray             Hide the close button to the notification area
   --no-close-to-tray           Close the application when the window is closed
 
 Launch and storage:
   --minimized, -m             Start in the notification area
   --portable                  Store settings beside the executable
   --config PATH               Use an explicit settings file
-  --version                   Print the version
+  --version                   Show product and version information
   --help, -h, -?              Show this help
 
 Durations accept s, m, or h suffixes; an omitted suffix means seconds.

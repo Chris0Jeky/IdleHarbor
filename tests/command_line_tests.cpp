@@ -94,7 +94,17 @@ int main() {
     Expect(!Parse({L"--stop-after", L"169h"}).ok(), "oversized stop duration fails");
     Expect(!Parse({L"--config"}).ok(), "missing value fails");
     Expect(!Parse({L"--wat"}).ok(), "unknown option fails");
-    Expect(!idleharbor::app::CommandLineHelp().empty(), "help text is available");
+    const auto help = idleharbor::app::CommandLineHelp();
+    Expect(!help.empty(), "help text is available");
+    Expect(
+        help.find(L"--status                    Show the current state") != std::wstring::npos,
+        "status help describes the visible state dialog");
+    Expect(
+        help.find(L"--version                   Show product and version information") != std::wstring::npos,
+        "version help describes the visible product-information dialog");
+    Expect(
+        help.find(L"--close-to-tray             Hide the close button") != std::wstring::npos,
+        "close-to-tray help columns align with neighboring options");
 
     if (failures != 0) {
         std::cerr << failures << " command-line test(s) failed\n";
