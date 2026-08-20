@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "capturedAtUtc": "2026-08-20T21:46:42.5112085Z",
-  "sourceRevision": "c8905a709ceb6d93a85d5254fc9dfd249af0bb08",
+  "capturedAtUtc": "2026-08-20T21:59:04.9977589Z",
+  "sourceRevision": "0ee327864475db525bd2085377db113691479a11",
   "dpi": 192,
   "executable": {
     "file": "IdleHarbor.exe",
@@ -13,30 +13,30 @@
     {
       "file": "idleharbor-window.png",
       "state": "Stopped settings and fixed actions",
-      "width": 1200,
-      "height": 789,
-      "sha256": "1efd2cfa361e381f3979686d5923364bad898ef7abf40c3fc20664ef1866dbf2"
+      "width": 1178,
+      "height": 778,
+      "sha256": "80f63550f64f3a118bbc5fd6804975f72e72207d6fd715a0d6b588ec60f51b49"
     },
     {
       "file": "idleharbor-viewport.png",
       "state": "Stopped settings scrolled to safeguards and notification options",
-      "width": 1200,
-      "height": 789,
-      "sha256": "fe90687e67052c879feb7606bb4aadd2099641479c0b7bca5e7c912e461978fb"
+      "width": 1178,
+      "height": 778,
+      "sha256": "7b135db096ba8915cfb35125558b6b6df63036559d1d1ea2ef096fe9c9c9b108"
     },
     {
       "file": "idleharbor-running.png",
       "state": "Running motion-free keep-awake session",
-      "width": 1200,
-      "height": 789,
-      "sha256": "0b3277b3a28dbfd2460657abff4de9d52b38eca4a5c0bd284ccd719276c3edb6"
+      "width": 1178,
+      "height": 778,
+      "sha256": "a86cc810024db200a76bd565e1f5a85be35f7e9303960b46612e6c68834ebb9b"
     },
     {
       "file": "idleharbor-paused.png",
       "state": "Paused outside configured active hours",
-      "width": 1200,
-      "height": 789,
-      "sha256": "6cb7fa1ce331a07ded8c8d494c6cbeae1bd8d46ddeda99ab1ae864abc0ae450b"
+      "width": 1178,
+      "height": 778,
+      "sha256": "4dfd9e4e7297dc855f3007c450f59c27d2231f92008cbdd2e1b1040a17ede402"
     },
     {
       "file": "idleharbor-tray-menu.png",
