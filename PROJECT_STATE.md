@@ -9,7 +9,7 @@ validated INI settings, strict CLI, bounded motion, genuine-input observation, p
 battery/fullscreen/session safeguards, visible tray controls, an emergency stop path, recoverable
 settings handling, and transactional per-user installation. No release or tag has been published.
 
-`origin/main` is `71093ac16c20f5859f57e7ca54fb69fbf217199b`. Pull requests
+`origin/main` is `974d8406d14fead3b7ffbdd4ed88534473f16c97`. Pull requests
 [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7),
 [#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8), and
 [#10](https://github.com/Chris0Jeky/IdleHarbor/pull/10) landed pinned action updates,
@@ -30,10 +30,8 @@ installs require a valid ownership marker. Follow-up edge hardening remains trac
 
 ### High-DPI viewport
 
-The merged baseline is `origin/main` at `7b1bcf3`. Ready-for-review PR
-[#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18), on branch
-`agent/v0.1.0-viewport-safety`, remains open and unmerged. It carries the viewport hardening
-slice for issues #14 and #15, including:
+The merged baseline is `origin/main` at `974d8406d14fead3b7ffbdd4ed88534473f16c97`; [PR #18](https://github.com/Chris0Jeky/IdleHarbor/pull/18)
+supplied the viewport hardening slice for issues #14 and #15, including:
 
 - `be6b42d`: canonical DPI-scaled geometry, work-area clamping, resize layout, vertical scrolling,
   focus reveal, and pure layout/scroll tests;
@@ -44,7 +42,12 @@ slice for issues #14 and #15, including:
 - Focus reveal is gated on actual focus changes, and fractional-DPI width decisions use exact
   physical/logical conversion at 120%, 150%, and 175% scaling.
 
-The current local x64 Release build passes CTest 7/7, including deterministic safety-region,
+The current `agent/v0.1.0-ui-polish` slice closes issues #19-#22: keyboard traversal follows visual
+order with Save before fixed Start/Stop, the native scrollbar belongs to the settings viewport,
+resize/DPI layout changes reveal a still-focused body control when needed, and stacked body geometry
+fits the smallest clamped client widths without a horizontal overflow.
+
+The pre-slice local x64 Release build passes CTest 7/7, including deterministic safety-region,
 focus-gating, fractional-DPI, and short-client Stop-bound tests. A real 200%-DPI desktop smoke at
 the earlier PR head resized the window, exercised three partial wheel messages over a child control,
 preserved native wheel handling for an open combo box, used native line/page scrolling, preserved an
@@ -52,7 +55,8 @@ in-range scroll position across resize, revealed an off-screen control by direct
 forward/reverse keyboard traversal, activated Save with Space, started/stopped a session, and
 hid/restored the window through the notification area. The fractional-DPI and short-client follow-up
 has not had a new desktop smoke. Only one display is attached, so a true cross-monitor mixed-DPI
-transition is not locally verifiable and must remain explicit.
+transition is not locally verifiable and must remain explicit. The current polish slice still needs
+its exact-head native Release/CTest and desktop resize/DPI smoke evidence.
 
 Before issue [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) is closed, update user-facing
 docs and genuine screenshots, run a final exact-head native/desktop proof, obtain hosted CI and an

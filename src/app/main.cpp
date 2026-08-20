@@ -295,7 +295,7 @@ class Application final {
             0,
             kWindowClassName,
             idleharbor::kProductName.data(),
-            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VSCROLL,
+            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             ScaleForDpi(kBaseWindowWidth, dpi_),
@@ -435,6 +435,28 @@ class Application final {
         if (focusable.empty()) {
             return false;
         }
+        std::stable_sort(focusable.begin(), focusable.end(), [&](const HWND left, const HWND right) {
+            const auto position_for = [&](const HWND window) {
+                const auto child = std::find_if(child_layouts_.begin(), child_layouts_.end(), [&](const ChildLayout& item) {
+                    return item.window == window;
+                });
+                if (child == child_layouts_.end()) {
+                    return idleharbor::app::TabOrderPosition{};
+                }
+                const auto region = child->region == LayoutRegion::Body
+                                        ? idleharbor::app::TabOrderRegion::Body
+                                        : child->region == LayoutRegion::FixedTop
+                                              ? idleharbor::app::TabOrderRegion::FixedTop
+                                              : idleharbor::app::TabOrderRegion::FixedBottom;
+                return idleharbor::app::TabOrderPosition{
+                    region,
+                    child->region == LayoutRegion::Body ? child->arranged_y : 0,
+                    child->region == LayoutRegion::Body ? child->arranged_x : child->x,
+                    static_cast<int>(child - child_layouts_.begin()),
+                };
+            };
+            return idleharbor::app::TabOrderBefore(position_for(left), position_for(right));
+        });
         const auto current = std::find(focusable.begin(), focusable.end(), GetFocus());
         const bool reverse = (GetKeyState(VK_SHIFT) & static_cast<SHORT>(0x8000)) != 0;
         std::size_t index = current == focusable.end() ? 0 : static_cast<std::size_t>(current - focusable.begin());
@@ -479,6 +501,9 @@ class Application final {
             return application->HandleMessage(message, w_param, l_param);
         } else if (message == WM_SETFOCUS && application != nullptr) {
             application->ObserveFocusChange();
+        } else if (message == WM_VSCROLL && application != nullptr && window == application->settings_viewport_) {
+            application->HandleVerticalScroll(w_param);
+            return 0;
         } else if (message == WM_MOUSEWHEEL && application != nullptr) {
             if (application->IsDroppedComboBox(window)) {
                 return DefSubclassProc(window, message, w_param, l_param);
@@ -654,7 +679,7 @@ class Application final {
         const int logical_client_width = std::max(
             idleharbor::app::LogicalPixels(static_cast<int>(client.right), static_cast<int>(dpi_)),
             1);
-        const int body_width = std::max(logical_client_width - 40, 80);
+        const auto stacked_body = idleharbor::app::ComputeStackedBodyLayout(logical_client_width);
         int narrow_y = 0;
         int body_bottom = 0;
         for (auto& child : child_layouts_) {
@@ -662,9 +687,9 @@ class Application final {
                 continue;
             }
             if (stacked) {
-                child.arranged_x = 20;
+                child.arranged_x = stacked_body.left;
                 child.arranged_y = narrow_y;
-                child.arranged_width = body_width;
+                child.arranged_width = stacked_body.width;
                 if (child.kind == BodyControlKind::Label) {
                     narrow_y += 28;
                 } else if (child.kind == BodyControlKind::Field) {
@@ -742,7 +767,9 @@ class Application final {
         scroll_info.nMax = std::max(ContentHeight() - 1, 0);
         scroll_info.nPage = static_cast<UINT>(viewport_height);
         scroll_info.nPos = scroll_position_;
-        SetScrollInfo(window_, SB_VERT, &scroll_info, TRUE);
+        if (settings_viewport_ != nullptr) {
+            SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+        }
         LayoutControls();
     }
 
@@ -755,14 +782,16 @@ class Application final {
         SCROLLINFO scroll_info{sizeof(scroll_info)};
         scroll_info.fMask = SIF_POS;
         scroll_info.nPos = scroll_position_;
-        SetScrollInfo(window_, SB_VERT, &scroll_info, TRUE);
+        if (settings_viewport_ != nullptr) {
+            SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+        }
         LayoutControls();
     }
 
     void HandleVerticalScroll(const WPARAM w_param) {
         SCROLLINFO scroll_info{sizeof(scroll_info)};
         scroll_info.fMask = SIF_ALL;
-        if (GetScrollInfo(window_, SB_VERT, &scroll_info) == FALSE) {
+        if (settings_viewport_ == nullptr || GetScrollInfo(settings_viewport_, SB_VERT, &scroll_info) == FALSE) {
             return;
         }
         int target = scroll_position_;
@@ -880,6 +909,7 @@ class Application final {
             ui_font_ = replacement_font;
         }
         UpdateViewport();
+        EnsureFocusedControlVisible();
     }
 
     void CreateControls() {
@@ -890,7 +920,7 @@ class Application final {
             WS_EX_CONTROLPARENT,
             L"STATIC",
             nullptr,
-            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_VSCROLL,
             0,
             0,
             0,
@@ -1814,6 +1844,7 @@ class Application final {
                 ShowWindow(window_, SW_HIDE);
             } else if (w_param != SIZE_MINIMIZED) {
                 UpdateViewport();
+                EnsureFocusedControlVisible();
             }
             return 0;
         case WM_GETMINMAXINFO:

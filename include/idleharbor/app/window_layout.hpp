@@ -38,6 +38,24 @@ struct ActionButtonRects {
     PixelRect stop;
 };
 
+enum class TabOrderRegion {
+    Body,
+    FixedTop,
+    FixedBottom,
+};
+
+struct TabOrderPosition {
+    TabOrderRegion region = TabOrderRegion::Body;
+    int top = 0;
+    int left = 0;
+    int sequence = 0;
+};
+
+struct StackedBodyLayout {
+    int left = 0;
+    int width = 0;
+};
+
 [[nodiscard]] PixelRect ClampWindowRect(PixelRect desired, PixelRect work_area, int margin) noexcept;
 [[nodiscard]] int MaximumScrollPosition(int content_height, int viewport_height) noexcept;
 [[nodiscard]] int ClampScrollPosition(int position, int content_height, int viewport_height) noexcept;
@@ -54,6 +72,8 @@ struct ActionButtonRects {
 [[nodiscard]] SettingsLayoutMode DetermineSettingsLayout(int client_width, int dpi) noexcept;
 [[nodiscard]] SafetyRegions ComputeSafetyRegions(int client_width, int client_height, int dpi) noexcept;
 [[nodiscard]] ActionButtonRects ComputeActionButtonRects(int client_width, int client_height, int dpi) noexcept;
+[[nodiscard]] bool TabOrderBefore(const TabOrderPosition& left, const TabOrderPosition& right) noexcept;
+[[nodiscard]] StackedBodyLayout ComputeStackedBodyLayout(int logical_client_width) noexcept;
 [[nodiscard]] bool FocusChanged(std::uintptr_t previous_focus, std::uintptr_t current_focus) noexcept;
 
 }  // namespace idleharbor::app

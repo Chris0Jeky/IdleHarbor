@@ -21,17 +21,20 @@ shown so a user can understand why a pulse is not being emitted.
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
 area. The live Running/Paused/Stopped status and immediate Start/Stop actions remain in fixed safety
-regions while the settings body uses a native vertical scrollbar. On narrow or highly scaled work
-areas, settings reflow into a single column and the action row wraps or stacks so every control stays
-visible and keyboard reachable.
+regions while the settings body uses a native vertical scrollbar whose track is confined to that
+body. On narrow or highly scaled work areas, settings reflow into a single column and the action row
+wraps or stacks so every control stays visible and keyboard reachable, including unusually tiny work
+areas.
 
 - Turn the mouse wheel over the window or any closed control to move the settings viewport.
 - An open profile, motion, or power list keeps native wheel handling so its choices can be browsed.
 - Precision touchpads and high-resolution wheels retain partial input until a complete wheel step is
   reached; IdleHarbor also follows the Windows wheel-lines/page setting.
-- Use **Tab** and **Shift+Tab** to traverse controls. The body viewport automatically reveals the
-  focused setting when focus changes; scrolling with the pointer or scrollbar does not snap back.
-  Start and Stop remain visible in the fixed safety region, while Save stays in the scrollable body.
+- Use **Tab** and **Shift+Tab** to traverse controls in visual top-to-bottom order. Save is reached
+  before the fixed Start and Stop actions. The body viewport automatically reveals the focused setting
+  when focus changes or a resize/DPI reflow clips the still-focused setting; scrolling with the
+  pointer or scrollbar does not snap back. Start and Stop remain visible in the fixed safety region,
+  while Save stays in the scrollable body.
 
 Moving the window between monitors reapplies the destination DPI and constrains the suggested size
 to that monitor's usable work area.
