@@ -54,7 +54,8 @@ under both PowerShell 7 and Windows PowerShell 5 proved injected rollback, exact
 preservation, executable hash equality, ownership-marker validation, installed executable
 launch/exit, and clean uninstall. The broader packaging suite's ZIP entry-name assertions fail
 under Windows PowerShell 5 but pass under the release workflow's PowerShell 7; this compatibility
-gap is not a release artifact failure and remains to be tracked.
+gap is not a release artifact failure and is tracked in
+[#9](https://github.com/Chris0Jeky/IdleHarbor/issues/9).
 
 ### High-DPI viewport
 
