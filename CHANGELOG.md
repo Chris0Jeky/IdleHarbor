@@ -66,6 +66,8 @@ where practical.
   ownership marker.
 - Serialize concurrent PowerShell packaging suites with a bounded, abandoned-owner-safe test lock
   while preserving transaction-residue assertions.
+- Use in-process .NET hashing for SBOM and checksum generation so concurrent Windows PowerShell
+  5.1 and PowerShell 7 packaging runs do not depend on command auto-loading.
 
 ### Release boundary
 

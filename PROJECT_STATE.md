@@ -61,10 +61,12 @@ visual/privacy review before its PR is opened.
 Issue [#26](https://github.com/Chris0Jeky/IdleHarbor/issues/26) has an unmerged checkpoint on branch
 `agent/v0.1.0-packaging-isolation`: a bounded, abandoned-owner-safe Local mutex serializes the
 PowerShell 7 and 5.1 packaging suites while retaining the existing global transaction-residue
-assertions. The sequential suite passes under both runtimes. The first concurrent proof returned
-exit code `0` for PowerShell 7 and `1` for Windows PowerShell 5.1; its failure output was not
-captured, and no transaction residue remained. Treat the slice as NOT verified until that failure
-is reproduced with separate stdout/stderr capture, fixed, and the concurrent matrix passes.
+assertions. The concurrent failure was reproduced with separate stdout/stderr capture: Windows
+PowerShell 5.1 lost the auto-loaded `Get-FileHash` command while PowerShell 7 passed. SBOM and
+checksum generation now use in-process .NET hashing, and the final concurrent proof returned exit
+code `0` for both runtimes with empty stderr and no transaction residue. Sequential proofs also
+returned exit code `0` under PowerShell 7 and Windows PowerShell 5.1. The slice is ready for review
+and PR creation; it is not merged into `main`.
 
 Issue [#27](https://github.com/Chris0Jeky/IdleHarbor/issues/27) tracks redundant Stop requests that
 can change internal action focus without a state transition. Issue

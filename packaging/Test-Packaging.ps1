@@ -8,6 +8,18 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-FileDigestHex([string]$Path, [string]$Algorithm) {
+    $hashAlgorithm = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        return [BitConverter]::ToString($hashAlgorithm.ComputeHash($stream)).Replace('-', '')
+    }
+    finally {
+        $stream.Dispose()
+        $hashAlgorithm.Dispose()
+    }
+}
+
 function Get-TransactionDirectories {
     return @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'IdleHarbor-install-transaction-*' -ErrorAction SilentlyContinue |
         ForEach-Object { $_.FullName })
@@ -423,7 +435,7 @@ try {
     $sbomDocument = Get-Content -Raw -LiteralPath $sbom | ConvertFrom-Json
     Assert-True ($sbomDocument.spdxVersion -eq 'SPDX-2.3') 'SBOM is not SPDX 2.3.'
     Assert-True ($sbomDocument.packages[0].filesAnalyzed -eq $true) 'SBOM package must declare filesAnalyzed=true.'
-    $fileSha1 = (Get-FileHash -LiteralPath $fakeExecutable -Algorithm SHA1).Hash.ToLowerInvariant()
+    $fileSha1 = (Get-FileDigestHex $fakeExecutable 'SHA1').ToLowerInvariant()
     $sha1Algorithm = [Security.Cryptography.SHA1]::Create()
     try {
         $expectedVerificationCode = [BitConverter]::ToString(

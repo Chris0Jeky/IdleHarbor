@@ -15,9 +15,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-FileDigestHex([string]$Path, [string]$Algorithm) {
+    $hashAlgorithm = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        return [BitConverter]::ToString($hashAlgorithm.ComputeHash($stream)).Replace('-', '')
+    }
+    finally {
+        $stream.Dispose()
+        $hashAlgorithm.Dispose()
+    }
+}
+
 $inputFile = (Resolve-Path -LiteralPath $InputPath).Path
-$fileSha1 = (Get-FileHash -LiteralPath $inputFile -Algorithm SHA1).Hash.ToLowerInvariant()
-$hash = (Get-FileHash -LiteralPath $inputFile -Algorithm SHA256).Hash.ToUpperInvariant()
+$fileSha1 = (Get-FileDigestHex $inputFile 'SHA1').ToLowerInvariant()
+$hash = (Get-FileDigestHex $inputFile 'SHA256').ToUpperInvariant()
 $fileName = Split-Path -Leaf $inputFile
 $packageId = "SPDXRef-Package-IdleHarbor-$Architecture"
 $fileId = "SPDXRef-File-$($fileName -replace '[^A-Za-z0-9.-]', '-')"
