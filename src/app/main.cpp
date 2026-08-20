@@ -176,6 +176,29 @@ std::wstring WindowsErrorText(const DWORD error) {
     return result.str();
 }
 
+bool SettingsEqual(const Settings& left, const Settings& right) noexcept {
+    return left.profile == right.profile && left.motion == right.motion && left.power == right.power &&
+           left.interval == right.interval && left.random_minimum == right.random_minimum &&
+           left.distance == right.distance && left.randomize == right.randomize &&
+           left.pause_on_user_activity == right.pause_on_user_activity &&
+           left.user_activity_cooldown == right.user_activity_cooldown &&
+           left.pause_when_locked == right.pause_when_locked &&
+           left.pause_when_disconnected == right.pause_when_disconnected &&
+           left.pause_on_battery == right.pause_on_battery && left.pause_on_low_battery == right.pause_on_low_battery &&
+           left.low_battery_threshold == right.low_battery_threshold &&
+           left.pause_when_fullscreen == right.pause_when_fullscreen &&
+           left.active_hours.enabled == right.active_hours.enabled &&
+           left.active_hours.start_minute == right.active_hours.start_minute &&
+           left.active_hours.end_minute == right.active_hours.end_minute &&
+           left.max_duration == right.max_duration;
+}
+
+bool AppSettingsEqual(const idleharbor::app::AppSettings& left, const idleharbor::app::AppSettings& right) noexcept {
+    return SettingsEqual(left.session, right.session) && left.start_minimized == right.start_minimized &&
+           left.close_to_tray == right.close_to_tray && left.show_notifications == right.show_notifications &&
+           left.emergency_hotkey == right.emergency_hotkey;
+}
+
 std::optional<ProfileKind> ProfileFromText(std::wstring_view raw) {
     const auto value = Lower(raw);
     for (const auto profile : kProfiles) {
@@ -282,6 +305,8 @@ class Application final {
         settings_ = loaded_settings.settings;
         settings_load_warnings_ = loaded_settings.warnings;
         ApplyCommandLineOptions(options);
+        saved_settings_ = settings_;
+        dirty_ = false;
         taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
         dpi_ = GetDpiForSystem();
 
@@ -1303,7 +1328,7 @@ class Application final {
         icon.hWnd = window_;
         icon.uID = 1;
         icon.uFlags = NIF_TIP;
-        const std::wstring tooltip = L"IdleHarbor - " + status_text_;
+        const std::wstring tooltip = L"IdleHarbor - " + DisplayStatusText();
         wcsncpy_s(icon.szTip, tooltip.c_str(), _TRUNCATE);
         if (Shell_NotifyIconW(NIM_MODIFY, &icon) == FALSE) {
             RecoverTrayIcon();
@@ -1335,6 +1360,37 @@ class Application final {
         UpdateTrayTooltip();
     }
 
+    [[nodiscard]] std::wstring DisplayStatusText() const {
+        return dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
+    }
+
+    void UpdateDirtyPresentation() {
+        if (save_ != nullptr) {
+            SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
+        }
+        if (status_ != nullptr) {
+            InvalidateRect(status_, nullptr, TRUE);
+            UpdateWindow(status_);
+        }
+        UpdateTrayTooltip();
+        UpdateButtons();
+    }
+
+    void UpdateDirtyStateFromControls() {
+        if (suppress_dirty_tracking_ || profile_ == nullptr) {
+            return;
+        }
+        const auto before = settings_;
+        std::wstring error;
+        if (!ReadControls(error)) {
+            settings_ = before;
+            dirty_ = true;
+        } else {
+            dirty_ = !AppSettingsEqual(settings_, saved_settings_);
+        }
+        UpdateDirtyPresentation();
+    }
+
     void DrawStatusCard(const DRAWITEMSTRUCT* draw_item) const noexcept {
         if (draw_item == nullptr || draw_item->hDC == nullptr) {
             return;
@@ -1351,7 +1407,7 @@ class Application final {
         InflateRect(&text_rect, -Scale(12), -Scale(2));
         DrawTextW(
             draw_item->hDC,
-            status_text_.c_str(),
+            DisplayStatusText().c_str(),
             -1,
             &text_rect,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
@@ -1364,6 +1420,8 @@ class Application final {
         if (profile_ == nullptr) {
             return;
         }
+        const bool previous_suppression = suppress_dirty_tracking_;
+        suppress_dirty_tracking_ = true;
         const auto profile_index = std::find(kProfiles.begin(), kProfiles.end(), settings_.session.profile);
         SendMessageW(
             profile_,
@@ -1400,7 +1458,9 @@ class Application final {
         SetChecked(close_to_tray_, settings_.close_to_tray);
         SetChecked(notifications_, settings_.show_notifications);
         SetChecked(emergency_hotkey_, settings_.emergency_hotkey);
+        suppress_dirty_tracking_ = previous_suppression;
         UpdateButtons();
+        UpdateDirtyPresentation();
     }
 
     void ApplyEmergencyHotkeySetting() {
@@ -1435,10 +1495,13 @@ class Application final {
         for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
                                    lock_pause_, disconnect_pause_, battery_, pause_on_battery_, fullscreen_,
                                    max_duration_, start_minimized_, close_to_tray_, notifications_,
-                                   emergency_hotkey_, save_}) {
+                                   emergency_hotkey_}) {
             if (control != nullptr) {
                 EnableWindow(control, session_active_ ? FALSE : TRUE);
             }
+        }
+        if (save_ != nullptr) {
+            EnableWindow(save_, session_active_ == false && dirty_ ? TRUE : FALSE);
         }
         RepaintSettingsViewport();
     }
@@ -1610,6 +1673,8 @@ class Application final {
             RefreshControls();
             return;
         }
+        dirty_ = !AppSettingsEqual(settings_, saved_settings_);
+        UpdateDirtyPresentation();
 
         ApplyEmergencyHotkeySetting();
         runtime_settings_ = settings_.session;
@@ -1817,12 +1882,15 @@ class Application final {
             MessageBoxW(window_, wide.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONERROR);
             return;
         }
+        saved_settings_ = settings_;
+        dirty_ = false;
         settings_load_warnings_.clear();
         if (settings_.emergency_hotkey && !hotkey_registered_) {
             SetStatus(L"Stopped: settings saved; emergency hotkey unavailable");
         } else {
             SetStatus(session_active_ ? L"Running: settings saved; restart to apply changes" : L"Stopped: settings saved");
         }
+        UpdateDirtyPresentation();
     }
 
     void ShowSettingsLoadWarnings() const {
@@ -1967,6 +2035,11 @@ class Application final {
                 StopSession();
             } else if (LOWORD(w_param) == kSave && HIWORD(w_param) == BN_CLICKED) {
                 Save();
+            } else if ((LOWORD(w_param) == kMotion || LOWORD(w_param) == kPower) &&
+                       HIWORD(w_param) == CBN_SELCHANGE) {
+                UpdateDirtyStateFromControls();
+            } else if (HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) {
+                UpdateDirtyStateFromControls();
             }
             return 0;
         case WM_DRAWITEM:
@@ -2156,11 +2229,14 @@ class Application final {
     std::vector<std::string> settings_load_warnings_;
     std::deque<std::wstring> deferred_commands_;
     idleharbor::app::AppSettings settings_{};
+    idleharbor::app::AppSettings saved_settings_{};
     Settings runtime_settings_{};
     InputMonitor input_monitor_{};
     PowerRequest power_request_{};
     std::unique_ptr<PolicyEngine> policy_{};
     std::unique_ptr<idleharbor::core::IntervalSampler> sampler_{};
+    bool dirty_ = false;
+    bool suppress_dirty_tracking_ = false;
 };
 
 bool SendCommandToExistingInstance(const std::wstring& raw_command_line) {
