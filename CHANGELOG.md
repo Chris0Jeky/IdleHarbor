@@ -6,8 +6,6 @@ where practical.
 
 ## [Unreleased]
 
-No user-visible changes have landed since `v0.1.0`.
-
 ## [0.1.0] - Unreleased
 
 ### Added

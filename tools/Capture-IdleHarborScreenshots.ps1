@@ -45,6 +45,18 @@ foreach ($name in $captureNames) {
     }
 }
 
+$sourceRevision = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[0-9a-f]{40}$') {
+    throw 'Could not determine the exact source revision for the capture manifest.'
+}
+$sourceStatus = @(& git -C $repositoryRoot status --porcelain --untracked-files=all)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not verify the repository state before capture.'
+}
+if ($sourceStatus.Count -ne 0) {
+    throw "The screenshot source must be committed and clean before capture:`n$($sourceStatus -join [Environment]::NewLine)"
+}
+
 $runningOwners = @(Get-CimInstance Win32_Process -Filter "Name='IdleHarbor.exe'")
 if ($runningOwners.Count -ne 0) {
     $ownerSummary = ($runningOwners | ForEach-Object { "PID $($_.ProcessId): $($_.ExecutablePath)" }) -join '; '
@@ -117,6 +129,13 @@ namespace IdleHarbor.Capture
 
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr window, out RECT rectangle);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(
+            IntPtr window,
+            uint attribute,
+            out RECT value,
+            uint valueSize);
 
         [DllImport("user32.dll")]
         public static extern bool SetWindowPos(
@@ -309,51 +328,73 @@ function Ensure-CaptureForeground([IntPtr]$Window) {
     throw 'IdleHarbor did not become foreground; refusing to capture another application.'
 }
 
+function Stop-CaptureProcess([Diagnostics.Process]$Process) {
+    if ($null -eq $Process) {
+        return
+    }
+    $Process.Refresh()
+    if ($Process.HasExited) {
+        return
+    }
+
+    $exitCommand = Start-Process -FilePath $executablePath -ArgumentList @('--exit') -PassThru
+    if (-not $exitCommand.WaitForExit(5000)) {
+        $exitCommand.Kill()
+        $exitCommand.WaitForExit(5000) | Out-Null
+    }
+    if (-not $Process.WaitForExit(5000)) {
+        $Process.Kill()
+        if (-not $Process.WaitForExit(5000)) {
+            throw 'The capture owner could not be stopped.'
+        }
+    }
+}
+
 function Start-CaptureOwner([string]$ConfigPath) {
     $owner = Start-Process -FilePath $executablePath -ArgumentList @(
         '--show', '--config', $ConfigPath) -PassThru
-    $window = [IntPtr]::Zero
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 100
-        $window = [IdleHarbor.Capture.Native]::FindMainWindow([uint32]$owner.Id)
-    } while ($window -eq [IntPtr]::Zero -and -not $owner.HasExited -and [DateTime]::UtcNow -lt $deadline)
-    if ($window -eq [IntPtr]::Zero) {
-        throw 'IdleHarbor did not expose its main window within 10 seconds.'
-    }
+    try {
+        $window = [IntPtr]::Zero
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        do {
+            Start-Sleep -Milliseconds 100
+            $window = [IdleHarbor.Capture.Native]::FindMainWindow([uint32]$owner.Id)
+        } while ($window -eq [IntPtr]::Zero -and -not $owner.HasExited -and [DateTime]::UtcNow -lt $deadline)
+        if ($window -eq [IntPtr]::Zero) {
+            throw 'IdleHarbor did not expose its main window within 10 seconds.'
+        }
 
-    [IdleHarbor.Capture.Native]::ShowWindow($window, 9) | Out-Null
-    if (-not [IdleHarbor.Capture.Native]::SetWindowPos(
-            $window,
-            [IntPtr]::Zero,
-            20,
-            20,
-            $WindowWidth,
-            $WindowHeight,
-            0x0040)) {
-        throw 'Could not size the documentation-capture window.'
-    }
-    Ensure-CaptureForeground $window
-    Start-Sleep -Milliseconds 600
+        [IdleHarbor.Capture.Native]::ShowWindow($window, 9) | Out-Null
+        if (-not [IdleHarbor.Capture.Native]::SetWindowPos(
+                $window,
+                [IntPtr]::Zero,
+                20,
+                20,
+                $WindowWidth,
+                $WindowHeight,
+                0x0040)) {
+            throw 'Could not size the documentation-capture window.'
+        }
+        Ensure-CaptureForeground $window
+        Start-Sleep -Milliseconds 600
 
-    $dpi = [int][IdleHarbor.Capture.Native]::GetDpiForWindow($window)
-    if ($dpi -ne $ExpectedDpi) {
-        throw "Expected a $ExpectedDpi-DPI capture but the window reports $dpi DPI."
+        $dpi = [int][IdleHarbor.Capture.Native]::GetDpiForWindow($window)
+        if ($dpi -ne $ExpectedDpi) {
+            throw "Expected a $ExpectedDpi-DPI capture but the window reports $dpi DPI."
+        }
+        return [pscustomobject]@{ Process = $owner; Window = $window; Dpi = $dpi }
     }
-    return [pscustomobject]@{ Process = $owner; Window = $window; Dpi = $dpi }
+    catch {
+        Stop-CaptureProcess $owner
+        throw
+    }
 }
 
 function Stop-CaptureOwner($Owner) {
-    if ($null -eq $Owner -or $Owner.Process.HasExited) {
+    if ($null -eq $Owner) {
         return
     }
-    $exitCommand = Start-Process -FilePath $executablePath -ArgumentList @('--exit') -PassThru
-    if (-not $exitCommand.WaitForExit(5000)) {
-        throw 'The capture-owner exit command did not return.'
-    }
-    if (-not $Owner.Process.WaitForExit(5000)) {
-        throw 'The capture owner did not exit.'
-    }
+    Stop-CaptureProcess $Owner.Process
 }
 
 function Invoke-OwnerCommand([string[]]$Arguments) {
@@ -415,8 +456,13 @@ function Save-WindowCapture([IntPtr]$Window, [string]$Path) {
     Start-Sleep -Milliseconds 250
     Ensure-CaptureForeground $Window
     $rectangle = New-Object IdleHarbor.Capture.Native+RECT
-    if (-not [IdleHarbor.Capture.Native]::GetWindowRect($Window, [ref]$rectangle)) {
-        throw 'Could not read the capture window rectangle.'
+    $frameBoundsResult = [IdleHarbor.Capture.Native]::DwmGetWindowAttribute(
+        $Window,
+        9,
+        [ref]$rectangle,
+        [uint32][Runtime.InteropServices.Marshal]::SizeOf($rectangle))
+    if ($frameBoundsResult -ne 0) {
+        throw "Could not read the visible capture frame bounds (HRESULT 0x$('{0:X8}' -f ([uint32]$frameBoundsResult)))."
     }
     Save-ScreenRectangle $rectangle $Path
     if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
@@ -557,9 +603,10 @@ try {
     Stop-CaptureOwner $owner
     $owner = $null
 
-    $sourceRevision = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[0-9a-f]{40}$') {
-        throw 'Could not determine the exact source revision for the capture manifest.'
+    $currentRevision = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    $currentStatus = @(& git -C $repositoryRoot status --porcelain --untracked-files=all)
+    if ($LASTEXITCODE -ne 0 -or $currentRevision -ne $sourceRevision -or $currentStatus.Count -ne 0) {
+        throw 'The repository changed during capture; refusing to publish ambiguous evidence.'
     }
     $executableItem = Get-Item -LiteralPath $executablePath
     $signature = Get-AuthenticodeSignature -FilePath $executablePath
@@ -590,17 +637,51 @@ try {
         (($manifest | ConvertTo-Json -Depth 6) + [Environment]::NewLine),
         $encoding)
 
-    # Promote only a complete capture set. The manifest moves last so a failed
-    # capture never describes a partially refreshed image set.
+    # Promote only a complete capture set. Preserve every previous destination
+    # so a failed copy or verification can roll the whole set back.
     foreach ($name in $captureNames) {
         $stagedPath = Join-Path $outputRoot $name
         if (-not (Test-Path -LiteralPath $stagedPath -PathType Leaf)) {
             throw "Staged capture is incomplete: $stagedPath"
         }
     }
+    $backupRoot = Join-Path $tempRoot 'previous'
+    New-Item -ItemType Directory -Path $backupRoot | Out-Null
     foreach ($name in $captureNames) {
-        Copy-Item -LiteralPath (Join-Path $outputRoot $name) `
-            -Destination (Join-Path $destinationRoot $name) -Force
+        $destinationPath = Join-Path $destinationRoot $name
+        if (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
+            Copy-Item -LiteralPath $destinationPath -Destination (Join-Path $backupRoot $name)
+        }
+    }
+
+    $promotionComplete = $false
+    try {
+        foreach ($name in $captureNames) {
+            Copy-Item -LiteralPath (Join-Path $outputRoot $name) `
+                -Destination (Join-Path $destinationRoot $name) -Force
+        }
+        foreach ($name in $captureNames) {
+            $stagedHash = (Get-FileHash -LiteralPath (Join-Path $outputRoot $name) -Algorithm SHA256).Hash
+            $destinationHash = (Get-FileHash -LiteralPath (Join-Path $destinationRoot $name) -Algorithm SHA256).Hash
+            if ($stagedHash -cne $destinationHash) {
+                throw "Promoted capture verification failed: $name"
+            }
+        }
+        $promotionComplete = $true
+    }
+    finally {
+        if (-not $promotionComplete) {
+            foreach ($name in $captureNames) {
+                $backupPath = Join-Path $backupRoot $name
+                $destinationPath = Join-Path $destinationRoot $name
+                if (Test-Path -LiteralPath $backupPath -PathType Leaf) {
+                    Copy-Item -LiteralPath $backupPath -Destination $destinationPath -Force
+                }
+                elseif (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
+                    [IO.File]::Delete($destinationPath)
+                }
+            }
+        }
     }
 
     $manifest

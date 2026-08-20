@@ -443,6 +443,30 @@ try {
     if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save)) {
         throw 'Saving the selected profile did not clear the dirty state.'
     }
+
+    # A settings-only command forwarded to the owner must expose the same
+    # explicitly saveable dirty state as a first-owner override.
+    $forwardedOverride = Start-Process -FilePath $executablePath -ArgumentList @(
+        '--motion', 'linear') -PassThru
+    if (-not $forwardedOverride.WaitForExit(5000) -or $forwardedOverride.ExitCode -ne 0) {
+        throw 'The forwarded settings override did not complete successfully.'
+    }
+    $forwardedDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    while (-not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -and
+           [DateTime]::UtcNow -lt $forwardedDeadline) {
+        Start-Sleep -Milliseconds 25
+    }
+    if (-not [IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -or
+        [IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -notlike 'Unsaved changes*') {
+        throw 'A forwarded settings override was not exposed as explicitly saveable and unsaved.'
+    }
+    [IdleHarbor.NativeViewportRepaint]::SendMessage(
+        $save, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null # BM_CLICK
+    if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($save) -or
+        [IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -like 'Unsaved changes*') {
+        throw 'Saving the forwarded settings override did not clear its dirty state.'
+    }
+
     [IdleHarbor.NativeViewportRepaint]::RedrawWindow(
         $viewport,
         [IntPtr]::Zero,
@@ -464,6 +488,9 @@ try {
     }
     if ([IdleHarbor.NativeViewportRepaint]::IsWindowEnabled($profile)) {
         throw 'The motion-free native session did not disable its settings controls.'
+    }
+    if ([IdleHarbor.NativeViewportRepaint]::ReadWindowText($status) -notlike 'Unsaved changes*') {
+        throw 'A forwarded start with runtime overrides did not retain its unsaved status.'
     }
     # The themed combo boxes animate their enabled-to-disabled transition.
     # Let that finite system animation settle before comparing a natural frame

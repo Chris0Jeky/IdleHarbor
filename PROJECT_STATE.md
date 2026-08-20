@@ -59,12 +59,13 @@ SBOM metadata.
 The release-preparation branch restores Windows PowerShell 5.1 release checks, keeps first-owner and
 forwarded CLI overrides explicitly saveable without silent INI persistence, and provides a
 deterministic exact-build screenshot harness. Issues
-[#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42),
 [#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
 [#44](https://github.com/Chris0Jeky/IdleHarbor/issues/44), and
 [#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) are expected to close when that branch
-lands. Issue [#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46) records two non-blocking status
-refresh follow-ups outside the `v0.1.0` release boundary.
+lands. Issue [#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42) remains open for a deterministic
+tray-failure transition test even though the accessible-text composition fix is implemented. Issue
+[#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46) records two non-blocking status refresh
+follow-ups outside the `v0.1.0` release boundary.
 
 ## Portfolio and publication queue
 
