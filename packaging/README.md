@@ -56,11 +56,17 @@ startup choices are:
 - `None` — no startup registration.
 
 Each startup choice runs `--start --minimized`. The installer removes only entries that point to the
-same executable and refuses to overwrite a non-owned destination. It writes an ownership marker and
-can be run repeatedly from Windows PowerShell 5.1 or PowerShell 7. Install and update operations
-snapshot managed files and owned startup state, then restore them after a caught failure. Managed
-paths that are symbolic links, junctions, or multiply linked files are rejected so an update cannot
-write through the installation boundary. Unexpected user files are preserved.
+same executable and refuses to overwrite a non-owned destination. A first install invoked with the
+source and destination set to the same directory also requires an already-valid IdleHarbor ownership
+marker; this prevents a marker from claiming unrelated files in an extracted directory. Once that
+marker exists, a same-directory reinstall remains supported. The installer writes an ownership marker
+and can be run repeatedly from Windows PowerShell 5.1 or PowerShell 7. Install and update operations
+snapshot managed files and owned startup state, then restore them after a caught failure. A complete
+rollback or successful commit removes the temporary transaction directory. If managed-file restoration
+is incomplete, the installer retains that directory and reports its exact recovery path so the prior
+bytes remain available for manual repair. Managed paths that are symbolic links, junctions, or
+multiply linked files are rejected so an update cannot write through the installation boundary.
+Unexpected user files are preserved.
 
 Uninstall with:
 

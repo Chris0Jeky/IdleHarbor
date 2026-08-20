@@ -50,6 +50,9 @@ where practical.
   pre-existing scheduler folders; and clean up installer-created empty task folders.
 - Reject linked managed files before an update can write outside its ownership boundary, and make
   packaging/checksum verification pass under both Windows PowerShell 5.1 and PowerShell 7.
+- Retain an exact-path transaction recovery backup when managed-file rollback is incomplete, clean
+  it up after a complete rollback, and reject first-time same-directory installs without a valid
+  ownership marker.
 
 ### Release boundary
 

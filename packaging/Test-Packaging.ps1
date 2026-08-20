@@ -8,6 +8,17 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-TransactionDirectories {
+    return @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'IdleHarbor-install-transaction-*' -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName })
+}
+
+function Assert-NoNewTransactionDirectories([string[]]$Before, [string]$Message) {
+    $after = @(Get-TransactionDirectories)
+    $new = @($after | Where-Object { $Before -notcontains $_ })
+    Assert-True ($new.Count -eq 0) "$Message New directories: $($new -join ', ')"
+}
+
 function Get-ScriptFunctionDefinition([string]$ScriptPath, [string]$Name) {
     $tokens = $null
     $errors = $null
@@ -118,6 +129,7 @@ $buildRoot = Join-Path $tempRoot 'build'
 $outputRoot = Join-Path $tempRoot 'dist'
 $installRoot = Join-Path $tempRoot 'IdleHarbor'
 $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
+$retainedTransactionPaths = @()
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot
 Assert-InstallerOwnershipPreflight (Join-Path $packagingRoot 'install.ps1')
@@ -132,6 +144,26 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
+
+    $sameSourceRoot = Join-Path $tempRoot 'same-source\IdleHarbor'
+    $sameSourceExecutable = Join-Path $sameSourceRoot 'IdleHarbor.exe'
+    $sameSourceUnrelated = Join-Path $sameSourceRoot 'unrelated.txt'
+    New-Item -ItemType Directory -Path $sameSourceRoot -Force | Out-Null
+    [IO.File]::WriteAllBytes($sameSourceExecutable, [byte[]](0x73, 0x61, 0x6d, 0x65))
+    Set-Content -LiteralPath $sameSourceUnrelated -Value 'do not change' -Encoding ASCII
+    $sameSourceFailureMessage = $null
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $sameSourceRoot -InstallRoot $sameSourceRoot -Startup None -NoLaunch | Out-Null
+    }
+    catch { $sameSourceFailureMessage = $_.Exception.Message }
+    Assert-True ($sameSourceFailureMessage -like '*no valid IdleHarbor ownership marker*') `
+        'First-time same-source installation without a marker was not rejected.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $sameSourceRoot '.idleharbor-managed.json'))) `
+        'Rejected same-source installation created an ownership marker.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($sameSourceExecutable))) -ceq 'same') `
+        'Rejected same-source installation changed the executable.'
+    Assert-True ((Get-Content -Raw -LiteralPath $sameSourceUnrelated).Trim() -ceq 'do not change') `
+        'Rejected same-source installation changed an unrelated file.'
 
     $transactionParent = Join-Path $tempRoot 'Transactional'
     $transactionRoot = Join-Path $transactionParent 'IdleHarbor'
@@ -167,7 +199,10 @@ try {
     Assert-True (@(Get-ChildItem -LiteralPath $preexistingTransactionRoot -Force).Count -eq 0) `
         'Rollback left managed residue in a pre-existing empty install root.'
 
+    $successfulCommitTransactions = @(Get-TransactionDirectories)
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
+    Assert-NoNewTransactionDirectories $successfulCommitTransactions `
+        'Successful commit left transaction backup material behind.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
     $initialMarker = Get-Content -Raw -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json') | ConvertFrom-Json
@@ -185,6 +220,7 @@ try {
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x09, 0x08, 0x07, 0x06))
     Set-Content -LiteralPath (Join-Path $buildRoot 'README.md') -Value 'new managed file'
 
+    $completeRollbackTransactions = @(Get-TransactionDirectories)
     $updateFailure = $false
     try {
         & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
@@ -199,6 +235,54 @@ try {
         'Failed update left a newly introduced managed file.'
     Assert-True ((Get-Content -Raw -LiteralPath $unexpectedFile).Trim() -ceq 'preserve') `
         'Failed update changed an unexpected user file.'
+    Assert-NoNewTransactionDirectories $completeRollbackTransactions `
+        'Complete rollback left transaction backup material behind.'
+
+    $priorRollbackBytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
+    $fileRestoreFailureMessage = $null
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') `
+            -SourcePath $buildRoot `
+            -InstallRoot $installRoot `
+            -Startup None `
+            -NoLaunch `
+            -InjectFailureAt AfterMarker `
+            -InjectRestoreFailureAt Files | Out-Null
+    }
+    catch { $fileRestoreFailureMessage = $_.Exception.Message }
+    $recoveryPrefix = 'Recovery backup retained at: '
+    $recoveryPrefixIndex = if ($null -eq $fileRestoreFailureMessage) { -1 } else { $fileRestoreFailureMessage.IndexOf($recoveryPrefix, [StringComparison]::Ordinal) }
+    Assert-True ($recoveryPrefixIndex -ge 0) `
+        'Incomplete file rollback did not report a retained recovery path.'
+    $recoveryPath = $fileRestoreFailureMessage.Substring($recoveryPrefixIndex + $recoveryPrefix.Length).TrimEnd('.')
+    $retainedTransactionPaths += $recoveryPath
+    Assert-True (Test-Path -LiteralPath $recoveryPath -PathType Container) `
+        'Incomplete file rollback did not retain its reported recovery directory.'
+    Assert-True ($fileRestoreFailureMessage.Contains($recoveryPath)) `
+        'Incomplete file rollback error did not contain the exact retained recovery path.'
+    Assert-True (([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $recoveryPath 'IdleHarbor.exe')))) -ceq $priorRollbackBytes) `
+        'Retained recovery backup does not contain readable prior executable bytes.'
+
+    $startupRestoreTransactions = @(Get-TransactionDirectories)
+    $startupRollbackBytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
+    $startupRestoreFailureMessage = $null
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') `
+            -SourcePath $buildRoot `
+            -InstallRoot $installRoot `
+            -Startup None `
+            -NoLaunch `
+            -InjectFailureAt AfterMarker `
+            -InjectRestoreFailureAt Startup | Out-Null
+    }
+    catch { $startupRestoreFailureMessage = $_.Exception.Message }
+    Assert-True ($null -ne $startupRestoreFailureMessage) 'Injected startup rollback failure did not fail.'
+    Assert-True (-not $startupRestoreFailureMessage.Contains($recoveryPrefix)) `
+        'Startup-only rollback failure incorrectly reported retained file recovery material.'
+    Assert-NoNewTransactionDirectories $startupRestoreTransactions `
+        'Startup-only rollback failure retained unnecessary transaction backup material.'
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -ceq $startupRollbackBytes) `
+        'Startup-only rollback failure did not preserve the restored executable bytes.'
 
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -cne $originalExecutable) `
@@ -401,5 +485,10 @@ try {
     Write-Output 'Packaging checks passed.'
 }
 finally {
+    foreach ($retainedTransactionPath in @($retainedTransactionPaths)) {
+        if (Test-Path -LiteralPath $retainedTransactionPath -PathType Container) {
+            Remove-Item -LiteralPath $retainedTransactionPath -Recurse -Force
+        }
+    }
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }
