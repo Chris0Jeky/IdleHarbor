@@ -8,10 +8,12 @@ IdleHarbor `0.1.0` is a native Windows release candidate with a platform-neutral
 validated local settings, strict CLI, independently designed bounded motion patterns, Windows power
 requests, genuine-input observation, battery/fullscreen/session safeguards, visible tray controls,
 an emergency stop, and transactional per-user installation. It has no telemetry or network service.
-The source and release artifacts are licensed `GPL-3.0-only`. No tag or release has been published.
+The polished native interface uses themed Windows controls, a dedicated status card, visible
+Save/Start/Stop actions, and a scrollable high-DPI settings body. The source and release artifacts
+are licensed `GPL-3.0-only`. No tag or release has been published.
 
 The current merged baseline is `origin/main` at
-`4be21adfe69b299739b451a255e69d268757b668`. PRs
+`cf773735234ad3481a409575e881fe5515deb35b`. PRs
 [#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
 [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
 scroll-range convergence, and inherited-scrollbar fixes. PR
@@ -29,13 +31,13 @@ settings-body artifact: disabled controls can leave stale fragments after viewpo
 resizing temporarily clears the display. The cause seam is the manually moved child controls inside
 a nested `WS_CLIPCHILDREN` viewport without a final explicit descendant repaint.
 
-The merged fix repaints the settings viewport and all descendants after final layout convergence,
-scroll-position changes, and Running/Stopped enabled-state changes. The native interactive smoke
-starts a safe motion-free session, proves that body controls are disabled, drives real wheel input,
-and compares natural frames with explicit descendant-repaint references at this desktop's 192 DPI.
-The smoke passes on the fixed x64 Release build. The supplied screenshot remains the reliable
-pre-fix reproduction: repeated automation against the old binary did not reproduce the intermittent
-artifact deterministically, so a red-old/green-new image comparison is not claimed.
+The fix repaints the settings viewport and all descendants after scrolling and state changes, then
+repaints the parent plus descendants after layout convergence so newly exposed footer pixels cannot
+retain clipped body controls. The native interactive smoke starts a safe motion-free session, proves
+that body controls are disabled, drives real wheel input, and compares both the whole client and the
+scrolled viewport with explicit repaint references at this desktop's 192 DPI. Natural and reference
+captures are pixel-identical on the fixed x64 Release build. The supplied screenshot remains the
+reliable pre-fix reproduction.
 
 ## Current release-preparation follow-up
 
@@ -47,17 +49,17 @@ uninstaller remove only an exact, marker-owned shortcut; changed or unowned shor
 preserved. The lifecycle suite uses temporary injected shortcut paths, and the actual per-user Start
 Menu path was exercised successfully during the local release-candidate installation.
 
-This licensing branch removes the only direct upstream motion-coordinate dependency, records the
-historical inspiration in `THIRD-PARTY-NOTICES.md`, and applies `GPL-3.0-only` consistently to the
-repository, portable archive, package manifest, and SPDX SBOM metadata.
+PR [#39](https://github.com/Chris0Jeky/IdleHarbor/pull/39) removed the only direct upstream
+motion-coordinate dependency, recorded the historical inspiration in `THIRD-PARTY-NOTICES.md`, and
+applied `GPL-3.0-only` consistently to the repository, portable archive, package manifest, and SPDX
+SBOM metadata.
 
 ## Portfolio and publication queue
 
-PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains exact-build portfolio text and
-privacy-reviewed UI captures. Its hosted x64/ARM64/x86 and CodeQL checks are green, and independent
-content review found no blocking defect. It remains intentionally unmerged until the repository
-social-preview image is uploaded and visually checked on GitHub. After runtime changes land, its
-exact-build evidence must be refreshed against final `main` before merge. Issue
+PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains pre-redesign portfolio text and
+privacy-reviewed captures. It is intentionally superseded rather than merged because its imagery
+no longer represents the release candidate. Fresh exact-build screenshots, social-preview artwork,
+and publication metadata will replace it after the redesigned UI lands. Issue
 [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks that publication boundary.
 
 The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
@@ -75,8 +77,8 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 
 ## Resume order
 
-1. Prove, review, and merge the GPLv3/provenance slice.
-2. Complete the native UI redesign, then refresh exact-build screenshots, documentation, repository
+1. Prove and merge the native UI redesign.
+2. Refresh exact-build screenshots, documentation, repository
    metadata, and social-preview artwork.
 3. Run final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact QA; preserve a dated demonstration bundle.

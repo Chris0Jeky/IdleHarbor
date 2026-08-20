@@ -96,17 +96,18 @@ void test_focus_reveal_is_gated_by_actual_focus_change() {
     CHECK(FocusChanged(0, 0x20));
 }
 
-void test_tab_order_puts_body_save_before_fixed_actions() {
+void test_tab_order_keeps_fixed_actions_after_the_settings_body() {
     using idleharbor::app::TabOrderBefore;
     using idleharbor::app::TabOrderPosition;
     using idleharbor::app::TabOrderRegion;
-    const TabOrderPosition save{TabOrderRegion::Body, 566, 270, 10};
+    const TabOrderPosition save{TabOrderRegion::FixedBottom, 0, 270, 10};
     const TabOrderPosition start{TabOrderRegion::FixedBottom, 0, 20, 8};
     const TabOrderPosition stop{TabOrderRegion::FixedBottom, 0, 145, 9};
-    CHECK(TabOrderBefore(save, start));
+    CHECK(TabOrderBefore(stop, save));
+    CHECK(TabOrderBefore(save, TabOrderPosition{TabOrderRegion::FixedBottom, 0, 395, 11}));
     CHECK(TabOrderBefore(start, stop));
     CHECK(!TabOrderBefore(stop, start));
-    CHECK(TabOrderBefore(TabOrderPosition{TabOrderRegion::Body, 50, 20, 0}, save));
+    CHECK(TabOrderBefore(TabOrderPosition{TabOrderRegion::Body, 50, 20, 0}, start));
 }
 
 void test_layout_change_reveals_only_when_focused_control_is_clipped() {
@@ -125,6 +126,20 @@ void test_narrow_work_areas_reflow_settings_and_actions() {
     CHECK(DetermineActionLayout(600, 96) == ActionLayoutMode::Wide);
     CHECK(DetermineActionLayout(320, 96) == ActionLayoutMode::Wrapped);
     CHECK(DetermineActionLayout(220, 96) == ActionLayoutMode::Stacked);
+}
+
+void test_wrapped_footer_actions_do_not_overlap() {
+    using idleharbor::app::ComputeActionButtonRects;
+    using idleharbor::app::PhysicalPixels;
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int width = PhysicalPixels(320, dpi);
+        const int height = PhysicalPixels(320, dpi);
+        const auto buttons = ComputeActionButtonRects(width, height, dpi);
+        CHECK(buttons.start.right <= buttons.stop.left);
+        CHECK(buttons.start.bottom <= buttons.save.top);
+        CHECK(buttons.stop.bottom <= buttons.save.top);
+        CHECK(buttons.save.bottom <= height);
+    }
 }
 
 void test_fractional_dpi_layout_uses_true_logical_widths() {
@@ -236,6 +251,8 @@ void test_stacked_stop_stays_inside_short_clients() {
             CHECK(buttons.stop.left >= 0 && buttons.stop.right <= width);
             CHECK(buttons.start.top >= 0 && buttons.start.bottom <= height);
             CHECK(buttons.stop.top >= 0 && buttons.stop.bottom <= height);
+            CHECK(buttons.save.left >= 0 && buttons.save.right <= width);
+            CHECK(buttons.save.top >= 0 && buttons.save.bottom <= height);
             CHECK(buttons.stop.bottom >= buttons.start.bottom);
         }
     }
@@ -268,9 +285,10 @@ int main() {
     test_wheel_delta_preserves_direction_and_remainder();
     test_fixed_safety_regions_never_scroll_with_the_body();
     test_focus_reveal_is_gated_by_actual_focus_change();
-    test_tab_order_puts_body_save_before_fixed_actions();
+    test_tab_order_keeps_fixed_actions_after_the_settings_body();
     test_layout_change_reveals_only_when_focused_control_is_clipped();
     test_narrow_work_areas_reflow_settings_and_actions();
+    test_wrapped_footer_actions_do_not_overlap();
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_settings_layout_uses_the_viewport_client_width();
     test_scrollbar_boundary_reflows_and_keeps_bottom_reachable();
