@@ -38,7 +38,7 @@ int main() {
     Expect(upstream.options.motion_mode == L"diagonal", "Normal aliases diagonal");
     Expect(upstream.options.randomize == true, "-r randomizes");
     Expect(upstream.options.interval == 60s, "-s parses seconds");
-    Expect(upstream.options.distance == std::uint32_t{2}, "-d parses distance");
+    Expect(upstream.options.distance == std::uint32_t{2}, "-d parses distance multiplier");
 
     const auto comprehensive = Parse(
         {L"--start",
@@ -87,7 +87,9 @@ int main() {
     Expect(!Parse({L"--power", L"away"}).ok(), "unsupported away mode fails");
     Expect(!Parse({L"--interval", L"0"}).ok(), "zero interval fails");
     Expect(!Parse({L"--interval", L"25h"}).ok(), "oversized interval fails");
-    Expect(!Parse({L"--distance", L"121"}).ok(), "oversized distance fails");
+    Expect(Parse({L"--distance", L"1"}).ok(), "minimum distance multiplier is accepted");
+    Expect(Parse({L"--distance", L"120"}).ok(), "maximum distance multiplier is accepted");
+    Expect(!Parse({L"--distance", L"121"}).ok(), "oversized distance multiplier fails");
     Expect(!Parse({L"--battery-threshold", L"101"}).ok(), "oversized threshold fails");
     Expect(!Parse({L"--stop-after", L"169h"}).ok(), "oversized stop duration fails");
     Expect(!Parse({L"--config"}).ok(), "missing value fails");

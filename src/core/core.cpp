@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <limits>
 #include <utility>
 
@@ -53,7 +52,7 @@ ValidationResult validate(const Settings& settings) {
         add_error(result, "random minimum must be between 1 second and the interval");
     }
     if (settings.distance < Settings::kMinimumDistance || settings.distance > Settings::kMaximumDistance) {
-        add_error(result, "distance must be between 1 and 120");
+        add_error(result, "distance multiplier must be between 1 and 120");
     }
     if (settings.user_activity_cooldown < Settings::kMinimumInterval ||
         settings.user_activity_cooldown > Settings::kMaximumInterval) {
@@ -240,21 +239,22 @@ MotionPlan make_motion_plan(MotionMode mode, std::uint32_t distance) {
     const auto d = static_cast<int>(bounded_distance);
     MotionPlan plan{mode, bounded_distance, {}};
 
+    // These are cumulative safe-anchor points translated from the official Mouse Jiggler
+    // JigglePatterns.cs deltas: https://github.com/arkane-systems/mousejiggler/blob/master/MouseJiggler/JigglePatterns.cs
     switch (mode) {
     case MotionMode::Off:
         plan.relative_offsets = {};
         break;
     case MotionMode::Normal:
-        plan.relative_offsets = {{d, d}, {-d, -d}, {0, 0}};
+        plan.relative_offsets = {{4 * d, 4 * d}, {0, 0}};
         break;
     case MotionMode::Linear:
-        plan.relative_offsets = {{d, 0}, {-d, 0}, {0, 0}};
+        plan.relative_offsets = {{4 * d, 0}, {0, 0}};
         break;
     case MotionMode::Circle: {
-        const auto diagonal = static_cast<int>(std::lround(static_cast<double>(d) * 0.70710678118));
         plan.relative_offsets = {
-            {d, 0}, {diagonal, diagonal}, {0, d}, {-diagonal, diagonal},
-            {-d, 0}, {-diagonal, -diagonal}, {0, -d}, {diagonal, -diagonal}, {0, 0},
+            {3 * d, 2 * d}, {5 * d, 5 * d}, {3 * d, 8 * d}, {0, 10 * d},
+            {-3 * d, 8 * d}, {-5 * d, 5 * d}, {-3 * d, 2 * d}, {0, 0},
         };
         break;
     }

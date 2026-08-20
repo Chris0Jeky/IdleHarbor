@@ -1065,7 +1065,7 @@ class Application final {
 
         add_label(L"Pulse interval (seconds)", 158);
         add_edit(interval_, 158, kInterval);
-        add_label(L"Motion distance (1-120)", 192);
+        add_label(L"Motion multiplier (1-120)", 192);
         add_edit(distance_, 192, kDistance);
         add_check(randomize_, L"Randomize pulse interval", 224, kRandomize);
         add_label(L"Pause after genuine input (seconds; 0 disables)", 258);
@@ -1305,7 +1305,7 @@ class Application final {
             session.random_minimum = Seconds{1};
         }
         if (!read_number(distance_, 120, value) || value == 0) {
-            error = L"Motion distance must be between 1 and 120.";
+            error = L"Motion multiplier must be between 1 and 120.";
             return false;
         }
         session.distance = static_cast<std::uint32_t>(value);
