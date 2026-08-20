@@ -89,11 +89,14 @@ stops the timer and hooks, and clears the power request.
 The top-level window scales canonical control geometry for its current monitor, clamps its preferred
 rectangle to the monitor work area, and keeps a fixed status/safety header and Start/Stop action bar
 outside a clipped settings viewport. When the body is taller than the available client area, that
-viewport exposes a native vertical scrollbar. Narrow work areas reflow paired labels and fields into
-one column and wrap or stack the action bar. Child controls forward wheel input to the viewport
-unless a combo list is open; partial wheel deltas are retained and Windows' configured wheel-scroll
-amount is respected. Dialog keyboard navigation reveals a newly focused body control, while pointer
-and scrollbar scrolling with unchanged focus remains stable.
+viewport owns the native vertical scrollbar, so its track does not imply that the fixed header or
+footer scrolls. Narrow work areas reflow paired labels and fields into one column and adapt the body
+inset to the available width, while the action bar wraps or stacks. Child controls forward wheel input
+to the viewport unless a combo list is open; partial wheel deltas are retained and Windows' configured
+wheel-scroll amount is respected. Explicit dialog keyboard navigation sorts focus stops by their
+visual layout, with Save before the fixed Start/Stop actions. It reveals a newly focused body control,
+and also re-reveals the still-focused body control after resize/DPI layout changes; pointer and
+scrollbar scrolling with unchanged focus remains stable.
 
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.

@@ -21,17 +21,21 @@ shown so a user can understand why a pulse is not being emitted.
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
 area. The live Running/Paused/Stopped status and immediate Start/Stop actions remain in fixed safety
-regions while the settings body uses a native vertical scrollbar. On narrow or highly scaled work
-areas, settings reflow into a single column and the action row wraps or stacks so every control stays
-visible and keyboard reachable.
+regions while the settings body uses a native vertical scrollbar whose track is confined to that
+body. On narrow or highly scaled work areas, settings reflow into a single column and the action row
+wraps or stacks so every control stays visible and keyboard reachable, including unusually tiny work
+areas.
 
 - Turn the mouse wheel over the window or any closed control to move the settings viewport.
 - An open profile, motion, or power list keeps native wheel handling so its choices can be browsed.
 - Precision touchpads and high-resolution wheels retain partial input until a complete wheel step is
   reached; IdleHarbor also follows the Windows wheel-lines/page setting.
-- Use **Tab** and **Shift+Tab** to traverse controls. The body viewport automatically reveals the
-  focused setting when focus changes; scrolling with the pointer or scrollbar does not snap back.
-  Start and Stop remain visible in the fixed safety region, while Save stays in the scrollable body.
+- Use **Tab** and **Shift+Tab** to traverse controls in visual top-to-bottom order. Save is reached
+  before the fixed Start and Stop actions. The body viewport automatically reveals the focused setting
+  when focus changes or a resize/DPI reflow clips the still-focused setting; scrolling with the
+  pointer or scrollbar does not snap back. Start and Stop remain visible in the fixed safety region,
+  while Save stays in the scrollable body. Starting or stopping from the keyboard transfers focus to
+  the newly enabled opposite action, keeping the immediate control path intact.
 
 Moving the window between monitors reapplies the destination DPI and constrains the suggested size
 to that monitor's usable work area.
@@ -50,6 +54,10 @@ an execution-state request. They are independent:
 
 An application may implement idle detection differently. Zen is not guaranteed to work everywhere,
 and visible movement is not evidence of human presence.
+
+For visible modes, the `--distance` setting is a multiplier from **1** to **120**, not a raw pixel
+radius. IdleHarbor follows the canonical Mouse Jiggler pattern deltas and translates them into
+cumulative safe-anchor points that finish at the captured pointer position.
 
 ## Profiles
 
@@ -105,7 +113,7 @@ status in visible dialogs rather than a console stream.
 `battery-saver`, or `custom`. `--motion`/`--mode` accepts `off`, `zen`, `diagonal`, `linear`, or
 `circle`; `--power` accepts `none`, `system`, or `display`.
 
-`--interval`, `--distance`, `--random`, `--no-random`, `--pause-on-input`, `--stop-after`,
+`--interval`, `--distance` (the motion multiplier, 1–120), `--random`, `--no-random`, `--pause-on-input`, `--stop-after`,
 `--battery-threshold`, `--pause-on-fullscreen`, and `--no-pause-on-fullscreen` control session
 behavior. `--minimized` starts hidden in the notification area. `--close-to-tray` and
 `--no-close-to-tray` control close behavior. `--portable` and `--config PATH` choose storage at
@@ -135,7 +143,7 @@ active_hours_end_minute=1080
 ```
 
 Other persisted keys include `profile`, `motion`, `power`, `interval_seconds`,
-`random_minimum_seconds`, `distance`, `randomize`, `pause_on_user_activity`,
+`random_minimum_seconds`, `distance` (the motion multiplier, 1–120), `randomize`, `pause_on_user_activity`,
 `user_activity_cooldown_seconds`, `pause_when_locked`, `pause_when_disconnected`, `pause_on_battery`,
 `pause_on_low_battery`, `low_battery_threshold`, `pause_when_fullscreen`, `max_duration_seconds`,
 `start_minimized`, `close_to_tray`, `show_notifications`, and `emergency_hotkey`.
