@@ -18,6 +18,15 @@ The tag-triggered release workflow is prepared to produce:
 The workflow builds Win32 in CI for coverage, but the current release matrix publishes x64 and
 ARM64 archives. Do not use a download URL until a tagged release exists.
 
+### Trust-file asset contract
+
+The portable archive owns the executable, installer helpers, package documentation, manifest, and
+the `LICENSE` file once the release licence is approved. `SHA256SUMS.txt` and the versioned,
+per-architecture SPDX JSON files are release-directory siblings generated outside the archive;
+the installer does not copy them into the installed directory. Verify those sibling assets before
+extracting or installing. The publication workflow refuses to publish while the root `LICENSE`
+file is not tracked.
+
 ## Portable use
 
 Extract the architecture-matched archive and run `IdleHarbor.exe`. Portable use does not create a
@@ -48,7 +57,10 @@ startup choices are:
 
 Each startup choice runs `--start --minimized`. The installer removes only entries that point to the
 same executable and refuses to overwrite a non-owned destination. It writes an ownership marker and
-can be run repeatedly.
+can be run repeatedly from Windows PowerShell 5.1 or PowerShell 7. Install and update operations
+snapshot managed files and owned startup state, then restore them after a caught failure. Managed
+paths that are symbolic links, junctions, or multiply linked files are rejected so an update cannot
+write through the installation boundary. Unexpected user files are preserved.
 
 Uninstall with:
 
@@ -57,7 +69,9 @@ Uninstall with:
 ```
 
 Settings are preserved by default. Add `-PurgeData` only when deleting local settings is intentional.
-The uninstaller refuses to remove an unverified directory and preserves unexpected files.
+The uninstaller refuses to remove an unverified directory and preserves unexpected files. When the
+installer created the Task Scheduler folder, rollback and uninstall also remove that folder after
+proving it is empty; a pre-existing or non-empty folder is preserved.
 
 ## Verification and trust
 

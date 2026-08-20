@@ -84,6 +84,47 @@ function Get-StartupLinkPath() {
     return Join-Path ([Environment]::GetFolderPath('Startup')) 'IdleHarbor.lnk'
 }
 
+function Test-TaskFolderExists {
+    $service = New-Object -ComObject 'Schedule.Service'
+    $service.Connect()
+    try {
+        $null = $service.GetFolder($TaskPath.TrimEnd('\'))
+        return $true
+    }
+    catch {
+        if ($_.Exception.HResult -eq -2147024894) { return $false }
+        throw
+    }
+}
+
+function Remove-EmptyOwnedTaskFolder {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory)]
+        [bool]$Owned
+    )
+
+    if (-not $Owned) { return $false }
+    $service = New-Object -ComObject 'Schedule.Service'
+    $service.Connect()
+    try {
+        $folder = $service.GetFolder($TaskPath.TrimEnd('\'))
+    }
+    catch {
+        if ($_.Exception.HResult -eq -2147024894) { return $true }
+        throw
+    }
+
+    if ($folder.GetTasks(0).Count -ne 0 -or $folder.GetFolders(0).Count -ne 0) {
+        return $false
+    }
+    if ($PSCmdlet.ShouldProcess("scheduled task folder $TaskPath", 'Remove empty installer-owned folder')) {
+        $service.GetFolder('\').DeleteFolder($TaskPath.Trim('\'), 0)
+        return $true
+    }
+    return $false
+}
+
 function Get-RunCommand() {
     $property = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $RunValueName -ErrorAction SilentlyContinue
     if ($null -eq $property) { return $null }
@@ -178,6 +219,10 @@ $marker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
 if ($marker.product -ne $ProductName -or -not (Test-SamePath $marker.installRoot $safeRoot)) {
     throw "Ownership marker does not belong to ${ProductName}: $markerPath"
 }
+$taskFolderOwned = (
+    @($marker.PSObject.Properties.Name) -contains 'taskFolderOwned' -and
+    $marker.taskFolderOwned -eq $true
+)
 
 $executable = Get-FullPath ([string]$marker.executable)
 if (-not (Test-SamePath (Split-Path -Parent $executable) $safeRoot)) {
@@ -186,6 +231,12 @@ if (-not (Test-SamePath (Split-Path -Parent $executable) $safeRoot)) {
 
 Stop-OwnedApplicationIfRunning $executable
 Remove-OwnedStartup $executable
+if ($taskFolderOwned) {
+    $folderRemoved = Remove-EmptyOwnedTaskFolder -Owned $true
+    if (-not $WhatIfPreference -and -not $folderRemoved -and (Test-TaskFolderExists)) {
+        Write-Warning "Preserved non-empty Task Scheduler folder: $TaskPath"
+    }
+}
 
 foreach ($file in @($marker.managedFiles)) {
     $candidate = Join-Path $safeRoot ([string]$file)

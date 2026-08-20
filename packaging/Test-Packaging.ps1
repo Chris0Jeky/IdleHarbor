@@ -108,6 +108,9 @@ foreach ($workflow in Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent 
         Assert-True ($line -match '@[0-9a-f]{40}(?:\s|$)') "Workflow action is not pinned in $($workflow.Name): $line"
     }
 }
+$releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) '.github\workflows\release.yml')
+Assert-True ($releaseWorkflow -match 'Test-ReleaseLicense\.ps1') `
+    'Release workflow lacks its tracked-LICENSE publication guard.'
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-packaging-test-$([Guid]::NewGuid().ToString('N'))"
 $sourceRoot = Join-Path $tempRoot 'source'
@@ -130,15 +133,119 @@ try {
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
 
+    $transactionParent = Join-Path $tempRoot 'Transactional'
+    $transactionRoot = Join-Path $transactionParent 'IdleHarbor'
+    New-Item -ItemType Directory -Path $transactionParent -Force | Out-Null
+    $transactionSentinel = Join-Path $transactionParent 'keep.txt'
+    Set-Content -LiteralPath $transactionSentinel -Value 'preserve'
+    $transactionFailed = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') `
+            -SourcePath $buildRoot `
+            -InstallRoot $transactionRoot `
+            -Startup None `
+            -NoLaunch `
+            -InjectFailureAt AfterCopy | Out-Null
+    }
+    catch { $transactionFailed = $true }
+    Assert-True $transactionFailed 'Injected fresh-install failure did not fail.'
+    Assert-True (-not (Test-Path -LiteralPath $transactionRoot)) `
+        'Fresh-install rollback left an owned installation directory behind.'
+    Assert-True ((Get-Content -Raw -LiteralPath $transactionSentinel).Trim() -eq 'preserve') `
+        'Fresh-install rollback crossed its exact ownership boundary.'
+
+    $preexistingTransactionRoot = Join-Path $tempRoot 'PreexistingEmpty\IdleHarbor'
+    New-Item -ItemType Directory -Path $preexistingTransactionRoot -Force | Out-Null
+    $preexistingFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
+    }
+    catch { $preexistingFailure = $true }
+    Assert-True $preexistingFailure 'Injected failure in a pre-existing empty root did not fail.'
+    Assert-True (Test-Path -LiteralPath $preexistingTransactionRoot -PathType Container) `
+        'Rollback removed a pre-existing empty install root.'
+    Assert-True (@(Get-ChildItem -LiteralPath $preexistingTransactionRoot -Force).Count -eq 0) `
+        'Rollback left managed residue in a pre-existing empty install root.'
+
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'
+    $initialMarker = Get-Content -Raw -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json') | ConvertFrom-Json
+    Assert-True (@($initialMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') `
+        'Installer marker does not record Task Scheduler folder ownership.'
+    Assert-True ($initialMarker.taskFolderOwned -eq $false) `
+        'A non-scheduled installation incorrectly claimed Task Scheduler folder ownership.'
+
+    $installedExecutable = Join-Path $installRoot 'IdleHarbor.exe'
+    $installedMarker = Join-Path $installRoot '.idleharbor-managed.json'
+    $originalExecutable = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
+    $originalMarker = Get-Content -Raw -LiteralPath $installedMarker
+    $unexpectedFile = Join-Path $installRoot 'user-note.txt'
+    Set-Content -LiteralPath $unexpectedFile -Value 'preserve'
+    [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x09, 0x08, 0x07, 0x06))
+    Set-Content -LiteralPath (Join-Path $buildRoot 'README.md') -Value 'new managed file'
+
+    $updateFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+    }
+    catch { $updateFailure = $true }
+    Assert-True $updateFailure 'Injected update failure did not fail.'
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -ceq $originalExecutable) `
+        'Failed update did not restore the previous executable.'
+    Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $originalMarker) `
+        'Failed update did not restore the previous ownership marker.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $installRoot 'README.md'))) `
+        'Failed update left a newly introduced managed file.'
+    Assert-True ((Get-Content -Raw -LiteralPath $unexpectedFile).Trim() -ceq 'preserve') `
+        'Failed update changed an unexpected user file.'
+
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
+    Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -cne $originalExecutable) `
+        'Successful update did not install the new executable.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'README.md') -PathType Leaf) `
+        'Successful update did not install the new managed file.'
+    Assert-True ((Get-Content -Raw -LiteralPath $unexpectedFile).Trim() -ceq 'preserve') `
+        'Successful update changed an unexpected user file.'
+
+    $sameDirectoryMarker = Get-Content -Raw -LiteralPath $installedMarker
+    $sameDirectoryFailure = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+    }
+    catch { $sameDirectoryFailure = $true }
+    Assert-True $sameDirectoryFailure 'Injected same-directory marker failure did not fail.'
+    Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $sameDirectoryMarker) `
+        'Same-directory rollback did not restore the ownership marker.'
+
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
+    Remove-Item -LiteralPath $unexpectedFile -Force
     & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
+
+    $hardlinkRoot = Join-Path $tempRoot 'hardlink-boundary\IdleHarbor'
+    $hardlinkSentinel = Join-Path $tempRoot 'hardlink-boundary-sentinel.bin'
+    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+    $hardlinkExecutable = Join-Path $hardlinkRoot 'IdleHarbor.exe'
+    Remove-Item -LiteralPath $hardlinkExecutable -Force
+    [IO.File]::WriteAllBytes($hardlinkSentinel, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
+    New-Item -ItemType HardLink -Path $hardlinkExecutable -Target $hardlinkSentinel | Out-Null
+    $hardlinkRejected = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -NoLaunch | Out-Null
+    }
+    catch { $hardlinkRejected = $_.Exception.Message -like '*hard links*' }
+    Assert-True $hardlinkRejected 'Installer accepted a multiply linked managed destination file.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
+        'Installer overwrote data outside its boundary through a managed hard link.'
+    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $hardlinkRoot | Out-Null
+    Assert-True (-not (Test-Path -LiteralPath $hardlinkRoot)) `
+        'Uninstaller did not remove the in-root hard link without touching its external peer.'
+    Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
+        'Uninstaller changed the external peer of an in-root hard link.'
 
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -NoLaunch | Out-Null
     $savedAppData = $env:APPDATA
@@ -188,12 +295,19 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead([string]$archive)
     try {
-        $entryNames = @($zip.Entries | ForEach-Object FullName)
+        $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
-        $manifestEntry = $zip.GetEntry('IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json')
-        Assert-True ($null -ne $manifestEntry) 'Archive lacks its package manifest.'
+        Assert-True ($entryNames -notcontains 'IdleHarbor-0.1.0-test-windows-x64-portable/SHA256SUMS.txt') `
+            'Archive unexpectedly owns the release-directory checksum manifest.'
+        Assert-True (@($entryNames | Where-Object { $_ -match '\.spdx\.json$' }).Count -eq 0) `
+            'Archive unexpectedly owns a release-directory SPDX asset.'
+        $manifestEntries = @($zip.Entries | Where-Object {
+            $_.FullName.Replace('\', '/') -ceq 'IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json'
+        })
+        Assert-True ($manifestEntries.Count -eq 1) 'Archive must contain exactly one package manifest.'
+        $manifestEntry = $manifestEntries[0]
         $reader = New-Object IO.StreamReader($manifestEntry.Open())
         try { $packageManifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
         $manifestProperties = @($packageManifest.PSObject.Properties.Name)
@@ -235,9 +349,55 @@ try {
     catch { $versionMismatchRejected = $true }
     Assert-True $versionMismatchRejected 'Release version validator accepted a mismatched tag.'
 
+    foreach ($unsupportedTag in @('v0.1.0-rc.1', 'v0.1.0+build.1')) {
+        $unsupportedTagRejected = $false
+        try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag $unsupportedTag | Out-Null }
+        catch { $unsupportedTagRejected = $true }
+        Assert-True $unsupportedTagRejected "Release version validator accepted unsupported tag $unsupportedTag."
+    }
+
+    $versionFixture = Join-Path $tempRoot 'version-fixture'
+    New-Item -ItemType Directory -Path (Join-Path $versionFixture 'include\idleharbor'), (Join-Path $versionFixture 'resources') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'CMakeLists.txt') -Destination $versionFixture
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'include\idleharbor\version.hpp') -Destination (Join-Path $versionFixture 'include\idleharbor')
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\IdleHarbor.rc') -Destination (Join-Path $versionFixture 'resources')
+    $fixtureManifest = Join-Path $versionFixture 'resources\app.manifest'
+    (Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\app.manifest')) -replace 'version="0\.1\.0\.0"', 'version="9.9.9.9"' |
+        Set-Content -LiteralPath $fixtureManifest -Encoding UTF8
+    $manifestMismatchRejected = $false
+    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.0' -SourceRoot $versionFixture | Out-Null }
+    catch { $manifestMismatchRejected = $true }
+    Assert-True $manifestMismatchRejected 'Release version validator accepted a mismatched app.manifest version.'
+
+    $licenseScript = Join-Path $packagingRoot 'Test-ReleaseLicense.ps1'
+    $licenseFixture = Join-Path $tempRoot 'license-fixture'
+    $missingLicenseFixture = Join-Path $tempRoot 'missing-license-fixture'
+    foreach ($fixture in @($licenseFixture, $missingLicenseFixture)) {
+        New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+        & git -C $fixture init --quiet 2>$null | Out-Null
+    }
+    Set-Content -LiteralPath (Join-Path $licenseFixture 'LICENSE') -Value 'fixture licence'
+    & git -C $licenseFixture add -- LICENSE | Out-Null
+    & $licenseScript -RepositoryRoot $licenseFixture | Out-Null
+    $missingLicenseRejected = $false
+    try { & $licenseScript -RepositoryRoot $missingLicenseFixture | Out-Null }
+    catch { $missingLicenseRejected = $true }
+    Assert-True $missingLicenseRejected 'Release licence guard accepted a repository without a tracked LICENSE.'
+
     $checksums = Join-Path $outputRoot 'SHA256SUMS.txt'
     & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $outputRoot -OutputPath $checksums | Out-Null
     Assert-True ((Get-Content -LiteralPath $checksums).Count -ge 2) 'Checksum manifest did not include release files.'
+
+    $checksumFixture = Join-Path $tempRoot 'checksum-fixture'
+    $nestedChecksumDirectory = Join-Path $checksumFixture 'nested folder'
+    New-Item -ItemType Directory -Path $nestedChecksumDirectory -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $nestedChecksumDirectory 'payload.bin') -Value 'payload' -Encoding ASCII
+    $fixtureChecksums = Join-Path $checksumFixture 'SHA256SUMS.txt'
+    & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $checksumFixture -OutputPath $fixtureChecksums | Out-Null
+    $fixtureLines = @(Get-Content -LiteralPath $fixtureChecksums)
+    Assert-True ($fixtureLines.Count -eq 1) 'Checksum fixture did not emit exactly one payload entry.'
+    Assert-True ($fixtureLines[0] -match '^[0-9a-f]{64} \*nested folder/payload\.bin$') `
+        'Checksum fixture did not emit a normalized root-relative path.'
     Write-Output 'Packaging checks passed.'
 }
 finally {

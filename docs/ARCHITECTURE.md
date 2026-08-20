@@ -92,7 +92,7 @@ of the design.
 
 CI builds x64, ARM64, and Win32 on Windows; runs tests for x64/Win32; validates PowerShell packaging
 scripts; and uses pinned GitHub Actions. CodeQL performs a manual C/C++ build on pull requests,
-main, and a weekly schedule. SemVer tags trigger x64/ARM64 portable packaging, SPDX SBOM creation,
+main, and a weekly schedule. Stable SemVer tags trigger x64/ARM64 portable packaging, SPDX SBOM creation,
 checksum generation, GitHub artifact attestations, and release publication.
 
 The workflow is configured, not evidence that a release has already been published. Authenticode
