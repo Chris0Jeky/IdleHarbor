@@ -272,19 +272,19 @@ function Invoke-ViewportWheelChurn(
     Start-Sleep -Milliseconds 250
 }
 
-function Save-ViewportCapture([IntPtr]$Viewport, [string]$Path) {
+function Save-ClientCapture([IntPtr]$Window, [string]$Path, [string]$Description) {
     $client = New-Object IdleHarbor.NativeViewportRepaint+RECT
-    if (-not [IdleHarbor.NativeViewportRepaint]::GetClientRect($Viewport, [ref]$client)) {
-        throw 'GetClientRect failed for the settings viewport.'
+    if (-not [IdleHarbor.NativeViewportRepaint]::GetClientRect($Window, [ref]$client)) {
+        throw "GetClientRect failed for $Description."
     }
     $origin = New-Object IdleHarbor.NativeViewportRepaint+POINT
-    if (-not [IdleHarbor.NativeViewportRepaint]::ClientToScreen($Viewport, [ref]$origin)) {
-        throw 'ClientToScreen failed for the settings viewport.'
+    if (-not [IdleHarbor.NativeViewportRepaint]::ClientToScreen($Window, [ref]$origin)) {
+        throw "ClientToScreen failed for $Description."
     }
     $width = $client.Right - $client.Left
     $height = $client.Bottom - $client.Top
     if ($width -le 0 -or $height -le 0) {
-        throw "The settings viewport has invalid dimensions: ${width}x${height}."
+        throw "$Description has invalid dimensions: ${width}x${height}."
     }
 
     $bitmap = New-Object Drawing.Bitmap($width, $height)
@@ -301,6 +301,10 @@ function Save-ViewportCapture([IntPtr]$Viewport, [string]$Path) {
     finally {
         $bitmap.Dispose()
     }
+}
+
+function Save-ViewportCapture([IntPtr]$Viewport, [string]$Path) {
+    Save-ClientCapture $Viewport $Path 'the settings viewport'
 }
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-native-repaint-$([Guid]::NewGuid().ToString('N'))"
@@ -344,6 +348,23 @@ try {
     }
     [IdleHarbor.NativeViewportRepaint]::ActivateWindow($window)
     Start-Sleep -Milliseconds 300
+
+    $windowNaturalPath = Join-Path $captureRoot 'window-after-resize-natural.png'
+    Save-ClientCapture $window $windowNaturalPath 'the main window'
+    if (-not [IdleHarbor.NativeViewportRepaint]::RedrawWindow(
+            $window,
+            [IntPtr]::Zero,
+            [IntPtr]::Zero,
+            0x0185)) {
+        throw 'Could not establish the whole-window repaint reference.'
+    }
+    $windowReferencePath = Join-Path $captureRoot 'window-after-resize-reference.png'
+    Save-ClientCapture $window $windowReferencePath 'the main window'
+    $windowNaturalHash = (Get-FileHash -LiteralPath $windowNaturalPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $windowReferenceHash = (Get-FileHash -LiteralPath $windowReferencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($windowNaturalHash -cne $windowReferenceHash) {
+        throw "Post-resize window repaint differs from the explicit reference: $windowNaturalHash versus $windowReferenceHash."
+    }
 
     $viewport = [IdleHarbor.NativeViewportRepaint]::FindSettingsViewport($window)
     if ($viewport -eq [IntPtr]::Zero) {

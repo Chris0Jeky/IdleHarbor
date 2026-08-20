@@ -31,13 +31,13 @@ settings-body artifact: disabled controls can leave stale fragments after viewpo
 resizing temporarily clears the display. The cause seam is the manually moved child controls inside
 a nested `WS_CLIPCHILDREN` viewport without a final explicit descendant repaint.
 
-The merged fix repaints the settings viewport and all descendants after final layout convergence,
-scroll-position changes, and Running/Stopped enabled-state changes. The native interactive smoke
-starts a safe motion-free session, proves that body controls are disabled, drives real wheel input,
-and compares natural frames with explicit descendant-repaint references at this desktop's 192 DPI.
-The smoke passes on the fixed x64 Release build. The supplied screenshot remains the reliable
-pre-fix reproduction: repeated automation against the old binary did not reproduce the intermittent
-artifact deterministically, so a red-old/green-new image comparison is not claimed.
+The fix repaints the settings viewport and all descendants after scrolling and state changes, then
+repaints the parent plus descendants after layout convergence so newly exposed footer pixels cannot
+retain clipped body controls. The native interactive smoke starts a safe motion-free session, proves
+that body controls are disabled, drives real wheel input, and compares both the whole client and the
+scrolled viewport with explicit repaint references at this desktop's 192 DPI. Natural and reference
+captures are pixel-identical on the fixed x64 Release build. The supplied screenshot remains the
+reliable pre-fix reproduction.
 
 ## Current release-preparation follow-up
 

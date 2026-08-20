@@ -809,6 +809,21 @@ class Application final {
             RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
     }
 
+    void RepaintWindowAndChildren() const noexcept {
+        if (window_ == nullptr) {
+            return;
+        }
+        // Resizing the settings viewport exposes parent-client pixels around
+        // it, especially the fixed action footer. Repaint that parent surface
+        // as well as every child so body fragments cannot remain outside the
+        // viewport's new clipped bounds.
+        RedrawWindow(
+            window_,
+            nullptr,
+            nullptr,
+            RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+    }
+
     void UpdateViewport() {
         if (updating_viewport_) {
             return;
@@ -867,7 +882,7 @@ class Application final {
         publish_scroll_info(true);
         LayoutControls();
         updating_viewport_ = false;
-        RepaintSettingsViewport();
+        RepaintWindowAndChildren();
     }
 
     void ScrollTo(const int position) {

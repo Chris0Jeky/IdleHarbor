@@ -86,6 +86,8 @@ where practical.
   5.1 and PowerShell 7 packaging runs do not depend on command auto-loading.
 - Repaint the settings viewport and all descendant controls after scrolling, layout convergence,
   and Running/Stopped enabled-state changes so stale control fragments do not survive until resize.
+- Clear newly exposed parent and footer pixels after viewport resize so clipped settings never
+  obscure the fixed Save/Start/Stop actions.
 - Mark profile defaults and recovered settings as unsaved until explicitly saved, expose that state
   to accessibility APIs, and keep all three footer actions separated at narrow high-DPI sizes.
 
