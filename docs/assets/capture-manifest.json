@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "capturedAtUtc": "2026-08-20T21:19:29.0107752Z",
+  "sourceRevision": "f011f7a4fd062cb0c917da957ad31d61d63c53c1",
+  "dpi": 192,
+  "executable": {
+    "file": "IdleHarbor.exe",
+    "sizeBytes": 521728,
+    "sha256": "f39b280be248c84b6e625dcf5995673aee3949aea6a68967274554aabc0b62f2",
+    "authenticodeStatus": "NotSigned"
+  },
+  "captures": [
+    {
+      "file": "idleharbor-window.png",
+      "state": "Stopped settings and fixed actions",
+      "width": 1200,
+      "height": 789,
+      "sha256": "35e23b0bc53fed1799e898936a896e54e903531d5bcafb893f147781ccd15c13"
+    },
+    {
+      "file": "idleharbor-viewport.png",
+      "state": "Stopped settings scrolled to safeguards and notification options",
+      "width": 1200,
+      "height": 789,
+      "sha256": "aec831641cdbccc27a50ebe9e9b03ea0ba5ee59319d3af70aaee8a0452b4d3b0"
+    },
+    {
+      "file": "idleharbor-running.png",
+      "state": "Running motion-free keep-awake session",
+      "width": 1200,
+      "height": 789,
+      "sha256": "f3d57d5ce6a7aaa099d96c5ffe04db5e6a1f9e13e37d7ad97d7bd72e4e256755"
+    },
+    {
+      "file": "idleharbor-paused.png",
+      "state": "Paused outside configured active hours",
+      "width": 1200,
+      "height": 789,
+      "sha256": "ded3866e0417403ccf0357b360a23e4b04ba731ce8b81c5cb41f91c4f8fcfde6"
+    },
+    {
+      "file": "idleharbor-tray-menu.png",
+      "state": "Running notification-area menu",
+      "width": 219,
+      "height": 151,
+      "sha256": "c4932fc4f92a54e71349e3ddaf92fe6a30b47da0f389abae870c857a04730444"
+    }
+  ]
+}
