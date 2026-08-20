@@ -85,6 +85,18 @@ Windows PowerShell 5.1 at 192 DPI, including every real body control staying wit
 client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
 mixed-DPI verification.
 
+The follow-up branch `agent/v0.1.0-scrollbar-release` addresses issue #32 and the late PR #30 review:
+`UpdateViewport` begins each convergence pass from a scrollbar-free candidate, then explicitly
+republishes scrollbar visibility and range from content height versus viewport height. Its bounded
+transaction also ignores re-entrant `WM_SIZE` notifications and preserves the requested scroll
+position until the final stable layout is known, preventing a temporary columns probe from losing
+an in-range near-bottom position. Deterministic layout coverage models the 570-to-700 logical
+boundary across supported DPI values. On this desktop, the normal minimum window size yields a
+587-logical-pixel viewport and the usable work area caps the tall probe at 670 logical pixels; the
+native harness preserved position 24 through a 570-to-580 height-only resize, then cleared the range,
+hid the scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Windows
+PowerShell 5.1. A physical 560-576 logical viewport remains unverified on the attached display.
+
 `HUMAN_TODO.md` remains authoritative:
 
 - q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a
