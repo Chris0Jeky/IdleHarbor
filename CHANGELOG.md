@@ -46,6 +46,8 @@ where practical.
   tracked licence before publication, and document release-directory trust assets.
 - Keep the v0.1.0 publication lane stable-only by rejecting prerelease and build-metadata tags
   consistently in both workflow and source-version validation.
+- Pass the triggering release tag through step-local environment data so PowerShell packaging and
+  GitHub release publication do not interpolate the tag directly into run scripts.
 - Restore managed files, marker bytes, and owned startup state after failed updates; preserve
   pre-existing scheduler folders; and clean up installer-created empty task folders.
 - Reject linked managed files before an update can write outside its ownership boundary, and make

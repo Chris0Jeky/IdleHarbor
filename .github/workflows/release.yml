@@ -31,10 +31,12 @@ jobs:
       - name: Resolve version
         id: version
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $version = '${{ github.ref_name }}' -replace '^v', ''
+          $version = $env:RELEASE_TAG -replace '^v', ''
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Tag is not a supported stable release version: $version" }
-          .\packaging\Test-ReleaseVersion.ps1 -Tag '${{ github.ref_name }}'
+          .\packaging\Test-ReleaseVersion.ps1 -Tag $env:RELEASE_TAG
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Configure
@@ -118,6 +120,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           $assets = @(Get-ChildItem -LiteralPath dist -File | ForEach-Object FullName)
-          gh release create '${{ github.ref_name }}' --verify-tag --generate-notes $assets
+          gh release create $env:RELEASE_TAG --verify-tag --generate-notes $assets

@@ -111,6 +111,7 @@ foreach ($workflow in Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent 
 $releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) '.github\workflows\release.yml')
 Assert-True ($releaseWorkflow -match 'Test-ReleaseLicense\.ps1') `
     'Release workflow lacks its tracked-LICENSE publication guard.'
+& (Join-Path $packagingRoot 'Test-ReleaseWorkflow.ps1')
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-packaging-test-$([Guid]::NewGuid().ToString('N'))"
 $sourceRoot = Join-Path $tempRoot 'source'

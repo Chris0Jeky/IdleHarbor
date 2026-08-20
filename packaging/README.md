@@ -16,7 +16,9 @@ The tag-triggered release workflow is prepared to produce:
 - a package manifest containing version, architecture, package type, and source revision.
 
 The workflow builds Win32 in CI for coverage, but the current release matrix publishes x64 and
-ARM64 archives. Do not use a download URL until a tagged release exists.
+ARM64 archives. It accepts only stable `v<major>.<minor>.<patch>` tags, passes the triggering tag
+through step-local environment data, and validates the same tag before packaging or publication.
+Do not use a download URL until a tagged release exists.
 
 ### Trust-file asset contract
 
