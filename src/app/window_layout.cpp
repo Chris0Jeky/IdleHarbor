@@ -4,6 +4,12 @@
 
 namespace idleharbor::app {
 
+namespace {
+
+constexpr int kWheelDeltaPerStep = 120;
+
+}  // namespace
+
 PixelRect ClampWindowRect(PixelRect desired, const PixelRect work_area, const int margin) noexcept {
     const int work_width = std::max(work_area.right - work_area.left, 1);
     const int work_height = std::max(work_area.bottom - work_area.top, 1);
@@ -48,6 +54,11 @@ int ScrollPositionToReveal(
         target = control_bottom - viewport_height;
     }
     return ClampScrollPosition(target, content_height, viewport_height);
+}
+
+WheelDeltaResult ConsumeWheelDelta(const int remainder, const int delta) noexcept {
+    const int total = remainder + delta;
+    return {total / kWheelDeltaPerStep, total % kWheelDeltaPerStep};
 }
 
 }  // namespace idleharbor::app

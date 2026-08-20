@@ -49,6 +49,32 @@ void test_focus_reveal_scrolls_only_when_needed() {
     CHECK(ScrollPositionToReveal(300, 1300, 1340, 1330, 500) == 830);
 }
 
+void test_wheel_delta_accumulates_high_resolution_input() {
+    using idleharbor::app::ConsumeWheelDelta;
+    auto result = ConsumeWheelDelta(0, 40);
+    CHECK(result.steps == 0);
+    CHECK(result.remainder == 40);
+    result = ConsumeWheelDelta(result.remainder, 40);
+    CHECK(result.steps == 0);
+    CHECK(result.remainder == 80);
+    result = ConsumeWheelDelta(result.remainder, 40);
+    CHECK(result.steps == 1);
+    CHECK(result.remainder == 0);
+}
+
+void test_wheel_delta_preserves_direction_and_remainder() {
+    using idleharbor::app::ConsumeWheelDelta;
+    auto result = ConsumeWheelDelta(0, -200);
+    CHECK(result.steps == -1);
+    CHECK(result.remainder == -80);
+    result = ConsumeWheelDelta(result.remainder, 40);
+    CHECK(result.steps == 0);
+    CHECK(result.remainder == -40);
+    result = ConsumeWheelDelta(result.remainder, 160);
+    CHECK(result.steps == 1);
+    CHECK(result.remainder == 0);
+}
+
 }  // namespace
 
 int main() {
@@ -56,5 +82,7 @@ int main() {
     test_oversized_window_uses_available_work_area();
     test_scroll_range_and_clamping();
     test_focus_reveal_scrolls_only_when_needed();
+    test_wheel_delta_accumulates_high_resolution_input();
+    test_wheel_delta_preserves_direction_and_remainder();
     return failures == 0 ? 0 : 1;
 }

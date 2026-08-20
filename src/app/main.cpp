@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <commctrl.h>
 #include <shellapi.h>
 #include <wtsapi32.h>
 
@@ -58,6 +59,7 @@ constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
 constexpr UINT kDeferredCommandMessage = WM_APP + 3;
 constexpr UINT kTimerId = 1;
+constexpr UINT_PTR kChildSubclassId = 1;
 constexpr int kEmergencyHotkeyId = 1;
 constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
 constexpr std::size_t kMaximumDeferredCommands = 32;
@@ -423,6 +425,26 @@ class Application final {
         return DefWindowProcW(window, message, w_param, l_param);
     }
 
+    static LRESULT CALLBACK ChildWindowProc(
+        const HWND window,
+        const UINT message,
+        const WPARAM w_param,
+        const LPARAM l_param,
+        const UINT_PTR subclass_id,
+        const DWORD_PTR reference_data) noexcept {
+        auto* application = reinterpret_cast<Application*>(reference_data);
+        if (message == WM_NCDESTROY) {
+            RemoveWindowSubclass(window, ChildWindowProc, subclass_id);
+        } else if (message == WM_MOUSEWHEEL && application != nullptr) {
+            if (application->IsDroppedComboBox(window)) {
+                return DefSubclassProc(window, message, w_param, l_param);
+            }
+            application->HandleMouseWheel(w_param);
+            return 0;
+        }
+        return DefSubclassProc(window, message, w_param, l_param);
+    }
+
   private:
     enum class ChildWidthMode {
         Fixed,
@@ -514,6 +536,7 @@ class Application final {
         const int focus_height,
         const ChildWidthMode width_mode = ChildWidthMode::Fixed) {
         child_layouts_.push_back({window, x, y, width, height, focus_height, width_mode});
+        SetWindowSubclass(window, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
     }
 
     [[nodiscard]] int ContentHeight() const noexcept { return Scale(kBaseContentHeight); }
@@ -619,10 +642,33 @@ class Application final {
     }
 
     void HandleMouseWheel(const WPARAM w_param) {
-        const int wheel_delta = GET_WHEEL_DELTA_WPARAM(w_param);
-        const int lines = std::max(std::abs(wheel_delta) / WHEEL_DELTA, 1) * 3;
-        const int distance = Scale(kBaseScrollLine) * lines;
-        ScrollTo(scroll_position_ + (wheel_delta > 0 ? -distance : distance));
+        const auto wheel = idleharbor::app::ConsumeWheelDelta(
+            wheel_delta_remainder_,
+            GET_WHEEL_DELTA_WPARAM(w_param));
+        wheel_delta_remainder_ = wheel.remainder;
+        if (wheel.steps == 0) {
+            return;
+        }
+
+        UINT scroll_lines = 3;
+        if (SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &scroll_lines, 0) == FALSE) {
+            scroll_lines = 3;
+        }
+        if (scroll_lines == 0) {
+            return;
+        }
+        const long long distance_per_step = scroll_lines == WHEEL_PAGESCROLL
+                                                ? ViewportHeight()
+                                                : static_cast<long long>(Scale(kBaseScrollLine)) * scroll_lines;
+        const long long maximum = idleharbor::app::MaximumScrollPosition(ContentHeight(), ViewportHeight());
+        const long long requested = static_cast<long long>(scroll_position_) -
+                                    static_cast<long long>(wheel.steps) * distance_per_step;
+        ScrollTo(static_cast<int>(std::clamp(requested, 0LL, maximum)));
+    }
+
+    [[nodiscard]] bool IsDroppedComboBox(const HWND window) const noexcept {
+        const bool is_combo = window == profile_ || window == motion_ || window == power_;
+        return is_combo && SendMessageW(window, CB_GETDROPPEDSTATE, 0, 0) != FALSE;
     }
 
     void EnsureFocusedControlVisible() {
@@ -1658,6 +1704,7 @@ class Application final {
     bool disconnected_ = false;
     bool exiting_ = false;
     int scroll_position_ = 0;
+    int wheel_delta_remainder_ = 0;
     std::uint64_t next_pulse_tick_ = 0;
     ULONGLONG next_input_hook_refresh_tick_ = 0;
     std::wstring status_text_ = L"Stopped: ready";
