@@ -130,6 +130,27 @@ try {
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
 
+    $transactionParent = Join-Path $tempRoot 'Transactional'
+    $transactionRoot = Join-Path $transactionParent 'IdleHarbor'
+    New-Item -ItemType Directory -Path $transactionParent -Force | Out-Null
+    $transactionSentinel = Join-Path $transactionParent 'keep.txt'
+    Set-Content -LiteralPath $transactionSentinel -Value 'preserve'
+    $transactionFailed = $false
+    try {
+        & (Join-Path $packagingRoot 'install.ps1') `
+            -SourcePath $buildRoot `
+            -InstallRoot $transactionRoot `
+            -Startup None `
+            -NoLaunch `
+            -InjectFailureAt AfterCopy | Out-Null
+    }
+    catch { $transactionFailed = $true }
+    Assert-True $transactionFailed 'Injected fresh-install failure did not fail.'
+    Assert-True (-not (Test-Path -LiteralPath $transactionRoot)) `
+        'Fresh-install rollback left an owned installation directory behind.'
+    Assert-True ((Get-Content -Raw -LiteralPath $transactionSentinel).Trim() -eq 'preserve') `
+        'Fresh-install rollback crossed its exact ownership boundary.'
+
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Installer did not copy the executable.'

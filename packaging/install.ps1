@@ -8,7 +8,10 @@ param(
     [ValidateSet('TaskScheduler', 'StartupFolder', 'RunKey', 'None')]
     [string]$Startup = 'None',
 
-    [switch]$NoLaunch
+    [switch]$NoLaunch,
+
+    [ValidateSet('AfterCopy')]
+    [string]$InjectFailureAt
 )
 
 Set-StrictMode -Version Latest
@@ -281,6 +284,46 @@ function Set-Startup {
     }
 }
 
+function Invoke-InjectedFailure([string]$Location) {
+    if ($InjectFailureAt -eq $Location) {
+        throw "Injected installer failure at $Location."
+    }
+}
+
+function Remove-FreshInstallArtifacts {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$CreatedFiles,
+
+        [Parameter(Mandatory)]
+        [string]$MarkerPath,
+
+        [Parameter(Mandatory)]
+        [bool]$MarkerCreated,
+
+        [Parameter(Mandatory)]
+        [string]$InstallRoot,
+
+        [Parameter(Mandatory)]
+        [bool]$InstallRootCreated
+    )
+
+    if ($MarkerCreated -and (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($file in @($CreatedFiles | Sort-Object -Descending)) {
+        if (Test-Path -LiteralPath $file -PathType Leaf) {
+            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if ($InstallRootCreated -and (Test-Path -LiteralPath $InstallRoot -PathType Container)) {
+        $remaining = @(Get-ChildItem -LiteralPath $InstallRoot -Force)
+        if ($remaining.Count -eq 0) {
+            Remove-Item -LiteralPath $InstallRoot -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 $sourceRoot = Get-SourceRoot $SourcePath
 $sourceExecutable = Get-ExecutablePath $sourceRoot
 $safeRoot = Assert-SafeInstallRoot $InstallRoot
@@ -290,39 +333,67 @@ $markerPath = Join-Path $safeRoot $MarkerName
 Assert-OwnedOrEmptyDestination $safeRoot $sourceRoot
 Assert-StartupEntriesOwned $destinationExecutable
 
+$sourceIsInstallRoot = Test-SamePath $sourceRoot $safeRoot
+$freshInstall = (-not $sourceIsInstallRoot) -and (-not (Test-Path -LiteralPath $markerPath -PathType Leaf))
+$installRootCreated = $false
+$markerCreated = $false
+$createdFiles = @()
+
 if (-not (Test-SamePath $sourceRoot $safeRoot) -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Stop-OwnedApplicationIfRunning $destinationExecutable
 }
 
-if (-not (Test-SamePath $sourceRoot $safeRoot)) {
-    if (Confirm-Change $safeRoot 'Create installation directory') {
-        New-Item -ItemType Directory -Path $safeRoot -Force | Out-Null
+try {
+    if (-not $sourceIsInstallRoot) {
+        if (Confirm-Change $safeRoot 'Create installation directory') {
+            $installRootCreated = -not (Test-Path -LiteralPath $safeRoot -PathType Container)
+            New-Item -ItemType Directory -Path $safeRoot -Force | Out-Null
+        }
     }
-}
 
-foreach ($fileName in $KnownFiles) {
-    if (Test-SamePath $sourceRoot $safeRoot) { continue }
-    $sourceFile = Join-Path $sourceRoot $fileName
-    if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }
-    $destinationFile = Join-Path $safeRoot $fileName
-    if (Confirm-Change $destinationFile 'Install package file') {
-        Copy-Item -LiteralPath $sourceFile -Destination $destinationFile -Force
+    foreach ($fileName in $KnownFiles) {
+        if ($sourceIsInstallRoot) { continue }
+        $sourceFile = Join-Path $sourceRoot $fileName
+        if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { continue }
+        $destinationFile = Join-Path $safeRoot $fileName
+        if (Confirm-Change $destinationFile 'Install package file') {
+            if ($freshInstall) { $createdFiles += $destinationFile }
+            Copy-Item -LiteralPath $sourceFile -Destination $destinationFile -Force
+            Invoke-InjectedFailure 'AfterCopy'
+        }
     }
-}
 
-if (Confirm-Change $markerPath 'Write ownership marker') {
-    $installedFiles = @($KnownFiles | Where-Object { Test-Path -LiteralPath (Join-Path $safeRoot $_) -PathType Leaf })
-    $marker = [ordered]@{
-        product = $ProductName
-        installRoot = $safeRoot
-        executable = $destinationExecutable
-        managedFiles = $installedFiles
-        installedAtUtc = [DateTime]::UtcNow.ToString('o')
+    if (Confirm-Change $markerPath 'Write ownership marker') {
+        if ($freshInstall) { $markerCreated = $true }
+        $installedFiles = @($KnownFiles | Where-Object { Test-Path -LiteralPath (Join-Path $safeRoot $_) -PathType Leaf })
+        $marker = [ordered]@{
+            product = $ProductName
+            installRoot = $safeRoot
+            executable = $destinationExecutable
+            managedFiles = $installedFiles
+            installedAtUtc = [DateTime]::UtcNow.ToString('o')
+        }
+        $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
     }
-    $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
-}
 
-Set-Startup $destinationExecutable $Startup
+    Set-Startup $destinationExecutable $Startup
+}
+catch {
+    if ($freshInstall) {
+        try {
+            Remove-FreshInstallArtifacts `
+                -CreatedFiles $createdFiles `
+                -MarkerPath $markerPath `
+                -MarkerCreated $markerCreated `
+                -InstallRoot $safeRoot `
+                -InstallRootCreated $installRootCreated
+        }
+        catch {
+            Write-Warning "Fresh-install rollback could not remove every artifact under ${safeRoot}: $($_.Exception.Message)"
+        }
+    }
+    throw
+}
 
 Write-Output "Installed $ProductName to $safeRoot"
 Write-Output "Startup mode: $Startup"
