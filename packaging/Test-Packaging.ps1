@@ -269,7 +269,7 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead([string]$archive)
     try {
-        $entryNames = @($zip.Entries | ForEach-Object FullName)
+        $entryNames = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/IdleHarbor.exe') 'Archive lacks the executable.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/install.ps1') 'Archive lacks the installer.'
         Assert-True ($entryNames -contains 'IdleHarbor-0.1.0-test-windows-x64-portable/DISTRIBUTION.md') 'Archive lacks the distribution guide.'
@@ -277,8 +277,11 @@ try {
             'Archive unexpectedly owns the release-directory checksum manifest.'
         Assert-True (@($entryNames | Where-Object { $_ -match '\.spdx\.json$' }).Count -eq 0) `
             'Archive unexpectedly owns a release-directory SPDX asset.'
-        $manifestEntry = $zip.GetEntry('IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json')
-        Assert-True ($null -ne $manifestEntry) 'Archive lacks its package manifest.'
+        $manifestEntries = @($zip.Entries | Where-Object {
+            $_.FullName.Replace('\', '/') -ceq 'IdleHarbor-0.1.0-test-windows-x64-portable/package-manifest.json'
+        })
+        Assert-True ($manifestEntries.Count -eq 1) 'Archive must contain exactly one package manifest.'
+        $manifestEntry = $manifestEntries[0]
         $reader = New-Object IO.StreamReader($manifestEntry.Open())
         try { $packageManifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
         $manifestProperties = @($packageManifest.PSObject.Properties.Name)
@@ -351,6 +354,17 @@ try {
     $checksums = Join-Path $outputRoot 'SHA256SUMS.txt'
     & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $outputRoot -OutputPath $checksums | Out-Null
     Assert-True ((Get-Content -LiteralPath $checksums).Count -ge 2) 'Checksum manifest did not include release files.'
+
+    $checksumFixture = Join-Path $tempRoot 'checksum-fixture'
+    $nestedChecksumDirectory = Join-Path $checksumFixture 'nested folder'
+    New-Item -ItemType Directory -Path $nestedChecksumDirectory -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $nestedChecksumDirectory 'payload.bin') -Value 'payload' -Encoding ASCII
+    $fixtureChecksums = Join-Path $checksumFixture 'SHA256SUMS.txt'
+    & (Join-Path $packagingRoot 'New-Checksums.ps1') -InputDirectory $checksumFixture -OutputPath $fixtureChecksums | Out-Null
+    $fixtureLines = @(Get-Content -LiteralPath $fixtureChecksums)
+    Assert-True ($fixtureLines.Count -eq 1) 'Checksum fixture did not emit exactly one payload entry.'
+    Assert-True ($fixtureLines[0] -match '^[0-9a-f]{64} \*nested folder/payload\.bin$') `
+        'Checksum fixture did not emit a normalized root-relative path.'
     Write-Output 'Packaging checks passed.'
 }
 finally {
