@@ -613,7 +613,7 @@ class Application final {
     }
 
     [[nodiscard]] idleharbor::app::SafetyRegions SafetyRegionsFor(const RECT& client) const noexcept {
-        return idleharbor::app::ComputeSafetyRegions(client.right, client.bottom, std::max(Scale(1), 1));
+        return idleharbor::app::ComputeSafetyRegions(client.right, client.bottom, static_cast<int>(dpi_));
     }
 
     [[nodiscard]] bool IsSettingsViewportPoint(const LPARAM l_param) const noexcept {
@@ -649,10 +649,11 @@ class Application final {
             return;
         }
         const auto regions = SafetyRegionsFor(client);
-        const int unit = std::max(Scale(1), 1);
-        const auto settings_layout = idleharbor::app::DetermineSettingsLayout(static_cast<int>(client.right), unit);
+        const auto settings_layout = idleharbor::app::DetermineSettingsLayout(static_cast<int>(client.right), static_cast<int>(dpi_));
         const bool stacked = settings_layout == idleharbor::app::SettingsLayoutMode::Stacked;
-        const int logical_client_width = std::max(static_cast<int>(client.right) / unit, 1);
+        const int logical_client_width = std::max(
+            idleharbor::app::LogicalPixels(static_cast<int>(client.right), static_cast<int>(dpi_)),
+            1);
         const int body_width = std::max(logical_client_width - 40, 80);
         int narrow_y = 0;
         int body_bottom = 0;
@@ -702,21 +703,24 @@ class Application final {
                 width = std::max(regions.status.right - regions.status.left, Scale(80));
                 height = std::max(regions.status.bottom - regions.status.top, Scale(24));
             } else if (child.region == LayoutRegion::FixedBottom) {
-                const auto action_layout = idleharbor::app::DetermineActionLayout(static_cast<int>(client.right), unit);
-                const int available = std::max(static_cast<int>(client.right) - 40 * unit, 80 * unit);
+                const auto action_layout = idleharbor::app::DetermineActionLayout(
+                    static_cast<int>(client.right),
+                    static_cast<int>(dpi_));
+                const int margin = Scale(20);
+                const int gap = Scale(10);
+                const int available = std::max(static_cast<int>(client.right) - 2 * margin, Scale(80));
                 if (action_layout == idleharbor::app::ActionLayoutMode::Wide) {
-                    x = 20 * unit + (child.window == stop_ ? 125 * unit : 0);
-                    y = regions.actions.top + 10 * unit;
-                    width = 115 * unit;
+                    x = margin + (child.window == stop_ ? Scale(125) : 0);
+                    y = regions.actions.top + Scale(10);
+                    width = Scale(115);
                 } else if (action_layout == idleharbor::app::ActionLayoutMode::Wrapped) {
-                    const int half_width = std::max((available - 10 * unit) / 2, 80 * unit);
-                    x = child.window == stop_ ? 20 * unit + half_width + 10 * unit : 20 * unit;
-                    y = regions.actions.top + 10 * unit;
+                    const int half_width = std::max((available - gap) / 2, Scale(80));
+                    x = child.window == stop_ ? margin + half_width + gap : margin;
+                    y = regions.actions.top + Scale(10);
                     width = half_width;
                 } else {
-                    x = 20 * unit;
-                    y = regions.actions.top + 6 * unit +
-                        (child.window == stop_ ? 42 * unit : 0);
+                    x = margin;
+                    y = regions.actions.top + Scale(6) + (child.window == stop_ ? Scale(42) : 0);
                     width = available;
                 }
             } else {

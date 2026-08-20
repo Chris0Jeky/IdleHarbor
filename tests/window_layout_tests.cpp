@@ -77,13 +77,13 @@ void test_wheel_delta_preserves_direction_and_remainder() {
 
 void test_fixed_safety_regions_never_scroll_with_the_body() {
     using idleharbor::app::ComputeSafetyRegions;
-    const auto regions = ComputeSafetyRegions(600, 700, 1);
+    const auto regions = ComputeSafetyRegions(600, 700, 96);
     CHECK(regions.status.top == 12);
     CHECK(regions.status.bottom <= regions.viewport.top);
     CHECK(regions.viewport.top == 58);
     CHECK(regions.viewport.bottom == regions.actions.top);
     CHECK(regions.actions.bottom == 700);
-    const auto compact = ComputeSafetyRegions(220, 320, 1);
+    const auto compact = ComputeSafetyRegions(220, 320, 96);
     CHECK(compact.status.left >= 0 && compact.status.right <= 220);
     CHECK(compact.status.bottom <= compact.viewport.top);
     CHECK(compact.viewport.bottom == compact.actions.top);
@@ -101,11 +101,39 @@ void test_narrow_work_areas_reflow_settings_and_actions() {
     using idleharbor::app::DetermineActionLayout;
     using idleharbor::app::DetermineSettingsLayout;
     using idleharbor::app::SettingsLayoutMode;
-    CHECK(DetermineSettingsLayout(600, 1) == SettingsLayoutMode::Columns);
-    CHECK(DetermineSettingsLayout(420, 1) == SettingsLayoutMode::Stacked);
-    CHECK(DetermineActionLayout(600, 1) == ActionLayoutMode::Wide);
-    CHECK(DetermineActionLayout(320, 1) == ActionLayoutMode::Wrapped);
-    CHECK(DetermineActionLayout(220, 1) == ActionLayoutMode::Stacked);
+    CHECK(DetermineSettingsLayout(600, 96) == SettingsLayoutMode::Columns);
+    CHECK(DetermineSettingsLayout(420, 96) == SettingsLayoutMode::Stacked);
+    CHECK(DetermineActionLayout(600, 96) == ActionLayoutMode::Wide);
+    CHECK(DetermineActionLayout(320, 96) == ActionLayoutMode::Wrapped);
+    CHECK(DetermineActionLayout(220, 96) == ActionLayoutMode::Stacked);
+}
+
+void test_fractional_dpi_layout_uses_true_logical_widths() {
+    using idleharbor::app::ActionLayoutMode;
+    using idleharbor::app::ComputeSafetyRegions;
+    using idleharbor::app::DetermineActionLayout;
+    using idleharbor::app::DetermineSettingsLayout;
+    using idleharbor::app::LogicalPixels;
+    using idleharbor::app::PhysicalPixels;
+    using idleharbor::app::SettingsLayoutMode;
+    for (const int dpi : {120, 144, 168}) {
+        const int physical_normal_width = PhysicalPixels(560, dpi);
+        CHECK(LogicalPixels(physical_normal_width, dpi) == 560);
+        CHECK(DetermineSettingsLayout(physical_normal_width, dpi) == SettingsLayoutMode::Columns);
+        CHECK(DetermineActionLayout(physical_normal_width, dpi) == ActionLayoutMode::Wide);
+        const auto regions = ComputeSafetyRegions(physical_normal_width, PhysicalPixels(700, dpi), dpi);
+        CHECK(regions.status.right <= physical_normal_width);
+        CHECK(regions.viewport.right <= physical_normal_width);
+        CHECK(regions.status.bottom <= regions.viewport.top);
+        CHECK(regions.viewport.bottom == regions.actions.top);
+
+        const int physical_narrow_width = PhysicalPixels(400, dpi);
+        CHECK(LogicalPixels(physical_narrow_width, dpi) == 400);
+        CHECK(DetermineSettingsLayout(physical_narrow_width, dpi) == SettingsLayoutMode::Stacked);
+        CHECK(DetermineActionLayout(physical_narrow_width, dpi) == ActionLayoutMode::Wide);
+        CHECK(DetermineActionLayout(PhysicalPixels(320, dpi), dpi) == ActionLayoutMode::Wrapped);
+        CHECK(DetermineActionLayout(PhysicalPixels(220, dpi), dpi) == ActionLayoutMode::Stacked);
+    }
 }
 
 }  // namespace
@@ -120,5 +148,6 @@ int main() {
     test_fixed_safety_regions_never_scroll_with_the_body();
     test_focus_reveal_is_gated_by_actual_focus_change();
     test_narrow_work_areas_reflow_settings_and_actions();
+    test_fractional_dpi_layout_uses_true_logical_widths();
     return failures == 0 ? 0 : 1;
 }

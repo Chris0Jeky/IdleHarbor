@@ -7,6 +7,13 @@ namespace idleharbor::app {
 namespace {
 
 constexpr int kWheelDeltaPerStep = 120;
+constexpr int kDefaultDpi = 96;
+
+int RoundedRatio(const int value, const int numerator, const int denominator) noexcept {
+    const int safe_denominator = std::max(denominator, 1);
+    const long long scaled = static_cast<long long>(std::max(value, 0)) * numerator;
+    return static_cast<int>((scaled + safe_denominator / 2) / safe_denominator);
+}
 
 }  // namespace
 
@@ -61,32 +68,42 @@ WheelDeltaResult ConsumeWheelDelta(const int remainder, const int delta) noexcep
     return {total / kWheelDeltaPerStep, total % kWheelDeltaPerStep};
 }
 
-ActionLayoutMode DetermineActionLayout(const int client_width, const int unit) noexcept {
-    const int safe_unit = std::max(unit, 1);
-    if (client_width >= 380 * safe_unit) {
+int LogicalPixels(const int physical_pixels, const int dpi) noexcept {
+    return RoundedRatio(physical_pixels, kDefaultDpi, dpi);
+}
+
+int PhysicalPixels(const int logical_pixels, const int dpi) noexcept {
+    return RoundedRatio(logical_pixels, std::max(dpi, 1), kDefaultDpi);
+}
+
+ActionLayoutMode DetermineActionLayout(const int client_width, const int dpi) noexcept {
+    if (LogicalPixels(client_width, dpi) >= 380) {
         return ActionLayoutMode::Wide;
     }
-    if (client_width >= 245 * safe_unit) {
+    if (LogicalPixels(client_width, dpi) >= 245) {
         return ActionLayoutMode::Wrapped;
     }
     return ActionLayoutMode::Stacked;
 }
 
-SettingsLayoutMode DetermineSettingsLayout(const int client_width, const int unit) noexcept {
-    return client_width >= 560 * std::max(unit, 1) ? SettingsLayoutMode::Columns : SettingsLayoutMode::Stacked;
+SettingsLayoutMode DetermineSettingsLayout(const int client_width, const int dpi) noexcept {
+    return LogicalPixels(client_width, dpi) >= 560 ? SettingsLayoutMode::Columns : SettingsLayoutMode::Stacked;
 }
 
-SafetyRegions ComputeSafetyRegions(const int client_width, const int client_height, const int unit) noexcept {
-    const int safe_unit = std::max(unit, 1);
+SafetyRegions ComputeSafetyRegions(const int client_width, const int client_height, const int dpi) noexcept {
+    const int safe_dpi = std::max(dpi, 1);
     const int width = std::max(client_width, 1);
     const int height = std::max(client_height, 1);
-    const int header_height = 58 * safe_unit;
-    const auto action_layout = DetermineActionLayout(width, safe_unit);
-    const int footer_height = action_layout == ActionLayoutMode::Stacked ? 92 * safe_unit : 52 * safe_unit;
+    const int header_height = PhysicalPixels(58, safe_dpi);
+    const auto action_layout = DetermineActionLayout(width, safe_dpi);
+    const int footer_height = PhysicalPixels(action_layout == ActionLayoutMode::Stacked ? 92 : 52, safe_dpi);
     const int footer_top = std::max(header_height, height - footer_height);
-    const int horizontal_margin = std::min(20 * safe_unit, std::max((width - 1) / 2, 0));
+    const int horizontal_margin = std::min(PhysicalPixels(20, safe_dpi), std::max((width - 1) / 2, 0));
     return {
-        {horizontal_margin, 12 * safe_unit, width - horizontal_margin, std::min(42 * safe_unit, header_height)},
+        {horizontal_margin,
+         PhysicalPixels(12, safe_dpi),
+         width - horizontal_margin,
+         std::min(PhysicalPixels(42, safe_dpi), header_height)},
         {0, footer_top, width, height},
         {0, header_height, width, footer_top},
     };

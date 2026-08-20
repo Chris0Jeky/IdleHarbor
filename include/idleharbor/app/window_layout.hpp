@@ -43,9 +43,11 @@ struct SafetyRegions {
     int content_height,
     int viewport_height) noexcept;
 [[nodiscard]] WheelDeltaResult ConsumeWheelDelta(int remainder, int delta) noexcept;
-[[nodiscard]] ActionLayoutMode DetermineActionLayout(int client_width, int unit) noexcept;
-[[nodiscard]] SettingsLayoutMode DetermineSettingsLayout(int client_width, int unit) noexcept;
-[[nodiscard]] SafetyRegions ComputeSafetyRegions(int client_width, int client_height, int unit) noexcept;
+[[nodiscard]] int LogicalPixels(int physical_pixels, int dpi) noexcept;
+[[nodiscard]] int PhysicalPixels(int logical_pixels, int dpi) noexcept;
+[[nodiscard]] ActionLayoutMode DetermineActionLayout(int client_width, int dpi) noexcept;
+[[nodiscard]] SettingsLayoutMode DetermineSettingsLayout(int client_width, int dpi) noexcept;
+[[nodiscard]] SafetyRegions ComputeSafetyRegions(int client_width, int client_height, int dpi) noexcept;
 [[nodiscard]] bool FocusChanged(std::uintptr_t previous_focus, std::uintptr_t current_focus) noexcept;
 
 }  // namespace idleharbor::app
