@@ -36,6 +36,7 @@ struct SafetyRegions {
 struct ActionButtonRects {
     PixelRect start;
     PixelRect stop;
+    PixelRect save;
 };
 
 enum class TabOrderRegion {

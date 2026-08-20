@@ -96,7 +96,9 @@ SafetyRegions ComputeSafetyRegions(const int client_width, const int client_heig
     const int height = std::max(client_height, 1);
     const int header_height = std::min(PhysicalPixels(58, safe_dpi), height);
     const auto action_layout = DetermineActionLayout(width, safe_dpi);
-    const int footer_height = PhysicalPixels(action_layout == ActionLayoutMode::Stacked ? 92 : 52, safe_dpi);
+    const int footer_height = PhysicalPixels(
+        action_layout == ActionLayoutMode::Wide ? 52 : action_layout == ActionLayoutMode::Wrapped ? 92 : 132,
+        safe_dpi);
     const int footer_top = std::max(header_height, height - footer_height);
     const int horizontal_margin = std::min(PhysicalPixels(20, safe_dpi), std::max((width - 1) / 2, 0));
     return {
@@ -133,13 +135,14 @@ ActionButtonRects ComputeActionButtonRects(const int client_width, const int cli
     };
 
     if (action_layout == ActionLayoutMode::Stacked) {
-        const int button_height = std::min(PhysicalPixels(32, safe_dpi), std::max((action_height - gap) / 2, 1));
-        const int actual_gap = std::min(gap, std::max(action_height - 2 * button_height, 0));
-        const int block_height = 2 * button_height + actual_gap;
+        const int button_height = std::min(PhysicalPixels(32, safe_dpi), std::max((action_height - 2 * gap) / 3, 1));
+        const int actual_gap = std::min(gap, std::max((action_height - 3 * button_height) / 2, 0));
+        const int block_height = 3 * button_height + 2 * actual_gap;
         const int first_y = action_top + std::max((action_height - block_height) / 2, 0);
         return {
             make_rect(margin, first_y, available, button_height),
             make_rect(margin, first_y + button_height + actual_gap, available, button_height),
+            make_rect(margin, first_y + 2 * (button_height + actual_gap), available, button_height),
         };
     }
 
@@ -150,6 +153,7 @@ ActionButtonRects ComputeActionButtonRects(const int client_width, const int cli
         return {
             make_rect(margin, button_y, half_width, button_height),
             make_rect(margin + half_width + gap, button_y, half_width, button_height),
+            make_rect((width - half_width) / 2, button_y + button_height + gap, half_width, button_height),
         };
     }
 
@@ -157,6 +161,7 @@ ActionButtonRects ComputeActionButtonRects(const int client_width, const int cli
     return {
         make_rect(margin, button_y, button_width, button_height),
         make_rect(margin + PhysicalPixels(125, safe_dpi), button_y, button_width, button_height),
+        make_rect(margin + 2 * PhysicalPixels(125, safe_dpi), button_y, button_width, button_height),
     };
 }
 

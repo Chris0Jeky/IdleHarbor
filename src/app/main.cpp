@@ -272,6 +272,11 @@ class Application final {
     Application& operator=(const Application&) = delete;
 
     bool Initialize(const CommandLineOptions& options) {
+        INITCOMMONCONTROLSEX common_controls{sizeof(common_controls)};
+        common_controls.dwICC = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
+        if (InitCommonControlsEx(&common_controls) == FALSE) {
+            return false;
+        }
         settings_path_ = idleharbor::app::ResolveSettingsPath(options.portable, options.config_path);
         const auto loaded_settings = idleharbor::app::LoadSettings(settings_path_);
         settings_ = loaded_settings.settings;
@@ -530,6 +535,7 @@ class Application final {
     enum class BodyControlKind {
         Generic,
         Label,
+        Heading,
         Field,
         Check,
     };
@@ -706,7 +712,9 @@ class Application final {
                 child.arranged_x = stacked_body.left;
                 child.arranged_y = narrow_y;
                 child.arranged_width = stacked_body.width;
-                if (child.kind == BodyControlKind::Label) {
+                if (child.kind == BodyControlKind::Heading) {
+                    narrow_y += 36;
+                } else if (child.kind == BodyControlKind::Label) {
                     narrow_y += 28;
                 } else if (child.kind == BodyControlKind::Field) {
                     narrow_y += 38;
@@ -738,7 +746,9 @@ class Application final {
                     static_cast<int>(client.right),
                     static_cast<int>(client.bottom),
                     static_cast<int>(dpi_));
-                const auto& action = child.window == stop_ ? action_buttons.stop : action_buttons.start;
+                const auto& action = child.window == stop_ ? action_buttons.stop
+                                  : child.window == save_ ? action_buttons.save
+                                                          : action_buttons.start;
                 x = action.left;
                 y = action.top;
                 width = action.right - action.left;
@@ -963,13 +973,39 @@ class Application final {
 
         HFONT replacement_font = CreateUiFont(dpi_);
         if (replacement_font != nullptr) {
+            HFONT replacement_heading_font = CreateFontW(
+                -MulDiv(10, static_cast<int>(dpi_), 72),
+                0,
+                0,
+                0,
+                FW_SEMIBOLD,
+                FALSE,
+                FALSE,
+                FALSE,
+                DEFAULT_CHARSET,
+                OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY,
+                DEFAULT_PITCH | FF_DONTCARE,
+                L"Segoe UI");
+            const HFONT heading_for_children = replacement_heading_font != nullptr ? replacement_heading_font : replacement_font;
             for (const auto& child : child_layouts_) {
-                SendMessageW(child.window, WM_SETFONT, reinterpret_cast<WPARAM>(replacement_font), TRUE);
+                SendMessageW(
+                    child.window,
+                    WM_SETFONT,
+                    reinterpret_cast<WPARAM>(child.kind == BodyControlKind::Heading ? heading_for_children : replacement_font),
+                    TRUE);
             }
             if (ui_font_ != nullptr) {
                 DeleteObject(ui_font_);
             }
             ui_font_ = replacement_font;
+            if (replacement_heading_font != nullptr) {
+                if (heading_font_ != nullptr) {
+                    DeleteObject(heading_font_);
+                }
+                heading_font_ = replacement_heading_font;
+            }
         }
         UpdateViewport();
         EnsureFocusedControlVisible();
@@ -978,6 +1014,22 @@ class Application final {
     void CreateControls() {
         ui_font_ = CreateUiFont(dpi_);
         const HFONT font = ui_font_ != nullptr ? ui_font_ : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        heading_font_ = CreateFontW(
+            -MulDiv(10, static_cast<int>(dpi_), 72),
+            0,
+            0,
+            0,
+            FW_SEMIBOLD,
+            FALSE,
+            FALSE,
+            FALSE,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE,
+            L"Segoe UI");
+        const HFONT heading = heading_font_ != nullptr ? heading_font_ : font;
         const auto scale = [&](const int value) { return ScaleForDpi(value, dpi_); };
         settings_viewport_ = CreateWindowExW(
             WS_EX_CONTROLPARENT,
@@ -1012,6 +1064,23 @@ class Application final {
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
             TrackChild(control, 20, y, 270, 24, 24, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Label);
+        };
+        const auto add_heading = [&](const wchar_t* text, const int y) {
+            const HWND control = CreateWindowExW(
+                0,
+                L"STATIC",
+                text,
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                scale(20),
+                scale(y),
+                scale(525),
+                scale(28),
+                body_parent,
+                nullptr,
+                instance_,
+                nullptr);
+            SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(heading), TRUE);
+            TrackChild(control, 20, y, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
         };
         const auto add_combo = [&](HWND& target, const int y, const int id) {
             target = CreateWindowExW(
@@ -1087,7 +1156,7 @@ class Application final {
             WS_EX_CLIENTEDGE,
             L"STATIC",
             L"Stopped: ready",
-            WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
+            WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
             scale(20),
             scale(18),
             scale(525),
@@ -1099,15 +1168,16 @@ class Application final {
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
-        add_label(L"Profile", 56);
-        add_combo(profile_, 56, kProfile);
+        add_heading(L"Session", 56);
+        add_label(L"Profile", 86);
+        add_combo(profile_, 86, kProfile);
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Motion", 90);
-        add_combo(motion_, 90, kMotion);
+        add_label(L"Motion", 120);
+        add_combo(motion_, 120, kMotion);
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -1119,32 +1189,35 @@ class Application final {
             SendMessageW(motion_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Power request", 124);
-        add_combo(power_, 124, kPower);
+        add_label(L"Power request", 154);
+        add_combo(power_, 154, kPower);
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Pulse interval (seconds)", 158);
-        add_edit(interval_, 158, kInterval);
-        add_label(L"Motion multiplier (1-120)", 192);
-        add_edit(distance_, 192, kDistance);
-        add_check(randomize_, L"Randomize pulse interval", 224, kRandomize);
-        add_label(L"Pause after genuine input (seconds; 0 disables)", 258);
-        add_edit(pause_input_, 258, kPauseInput);
-        add_check(lock_pause_, L"Pause while the workstation is locked", 290, kLockPause);
-        add_check(disconnect_pause_, L"Pause while the session is disconnected", 322, kDisconnectPause);
-        add_label(L"Low-battery threshold (0 disables)", 354);
-        add_edit(battery_, 354, kBattery);
-        add_check(pause_on_battery_, L"Pause whenever the device is on battery", 386, kPauseOnBattery);
-        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 418, kFullscreen);
-        add_label(L"Maximum session duration (seconds; 0 disables)", 450);
-        add_edit(max_duration_, 450, kMaxDuration);
-        add_check(start_minimized_, L"Start minimized to the notification area", 484, kStartMinimized);
-        add_check(close_to_tray_, L"Close button hides to the notification area", 516, kCloseToTray);
-        add_check(notifications_, L"Show safety state notifications", 548, kNotifications);
-        add_check(emergency_hotkey_, L"Enable emergency stop: Ctrl+Alt+Shift+F12", 580, kEmergencyHotkey);
+        add_heading(L"Pulse", 190);
+        add_label(L"Pulse interval (seconds)", 220);
+        add_edit(interval_, 220, kInterval);
+        add_label(L"Motion multiplier (1-120)", 254);
+        add_edit(distance_, 254, kDistance);
+        add_check(randomize_, L"Randomize pulse interval", 286, kRandomize);
+        add_heading(L"Safeguards", 322);
+        add_label(L"Pause after genuine input (seconds; 0 disables)", 352);
+        add_edit(pause_input_, 352, kPauseInput);
+        add_check(lock_pause_, L"Pause while the workstation is locked", 384, kLockPause);
+        add_check(disconnect_pause_, L"Pause while the session is disconnected", 416, kDisconnectPause);
+        add_label(L"Low-battery threshold (0 disables)", 450);
+        add_edit(battery_, 450, kBattery);
+        add_check(pause_on_battery_, L"Pause whenever the device is on battery", 482, kPauseOnBattery);
+        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 514, kFullscreen);
+        add_heading(L"Window & notifications", 550);
+        add_label(L"Maximum session duration (seconds; 0 disables)", 580);
+        add_edit(max_duration_, 580, kMaxDuration);
+        add_check(start_minimized_, L"Start minimized to the notification area", 612, kStartMinimized);
+        add_check(close_to_tray_, L"Close button hides to the notification area", 644, kCloseToTray);
+        add_check(notifications_, L"Show safety state notifications", 676, kNotifications);
+        add_check(emergency_hotkey_, L"Enable emergency stop: Ctrl+Alt+Shift+F12", 708, kEmergencyHotkey);
 
         const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id) {
             target = CreateWindowExW(
@@ -1156,7 +1229,7 @@ class Application final {
                 scale(618),
                 scale(115),
                 scale(32),
-                id == kSave ? body_parent : window_,
+                window_,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
@@ -1169,8 +1242,8 @@ class Application final {
                 32,
                 32,
                 ChildWidthMode::Fixed,
-                id == kSave ? LayoutRegion::Body : LayoutRegion::FixedBottom,
-                id == kSave ? BodyControlKind::Check : BodyControlKind::Generic);
+                LayoutRegion::FixedBottom,
+                BodyControlKind::Generic);
         };
         add_button(start_, L"Start", 20, kStart);
         add_button(stop_, L"Stop", 145, kStop);
@@ -1256,9 +1329,35 @@ class Application final {
     void SetStatus(const std::wstring& status) {
         status_text_ = status;
         if (status_ != nullptr) {
-            SetControlText(status_, status_text_);
+            InvalidateRect(status_, nullptr, TRUE);
+            UpdateWindow(status_);
         }
         UpdateTrayTooltip();
+    }
+
+    void DrawStatusCard(const DRAWITEMSTRUCT* draw_item) const noexcept {
+        if (draw_item == nullptr || draw_item->hDC == nullptr) {
+            return;
+        }
+        const HBRUSH background = GetSysColorBrush(COLOR_INFOBK);
+        FillRect(draw_item->hDC, &draw_item->rcItem, background);
+        FrameRect(draw_item->hDC, &draw_item->rcItem, GetSysColorBrush(COLOR_ACTIVEBORDER));
+        const int old_mode = SetBkMode(draw_item->hDC, TRANSPARENT);
+        const COLORREF old_color = SetTextColor(draw_item->hDC, GetSysColor(COLOR_INFOTEXT));
+        const HFONT old_font = static_cast<HFONT>(SelectObject(
+            draw_item->hDC,
+            ui_font_ != nullptr ? ui_font_ : GetStockObject(DEFAULT_GUI_FONT)));
+        RECT text_rect = draw_item->rcItem;
+        InflateRect(&text_rect, -Scale(12), -Scale(2));
+        DrawTextW(
+            draw_item->hDC,
+            status_text_.c_str(),
+            -1,
+            &text_rect,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        SelectObject(draw_item->hDC, old_font);
+        SetTextColor(draw_item->hDC, old_color);
+        SetBkMode(draw_item->hDC, old_mode);
     }
 
     void RefreshControls() {
@@ -1870,6 +1969,20 @@ class Application final {
                 Save();
             }
             return 0;
+        case WM_DRAWITEM:
+            if (w_param == static_cast<WPARAM>(kStatus) &&
+                reinterpret_cast<const DRAWITEMSTRUCT*>(l_param) != nullptr &&
+                reinterpret_cast<const DRAWITEMSTRUCT*>(l_param)->hwndItem == status_) {
+                DrawStatusCard(reinterpret_cast<const DRAWITEMSTRUCT*>(l_param));
+                return TRUE;
+            }
+            break;
+        case WM_THEMECHANGED:
+        case WM_SYSCOLORCHANGE:
+            if (status_ != nullptr) {
+                InvalidateRect(status_, nullptr, TRUE);
+            }
+            return 0;
         case WM_TIMER:
             if (w_param == kTimerId) {
                 if (input_observer_requested_ && GetTickCount64() >= next_input_hook_refresh_tick_) {
@@ -1978,6 +2091,10 @@ class Application final {
                 DeleteObject(ui_font_);
                 ui_font_ = nullptr;
             }
+            if (heading_font_ != nullptr) {
+                DeleteObject(heading_font_);
+                heading_font_ = nullptr;
+            }
             PostQuitMessage(0);
             return 0;
         default:
@@ -2012,6 +2129,7 @@ class Application final {
     HWND save_ = nullptr;
     HICON tray_icon_ = nullptr;
     HFONT ui_font_ = nullptr;
+    HFONT heading_font_ = nullptr;
     UINT taskbar_created_message_ = 0;
     UINT dpi_ = USER_DEFAULT_SCREEN_DPI;
     bool tray_added_ = false;
