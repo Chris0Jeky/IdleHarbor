@@ -347,7 +347,9 @@ class Application final {
         if (automatic_start_blocked) {
             ShowWindow(window_, SW_SHOW);
             SetForegroundWindow(window_);
-            SetStatus(L"Stopped: settings recovered; review and save before automatic start");
+            if (!session_active_) {
+                SetStatus(L"Stopped: settings recovered; review and save before automatic start");
+            }
             return;
         }
         switch (options.command) {
