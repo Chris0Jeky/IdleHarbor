@@ -37,8 +37,9 @@ The current branch, `agent/v0.1.0-ui-viewport`, incorporates the latest `origin/
 
 The current local x64 Release build passes CTest 7/7. A real 200%-DPI desktop smoke resized the
 window, exercised three partial wheel messages over a child control, preserved native wheel handling
-for an open combo box, dragged the native scrollbar thumb, revealed an off-screen control by direct
-focus and keyboard traversal, started/stopped a session, and hid/restored the window through the
+for an open combo box, used native line/page scrolling, preserved an in-range scroll position across
+resize, revealed an off-screen control by direct focus and forward/reverse keyboard traversal,
+activated Save with Space, started/stopped a session, and hid/restored the window through the
 notification area. Only one display is attached, so a true cross-monitor mixed-DPI transition is
 not locally verifiable and must remain explicit.
 
