@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 ![IdleHarbor social preview](docs/assets/idleharbor-social.svg)
 
@@ -45,7 +46,7 @@ published yet.
 | Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
 | Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
 | Distribution | Portable archive and per-user installation scripts | No download link until a tagged release exists |
-| Trust evidence | CI, CodeQL, SHA-256, SPDX SBOM, GitHub attestations are wired into workflows | Signing and licence decisions remain human-owned |
+| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | v0.1.0 will be unsigned |
 
 Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
 
@@ -183,8 +184,8 @@ URL. The release workflow is prepared to produce architecture-labelled portable 
 - package manifest with source revision and architecture.
 
 The optional per-user installer, Start Menu launcher, and startup helpers are documented in
-[`packaging/README.md`](packaging/README.md). Signing is not claimed until a human-owned
-Authenticode decision is made; the licence is also still pending in [`HUMAN_TODO.md`](HUMAN_TODO.md).
+[`packaging/README.md`](packaging/README.md). `v0.1.0` will be explicitly unsigned; use the
+published checksums, SBOMs, and GitHub attestations to verify its artifacts.
 
 ## Safety boundary
 
@@ -203,8 +204,10 @@ for a managed device before installing or running it. See [`docs/SAFETY.md`](doc
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and review expectations.
 - [`SECURITY.md`](SECURITY.md) — private vulnerability reporting.
 - [`CHANGELOG.md`](CHANGELOG.md) — pre-release user-visible changes.
+- [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) — implementation provenance and attribution.
 
 ## Licence
 
-No licence is committed yet. See [`HUMAN_TODO.md`](HUMAN_TODO.md); do not infer downstream rights
-from this pre-release repository.
+IdleHarbor is free software licensed under the
+[GNU General Public License version 3 only](LICENSE) (`GPL-3.0-only`). Source distributions and
+portable release archives include the complete licence text.

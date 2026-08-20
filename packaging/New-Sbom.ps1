@@ -61,8 +61,8 @@ $document = [ordered]@{
             downloadLocation = 'NOASSERTION'
             filesAnalyzed = $true
             packageVerificationCode = [ordered]@{ value = $packageVerificationCode }
-            licenseConcluded = 'NOASSERTION'
-            licenseDeclared = 'NOASSERTION'
+            licenseConcluded = 'GPL-3.0-only'
+            licenseDeclared = 'GPL-3.0-only'
             copyrightText = 'NOASSERTION'
         }
     )
@@ -74,7 +74,7 @@ $document = [ordered]@{
                 [ordered]@{ algorithm = 'SHA1'; checksum = $fileSha1 }
                 [ordered]@{ algorithm = 'SHA256'; checksum = $hash }
             )
-            licenseConcluded = 'NOASSERTION'
+            licenseConcluded = 'GPL-3.0-only'
             copyrightText = 'NOASSERTION'
         }
     )

@@ -23,7 +23,7 @@ Do not use a download URL until a tagged release exists.
 ### Trust-file asset contract
 
 The portable archive owns the executable, installer helpers, package documentation, manifest, and
-the `LICENSE` file once the release licence is approved. `SHA256SUMS.txt` and the versioned,
+the complete GPLv3 `LICENSE` and `THIRD-PARTY-NOTICES.md`. `SHA256SUMS.txt` and the versioned,
 per-architecture SPDX JSON files are release-directory siblings generated outside the archive;
 the installer does not copy them into the installed directory. Verify those sibling assets before
 extracting or installing. The publication workflow refuses to publish while the root `LICENSE`
@@ -105,6 +105,6 @@ Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The release workflow is configured to produce SHA-256, SBOM, and attestation evidence. Authenticode
-signing is not claimed until the human-owned signing decision is made. The repository licence is
-also pending; do not infer downstream rights from a pre-release archive.
+The release workflow is configured to produce SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
+and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.

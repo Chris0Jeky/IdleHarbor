@@ -36,7 +36,8 @@ $KnownFiles = @(
     'install.cmd',
     'README.md',
     'DISTRIBUTION.md',
-    'LICENSE'
+    'LICENSE',
+    'THIRD-PARTY-NOTICES.md'
 )
 
 if (-not ('IdleHarbor.Packaging.FileIdentity' -as [type])) {

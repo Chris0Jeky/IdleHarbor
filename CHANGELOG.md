@@ -8,6 +8,8 @@ where practical.
 
 ### Added
 
+- GNU General Public License version 3 only (`GPL-3.0-only`), with the complete licence and a
+  transparent implementation-provenance notice included in source and portable distributions.
 - Ownership-safe per-user Start Menu launcher creation (enabled by default) with independent
   `-StartMenu Create|None` control, exact-link preflight, marker ownership, and transactional byte
   rollback; automatic startup remains independently disabled by default.
@@ -85,10 +87,11 @@ where practical.
 
 ### Release boundary
 
-- No version has been published. Download links, signing status, and downstream licence rights remain intentionally unclaimed.
+- No version has been published. The licence is `GPL-3.0-only`; `v0.1.0` will be unsigned and
+  accompanied by checksums, SBOMs, and GitHub artifact attestations.
 
 ## [0.1.0] - Unreleased
 
 This heading reserves the first release entry. It must not be dated or described as released until
-the tagged artifacts, release checks, checksums, SBOMs, attestations, signing decision, and licence
-decision are verified.
+the tagged artifacts, release checks, checksums, SBOMs, attestations, and unsigned-release notice
+are verified.

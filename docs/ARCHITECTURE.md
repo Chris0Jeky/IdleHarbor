@@ -108,5 +108,6 @@ scripts; and uses pinned GitHub Actions. CodeQL performs a manual C/C++ build on
 main, and a weekly schedule. Stable SemVer tags trigger x64/ARM64 portable packaging, SPDX SBOM creation,
 checksum generation, GitHub artifact attestations, and release publication.
 
-The workflow is configured, not evidence that a release has already been published. Authenticode
-signing and the project licence remain explicit human decisions.
+The workflow is configured, not evidence that a release has already been published. The project is
+licensed `GPL-3.0-only`; `v0.1.0` is intentionally unsigned and relies on checksums, SPDX SBOMs, and
+GitHub artifact attestations for published provenance.
