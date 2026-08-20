@@ -198,6 +198,19 @@ void test_scrollbar_boundary_reflows_and_keeps_bottom_reachable() {
     }
 }
 
+void test_height_resize_can_clear_a_scrollbar_free_candidate() {
+    using idleharbor::app::MaximumScrollPosition;
+    using idleharbor::app::PhysicalPixels;
+
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int candidate_content_height = PhysicalPixels(614, dpi);
+        const int short_viewport_height = PhysicalPixels(570, dpi);
+        const int tall_viewport_height = PhysicalPixels(700, dpi);
+        CHECK(MaximumScrollPosition(candidate_content_height, short_viewport_height) > 0);
+        CHECK(MaximumScrollPosition(candidate_content_height, tall_viewport_height) == 0);
+    }
+}
+
 void test_viewport_fill_widths_respect_the_effective_client_width() {
     using idleharbor::app::LogicalPixels;
     using idleharbor::app::PhysicalPixels;
@@ -261,6 +274,7 @@ int main() {
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_settings_layout_uses_the_viewport_client_width();
     test_scrollbar_boundary_reflows_and_keeps_bottom_reachable();
+    test_height_resize_can_clear_a_scrollbar_free_candidate();
     test_viewport_fill_widths_respect_the_effective_client_width();
     test_stacked_stop_stays_inside_short_clients();
     test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();

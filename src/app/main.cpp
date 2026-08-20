@@ -762,6 +762,12 @@ class Application final {
 
     void UpdateViewport() {
         constexpr int kMaxLayoutPasses = 4;
+        if (settings_viewport_ != nullptr) {
+            // A visible scrollbar reduces GetClientRect(). Start each resize pass
+            // from the scrollbar-free candidate so a height increase can shed an
+            // inherited bar and return to the wider layout.
+            ShowScrollBar(settings_viewport_, SB_VERT, FALSE);
+        }
         const auto publish_scroll_info = [&]() {
             const int viewport_height = ViewportHeight();
             scroll_position_ = idleharbor::app::ClampScrollPosition(
@@ -776,6 +782,10 @@ class Application final {
             scroll_info.nPos = scroll_position_;
             if (settings_viewport_ != nullptr) {
                 SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+                ShowScrollBar(
+                    settings_viewport_,
+                    SB_VERT,
+                    ContentHeight() > viewport_height ? TRUE : FALSE);
             }
             return viewport_height;
         };

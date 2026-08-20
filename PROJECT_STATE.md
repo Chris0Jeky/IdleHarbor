@@ -85,6 +85,13 @@ Windows PowerShell 5.1 at 192 DPI, including every real body control staying wit
 client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
 mixed-DPI verification.
 
+The follow-up branch `agent/v0.1.0-scrollbar-release` addresses issue #32 and the late PR #30 review:
+`UpdateViewport` begins each convergence pass from a scrollbar-free candidate, then explicitly
+republishes scrollbar visibility and range from content height versus viewport height. A native
+height-only transition at a 570-logical-pixel width exposes a short-window range and clears it after
+expansion to roughly a 700-logical-pixel viewport height under both PowerShell 7 and Windows
+PowerShell 5.1. The branch is pushed and awaiting review; it is not merged.
+
 `HUMAN_TODO.md` remains authoritative:
 
 - q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer a

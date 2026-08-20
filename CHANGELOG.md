@@ -69,6 +69,8 @@ where practical.
   scrollbars, so stacked and fill-width controls remain within the visible viewport.
 - Recompute and republish the settings scroll range when scrollbar appearance changes the effective
   viewport layout, keeping the bottom controls reachable after a breakpoint reflow.
+- Re-evaluate a scrollbar-free viewport candidate after height-only resizes so an inherited vertical
+  scrollbar does not keep a tall, column-fit window in the narrow stacked layout.
 - Serialize concurrent PowerShell packaging suites with a bounded, abandoned-owner-safe test lock
   while preserving transaction-residue assertions.
 - Use in-process .NET hashing for SBOM and checksum generation so concurrent Windows PowerShell
