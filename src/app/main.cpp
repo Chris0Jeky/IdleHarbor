@@ -761,22 +761,45 @@ class Application final {
     }
 
     void UpdateViewport() {
-        LayoutControls();
-        const int viewport_height = ViewportHeight();
-        scroll_position_ = idleharbor::app::ClampScrollPosition(
-            scroll_position_,
-            ContentHeight(),
-            viewport_height);
-        SCROLLINFO scroll_info{sizeof(scroll_info)};
-        scroll_info.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
-        scroll_info.nMin = 0;
-        scroll_info.nMax = std::max(ContentHeight() - 1, 0);
-        scroll_info.nPage = static_cast<UINT>(viewport_height);
-        scroll_info.nPos = scroll_position_;
-        if (settings_viewport_ != nullptr) {
-            SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+        constexpr int kMaxLayoutPasses = 4;
+        const auto publish_scroll_info = [&]() {
+            const int viewport_height = ViewportHeight();
+            scroll_position_ = idleharbor::app::ClampScrollPosition(
+                scroll_position_,
+                ContentHeight(),
+                viewport_height);
+            SCROLLINFO scroll_info{sizeof(scroll_info)};
+            scroll_info.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+            scroll_info.nMin = 0;
+            scroll_info.nMax = std::max(ContentHeight() - 1, 0);
+            scroll_info.nPage = static_cast<UINT>(viewport_height);
+            scroll_info.nPos = scroll_position_;
+            if (settings_viewport_ != nullptr) {
+                SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+            }
+            return viewport_height;
+        };
+        for (int pass = 0; pass < kMaxLayoutPasses; ++pass) {
+            LayoutControls();
+            const int content_height_before = ContentHeight();
+            const int viewport_height_before = publish_scroll_info();
+
+            LayoutControls();
+            const bool stable = content_height_before == ContentHeight() &&
+                                 viewport_height_before == ViewportHeight() &&
+                                 scroll_position_ == idleharbor::app::ClampScrollPosition(
+                                                             scroll_position_,
+                                                             ContentHeight(),
+                                                             ViewportHeight());
+            if (stable) {
+                return;
+            }
         }
+
+        // A bounded fallback keeps the native range synchronized even if a future
+        // platform-specific scrollbar policy does not converge within the normal passes.
         LayoutControls();
+        publish_scroll_info();
     }
 
     void ScrollTo(const int position) {

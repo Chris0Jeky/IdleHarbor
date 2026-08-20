@@ -76,11 +76,14 @@ bounded final review.
 The follow-up branch `agent/v0.1.0-ui-final` implements both bounded UI fixes: deferred Start focus
 is now posted only after an actual active-to-stopped transition, and body layout measures the
 settings viewport after sizing it, using its effective client width for breakpoint and fill-width
-decisions. Deterministic layout tests cover 96/120/144/168/192 DPI and a 48-logical-pixel scrollbar
-case. The Visual Studio 2019 x64 Release build and CTest 7/7 passed. The reusable native desktop
-harness passed under PowerShell 7 and Windows PowerShell 5.1 at 192 DPI, including every real body
-control staying within the viewport client edge and redundant forwarded `--stop` preserving focus.
-Only one display is attached for mixed-DPI verification.
+decisions. `UpdateViewport` now converges layout and scroll-range publication across native
+scrollbar-driven reflow, so a 560-logical-pixel breakpoint transition cannot leave a stale thumb
+range or unreachable bottom controls. Deterministic layout tests cover 96/120/144/168/192 DPI, the
+560 logical boundary, and a 48-logical-pixel scrollbar case. The Visual Studio 2019 x64 Release
+build and CTest 7/7 passed. The reusable native desktop harness passed under PowerShell 7 and
+Windows PowerShell 5.1 at 192 DPI, including every real body control staying within the viewport
+client edge and redundant forwarded `--stop` preserving focus. Only one display is attached for
+mixed-DPI verification.
 
 `HUMAN_TODO.md` remains authoritative:
 

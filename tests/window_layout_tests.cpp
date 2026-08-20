@@ -175,6 +175,29 @@ void test_settings_layout_uses_the_viewport_client_width() {
     }
 }
 
+void test_scrollbar_boundary_reflows_and_keeps_bottom_reachable() {
+    using idleharbor::app::ClampScrollPosition;
+    using idleharbor::app::ComputeStackedBodyLayout;
+    using idleharbor::app::DetermineSettingsLayout;
+    using idleharbor::app::MaximumScrollPosition;
+    using idleharbor::app::PhysicalPixels;
+    using idleharbor::app::SettingsLayoutMode;
+
+    for (const int dpi : {96, 120, 144, 168, 192}) {
+        const int outer_width = PhysicalPixels(560, dpi);
+        const int viewport_width = outer_width - PhysicalPixels(48, dpi);
+        CHECK(DetermineSettingsLayout(outer_width, dpi) == SettingsLayoutMode::Columns);
+        CHECK(DetermineSettingsLayout(viewport_width, dpi) == SettingsLayoutMode::Stacked);
+
+        const auto body = ComputeStackedBodyLayout(idleharbor::app::LogicalPixels(viewport_width, dpi));
+        const int content_height = PhysicalPixels(570 + body.width / 2, dpi);
+        const int viewport_height = PhysicalPixels(390, dpi);
+        const int maximum = MaximumScrollPosition(content_height, viewport_height);
+        CHECK(maximum > 0);
+        CHECK(ClampScrollPosition(maximum, content_height, viewport_height) == maximum);
+    }
+}
+
 void test_viewport_fill_widths_respect_the_effective_client_width() {
     using idleharbor::app::LogicalPixels;
     using idleharbor::app::PhysicalPixels;
@@ -237,6 +260,7 @@ int main() {
     test_narrow_work_areas_reflow_settings_and_actions();
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_settings_layout_uses_the_viewport_client_width();
+    test_scrollbar_boundary_reflows_and_keeps_bottom_reachable();
     test_viewport_fill_widths_respect_the_effective_client_width();
     test_stacked_stop_stays_inside_short_clients();
     test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();
