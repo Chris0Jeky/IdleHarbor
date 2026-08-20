@@ -30,6 +30,7 @@ add_library(
   STATIC
   src/app/command_line.cpp
   src/app/settings_store.cpp
+  src/app/window_layout.cpp
 )
 target_include_directories(idleharbor_app_support PUBLIC include)
 target_compile_features(idleharbor_app_support PUBLIC cxx_std_20)
@@ -95,6 +96,12 @@ if(IDLEHARBOR_BUILD_TESTS)
   target_compile_features(idleharbor_settings_store_tests PRIVATE cxx_std_20)
   idleharbor_configure_msvc(idleharbor_settings_store_tests)
   add_test(NAME settings_store COMMAND idleharbor_settings_store_tests)
+
+  add_executable(idleharbor_window_layout_tests tests/window_layout_tests.cpp)
+  target_link_libraries(idleharbor_window_layout_tests PRIVATE idleharbor_app_support)
+  target_compile_features(idleharbor_window_layout_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_window_layout_tests)
+  add_test(NAME window_layout COMMAND idleharbor_window_layout_tests)
 
   add_executable(idleharbor_motion_math_tests tests/motion_emitter_math_tests.cpp)
   target_link_libraries(idleharbor_motion_math_tests PRIVATE idleharbor_windows)
