@@ -1,8 +1,8 @@
 # Architecture
 
 IdleHarbor is a native Windows executable with a platform-neutral policy core and explicit Win32
-boundaries. The components described here are landed on the integration branch unless marked as a
-release workflow or verification activity.
+boundaries. The components described here are implemented unless marked as a release workflow or
+verification activity.
 
 ## Runtime topology
 
@@ -87,14 +87,14 @@ active session; destruction unregisters the hotkey and session notifications, re
 stops the timer and hooks, and clears the power request.
 
 The top-level window scales canonical control geometry for its current monitor, clamps its preferred
-rectangle to the monitor work area, and keeps a fixed status/safety header and Start/Stop action bar
+rectangle to the monitor work area, and keeps a fixed status/safety header and Start/Stop/Save action bar
 outside a clipped settings viewport. When the body is taller than the available client area, that
 viewport owns the native vertical scrollbar, so its track does not imply that the fixed header or
 footer scrolls. Narrow work areas reflow paired labels and fields into one column and adapt the body
 inset to the available width, while the action bar wraps or stacks. Child controls forward wheel input
 to the viewport unless a combo list is open; partial wheel deltas are retained and Windows' configured
 wheel-scroll amount is respected. Explicit dialog keyboard navigation sorts focus stops by their
-visual layout, with Save before the fixed Start/Stop actions. It reveals a newly focused body control,
+visual layout, including the fixed footer's Start, Stop, Save order. It reveals a newly focused body control,
 and also re-reveals the still-focused body control after resize/DPI layout changes; pointer and
 scrollbar scrolling with unchanged focus remains stable.
 

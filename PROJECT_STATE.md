@@ -9,11 +9,11 @@ validated local settings, strict CLI, independently designed bounded motion patt
 requests, genuine-input observation, battery/fullscreen/session safeguards, visible tray controls,
 an emergency stop, and transactional per-user installation. It has no telemetry or network service.
 The polished native interface uses themed Windows controls, a dedicated status card, visible
-Save/Start/Stop actions, and a scrollable high-DPI settings body. The source and release artifacts
+Start/Stop/Save actions, and a scrollable high-DPI settings body. The source and release artifacts
 are licensed `GPL-3.0-only`. No tag or release has been published.
 
 The current merged baseline is `origin/main` at
-`cf773735234ad3481a409575e881fe5515deb35b`. PRs
+`14daadf64fd1c895b2721ccfb7006e48a29635ad`. PRs
 [#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
 [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
 scroll-range convergence, and inherited-scrollbar fixes. PR
@@ -22,7 +22,8 @@ scroll-range convergence, and inherited-scrollbar fixes. PR
 192-DPI smoke. PR [#36](https://github.com/Chris0Jeky/IdleHarbor/pull/36) then landed the default,
 ownership-safe Start Menu launcher. Earlier merged work established the runtime, settings recovery,
 installer rollback and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and
-packaging isolation.
+packaging isolation. PR [#41](https://github.com/Chris0Jeky/IdleHarbor/pull/41) landed the polished
+native interface and whole-window resize repaint proof.
 
 ## Repaint follow-up
 
@@ -36,8 +37,9 @@ repaints the parent plus descendants after layout convergence so newly exposed f
 retain clipped body controls. The native interactive smoke starts a safe motion-free session, proves
 that body controls are disabled, drives real wheel input, and compares both the whole client and the
 scrolled viewport with explicit repaint references at this desktop's 192 DPI. Natural and reference
-captures are pixel-identical on the fixed x64 Release build. The supplied screenshot remains the
-reliable pre-fix reproduction.
+captures are pixel-identical on the fixed x64 Release build. The original user-supplied screenshot
+remains the pre-fix reproduction; the post-fix stopped, running, paused, scrolled, and tray states
+are recorded in `docs/assets/capture-manifest.json` with exact PNG and executable hashes.
 
 ## Current release-preparation follow-up
 
@@ -54,13 +56,23 @@ motion-coordinate dependency, recorded the historical inspiration in `THIRD-PART
 applied `GPL-3.0-only` consistently to the repository, portable archive, package manifest, and SPDX
 SBOM metadata.
 
+The release-preparation branch restores Windows PowerShell 5.1 release checks, keeps first-owner and
+forwarded CLI overrides explicitly saveable without silent INI persistence, and provides a
+deterministic exact-build screenshot harness. Issues
+[#42](https://github.com/Chris0Jeky/IdleHarbor/issues/42),
+[#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
+[#44](https://github.com/Chris0Jeky/IdleHarbor/issues/44), and
+[#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) are expected to close when that branch
+lands. Issue [#46](https://github.com/Chris0Jeky/IdleHarbor/issues/46) records two non-blocking status
+refresh follow-ups outside the `v0.1.0` release boundary.
+
 ## Portfolio and publication queue
 
 PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) contains pre-redesign portfolio text and
-privacy-reviewed captures. It is intentionally superseded rather than merged because its imagery
-no longer represents the release candidate. Fresh exact-build screenshots, social-preview artwork,
-and publication metadata will replace it after the redesigned UI lands. Issue
-[#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks that publication boundary.
+captures and is superseded rather than merged. The release-preparation branch replaces it with five
+privacy-reviewed exact-build screenshots, a reproducible capture manifest, refreshed social-preview
+artwork, and current publication metadata. Issue
+[#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) tracks the remaining publication boundary.
 
 The installer has locally proved per-user Task Scheduler, Startup-folder, HKCU Run, and no-startup
 modes; exact rollback after fresh and update failures; preservation of unexpected files and
@@ -77,12 +89,11 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 
 ## Resume order
 
-1. Prove and merge the native UI redesign.
-2. Refresh exact-build screenshots, documentation, repository
-   metadata, and social-preview artwork.
-3. Run final native runtime, packaging, installer, performance, security, accessibility, and
+1. Finish and merge exact-build screenshots, documentation, repository metadata, and social-preview
+   artwork.
+2. Run final native runtime, packaging, installer, performance, security, accessibility, and
    release-artifact QA; preserve a dated demonstration bundle.
-4. Tag and publish unsigned `v0.1.0`, then derive and submit package-manager manifests from its
+3. Tag and publish unsigned `v0.1.0`, then derive and submit package-manager manifests from its
    immutable release URLs and hashes.
 
 ## Proving commands

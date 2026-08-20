@@ -35,6 +35,16 @@ Extract the architecture-matched archive and run `IdleHarbor.exe`. Portable use 
 startup entry. It stores `IdleHarbor.ini` beside the executable when launched with `--portable`.
 Use the tray menu or documented command-line options to control a session.
 
+For the simplest persistent per-user setup without automatic startup, verify and extract the ZIP,
+then run:
+
+```powershell
+.\install.ps1 -Startup None
+```
+
+This creates the default Start Menu launcher and leaves startup disabled. The ZIP remains the
+canonical distribution; installation is optional.
+
 ## Per-user installation
 
 From an extracted release directory, preview the changes:
@@ -84,6 +94,10 @@ is incomplete, the installer retains that directory and reports its exact recove
 bytes remain available for manual repair. Managed paths that are symbolic links, junctions, or
 multiply linked files are rejected so an update cannot write through the installation boundary.
 Unexpected user files are preserved.
+
+On a managed laptop, do not choose Task Scheduler, StartupFolder, or RunKey unless policy permits
+both IdleHarbor and that persistence mechanism. If endpoint controls block the executable or
+installer, do not disable or independently whitelist around them.
 
 Uninstall with:
 
