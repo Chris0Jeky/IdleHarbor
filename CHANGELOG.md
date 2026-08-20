@@ -77,6 +77,8 @@ where practical.
   while preserving transaction-residue assertions.
 - Use in-process .NET hashing for SBOM and checksum generation so concurrent Windows PowerShell
   5.1 and PowerShell 7 packaging runs do not depend on command auto-loading.
+- Repaint the settings viewport and all descendant controls after scrolling, layout convergence,
+  and Running/Stopped enabled-state changes so stale control fragments do not survive until resize.
 
 ### Release boundary
 

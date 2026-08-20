@@ -757,7 +757,21 @@ class Application final {
                 height,
                 SWP_NOACTIVATE | SWP_NOZORDER);
         }
-        InvalidateRect(window_, nullptr, TRUE);
+    }
+
+    void RepaintSettingsViewport() const noexcept {
+        const HWND target = settings_viewport_ != nullptr ? settings_viewport_ : window_;
+        if (target == nullptr) {
+            return;
+        }
+        // Body controls are child windows moved inside a clipped child viewport.
+        // Finish each layout/state transaction with one synchronous descendant
+        // repaint so exposed client pixels cannot retain their previous contents.
+        RedrawWindow(
+            target,
+            nullptr,
+            nullptr,
+            RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
     }
 
     void UpdateViewport() {
@@ -818,6 +832,7 @@ class Application final {
         publish_scroll_info(true);
         LayoutControls();
         updating_viewport_ = false;
+        RepaintSettingsViewport();
     }
 
     void ScrollTo(const int position) {
@@ -833,6 +848,7 @@ class Application final {
             SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
         }
         LayoutControls();
+        RepaintSettingsViewport();
     }
 
     void HandleVerticalScroll(const WPARAM w_param) {
@@ -1325,6 +1341,7 @@ class Application final {
                 EnableWindow(control, session_active_ ? FALSE : TRUE);
             }
         }
+        RepaintSettingsViewport();
     }
 
     bool ReadControls(std::wstring& error) {

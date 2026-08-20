@@ -69,14 +69,16 @@ its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 
-Use a Windows developer PowerShell with Visual Studio 2022 and CMake. For a Visual Studio generator
-build:
+Use a Windows developer PowerShell with Visual Studio 2019 or newer and CMake. This machine's
+validated Visual Studio 2019 Build Tools command is:
 
 ```powershell
-cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 ```
+
+With Visual Studio 2022, use generator `Visual Studio 17 2022` instead.
 
 The project is Windows-only. CI also builds ARM64 and Win32; release packaging currently produces
 x64 and ARM64 archives. The packaging parser and ownership tests can be run independently:
