@@ -10,28 +10,40 @@ genuine-input observation, battery/fullscreen/session safeguards, visible tray c
 emergency stop, and transactional per-user installation. It has no telemetry or network service.
 No licence, tag, or release has been created or published.
 
-The merged baseline at the start of the current repaint follow-up was `origin/main` at
-`6fa05cdcd8722bb1f675974c76f1bf990802de1a`. PRs
+The current merged baseline is `origin/main` at
+`abcaf19e21aa535085dd34a052207c26d12acca4`. PRs
 [#30](https://github.com/Chris0Jeky/IdleHarbor/pull/30) and
 [#33](https://github.com/Chris0Jeky/IdleHarbor/pull/33) completed the compact-viewport accessibility,
-scroll-range convergence, and inherited-scrollbar fixes. Earlier merged work established the
-runtime, settings recovery, installer rollback and ownership boundaries, release workflow,
-multi-architecture CI, CodeQL, and packaging isolation.
+scroll-range convergence, and inherited-scrollbar fixes. PR
+[#35](https://github.com/Chris0Jeky/IdleHarbor/pull/35) closed issue
+[#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) with the descendant-repaint fix and native
+192-DPI smoke. Earlier merged work established the runtime, settings recovery, installer rollback
+and ownership boundaries, release workflow, multi-architecture CI, CodeQL, and packaging isolation.
 
-## Current repaint follow-up
+## Repaint follow-up
 
 Issue [#34](https://github.com/Chris0Jeky/IdleHarbor/issues/34) records a 192-DPI Running-state
 settings-body artifact: disabled controls can leave stale fragments after viewport movement, while
 resizing temporarily clears the display. The cause seam is the manually moved child controls inside
 a nested `WS_CLIPCHILDREN` viewport without a final explicit descendant repaint.
 
-The bounded fix repaints the settings viewport and all descendants after final layout convergence,
+The merged fix repaints the settings viewport and all descendants after final layout convergence,
 scroll-position changes, and Running/Stopped enabled-state changes. The native interactive smoke
 starts a safe motion-free session, proves that body controls are disabled, drives real wheel input,
 and compares natural frames with explicit descendant-repaint references at this desktop's 192 DPI.
 The smoke passes on the fixed x64 Release build. The supplied screenshot remains the reliable
 pre-fix reproduction: repeated automation against the old binary did not reproduce the intermittent
 artifact deterministically, so a red-old/green-new image comparison is not claimed.
+
+## Current installer follow-up
+
+The current branch adds a per-user Start Menu shortcut as the installer's default launch surface.
+It opens the visible settings window with `--show`; automatic startup remains an independent,
+explicit choice. The installer records ownership only for a shortcut it created, restores exact
+prior bytes on rollback, and rejects unsafe or foreign shortcut leaves. `-StartMenu None` and the
+uninstaller remove only an exact, marker-owned shortcut; changed or unowned shortcuts are
+preserved. The lifecycle suite uses temporary injected shortcut paths, so the actual per-user Start
+Menu path will be exercised during the final machine installation after this slice merges.
 
 ## Portfolio and publication queue
 
@@ -59,7 +71,8 @@ under PowerShell 7 and Windows PowerShell 5.1. Startup remains explicit and visi
 
 ## Resume order
 
-1. Prove, review, and merge the issue #34 repaint follow-up, then sweep late review feedback once.
+1. Prove, review, and merge the ownership-safe Start Menu installer follow-up, then sweep late
+   review feedback once.
 2. Incorporate final `main` into PR #31, refresh its exact-build evidence, and complete the GitHub
    social-preview upload/visual check.
 3. Run final native runtime, packaging, installer, performance, security, accessibility, and
