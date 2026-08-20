@@ -33,9 +33,10 @@ Fresh local evidence at this checkpoint:
 - `packaging/Test-Packaging.ps1` passed, including matching/mismatched release tags and SPDX checks.
 - `git diff --check` passed before this state update.
 
-The previous PR head `21ea6e4` was green in hosted x64, ARM64, x86, CodeQL analysis, and CodeQL
-scanning. Hosted CI has not yet proved the review-fix head. Review threads have not yet been replied
-to or resolved; preserve them until the corresponding commit and verification evidence are posted.
+The review-fix checkpoint is pushed to `origin/agent/v0.1.0-native-release`. The previous PR head
+`21ea6e4` was green in hosted x64, ARM64, x86, CodeQL analysis, and CodeQL scanning; hosted CI has
+not yet proved the new head. Review threads have not yet been replied to or resolved; preserve them
+until the corresponding commit and verification evidence are posted.
 
 ## Authority and publication
 
@@ -60,8 +61,8 @@ tags and generates checksums, SPDX SBOMs, and GitHub attestations.
 
 ## Next safe slice
 
-1. Push the checkpoint on `agent/v0.1.0-native-release` and wait for exact-head x64, ARM64, x86,
-   CodeQL analysis, and CodeQL scanning results.
+1. Wait for exact-head x64, ARM64, x86, CodeQL analysis, and CodeQL scanning results on
+   `agent/v0.1.0-native-release`.
 2. Exercise the deferred forwarded-command path and installer collision preflight on a real Windows
    desktop, then reply to and resolve each of the eight review threads with commit/check evidence.
 3. Recheck the PR diff, zero open code-scanning alerts, mergeability, and the three-minute head-age
