@@ -20,8 +20,10 @@ closed.
 PR #10's local evidence included x64 CTest 6/6 plus complete packaging and real seven-scenario
 rollback matrices under both PowerShell 7.6.4 and Windows PowerShell 5.1. The matrix covered every
 startup mechanism, fresh failure cleanup, exact update restoration, preservation of unknown files,
-Task Scheduler folder ownership, hard-link rejection, successful update, and uninstall. Follow-up
-edge hardening is tracked in [#11](https://github.com/Chris0Jeky/IdleHarbor/issues/11) and
+Task Scheduler folder ownership, hard-link rejection, successful update, and uninstall. Issue
+[#11](https://github.com/Chris0Jeky/IdleHarbor/issues/11) is complete: installer rollback recovery
+material is retained only when managed-file restoration is incomplete, and first-time same-source
+installs require a valid ownership marker. Follow-up edge hardening remains tracked in
 [#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12).
 
 ## Active integration queue
@@ -71,7 +73,7 @@ from real URLs and hashes.
 
 1. Finish and ship the viewport slice for #2 with native, hosted, review, and real desktop evidence.
 2. Complete #6 using genuine application captures and polish the GitHub presentation.
-3. Resolve the bounded #11/#12 release-hardening follow-ups.
+3. Resolve the bounded [#12](https://github.com/Chris0Jeky/IdleHarbor/issues/12) release-hardening follow-up.
 4. Resolve q-1 and q-2 with the user, then run the final tag/release/install/distribution audit.
 
 ## Proving commands
