@@ -1,131 +1,149 @@
 # Project state
 
-Last updated: 2026-08-20
+Last updated: 2026-08-20 12:05 UTC
 
 ## Stop-safe checkpoint
 
-The 2026-08-20 session ended intentionally at a recoverable checkpoint. All intended source and
-documentation work is committed, the two temporary delegated worktrees were removed with plain
-`git worktree remove`, and every active branch is saved on `origin`. This checkout intentionally
-remains on `agent/v0.1.0-ui-viewport` so this handoff and the unfinished viewport slice are visible
-on resume. Ignored build products remain locally and are disposable.
+The session ended intentionally at a recoverable checkpoint. Every intended repository change is
+committed and pushed. The completed settings-recovery slice is merged; the installer and viewport
+slices are saved on separate remote branches and are not represented as merge-ready. No release,
+tag, licence, signing decision, startup configuration, or external deployment was created.
 
-`origin/main` is `986cb011ea645f73e0d806f623c15e454bd740c1`, the merge commit for pull request
-[#1](https://github.com/Chris0Jeky/IdleHarbor/pull/1). The PR merged with x64, ARM64, x86,
-CodeQL analysis, and CodeQL scanning green; all 11 review threads were resolved and the post-merge
-review sweep found no untriaged late feedback. Main branch protection still requires the four named
-build/analysis checks and conversation resolution, and disallows force pushes and deletion.
+The primary checkout intentionally remains on `agent/v0.1.0-ui-viewport` so the unfinished viewport
+work and this handoff are immediately visible on resume. The only remaining delegated worktree is
+the clean installer checkout. The completed settings worktree was removed with plain
+`git worktree remove` after its status showed only disposable ignored build output.
 
-No release or tag has been published. Human licence approval remains a hard release gate; see
-`HUMAN_TODO.md`.
+## Landed on `main`
 
-## Saved follow-up branches
+`origin/main` is `f9c07ef0a5e5b0b4c73bc591bc8b448bfabf3ec2`, the merge commit for pull request
+[#8](https://github.com/Chris0Jeky/IdleHarbor/pull/8). Issue
+[#3](https://github.com/Chris0Jeky/IdleHarbor/issues/3) is closed.
 
-### `agent/v0.1.0-settings-safety`
+The landed settings-recovery behavior:
 
-Remote head: `95a619a639b2ece23c575dd993d91a2e236623f6`
+- shows every recovery warning and leaves the window visible;
+- blocks initial or forwarded automatic start and stopped-session toggle until a successful Save;
+- keeps explicit in-window Start under the user's control;
+- preserves `Stopped: ready` on a healthy launch; and
+- preserves Running or Paused status when a redundant forwarded start is blocked.
 
-- `6f3dda5` blocks automatic start and stopped-session toggle after settings recovery until the
-  warnings have been shown and the settings are successfully saved.
-- `95a619a` adds malformed, out-of-range, and cross-field warning coverage and updates the user,
-  safety, troubleshooting, changelog, and project-state documentation.
-- Verified locally: x64 Debug build and CTest 6/6; x64 Release build and CTest 6/6;
-  `git diff --check origin/main..HEAD`.
-- NOT verified: hosted CI, x86, or a real GUI/tray smoke of the recovery message and forwarded
-  startup-command behavior.
-- Intended issue: [#3](https://github.com/Chris0Jeky/IdleHarbor/issues/3).
+Exact-head x64, ARM64, x86, CodeQL analysis, and CodeQL scanning checks passed. A fresh-context
+review passed after the logic fixes, the sole connector thread was fixed and resolved, and the
+three-minute final-head aging floor elapsed before merge. A real Windows UI Automation smoke covered
+the warning dialog, all four warnings, blocked launch commands, explicit Start, redundant forwarded
+Start, Stop, Save, post-save start, healthy relaunch, and clean exit. The immediate post-merge sweep
+found no untriaged late feedback.
 
-### `agent/v0.1.0-installer-trust`
+## Saved installer and release-trust slice
 
-Remote head: `a8d84c5facda76fb265df402fba59f2aeacd4515`
+Branch: `agent/v0.1.0-installer-trust`  
+Remote head: `dd65ee83af1113100936420dc860c8c2169f26cf`  
+Worktree: `..\IdleHarbor-worktrees\installer-trust-ship`
 
-- `e8340cf` makes a fresh per-user installation transactional and adds injected-failure rollback
-  coverage.
-- `a8d84c5` validates the application manifest version, adds a tracked-root-`LICENSE` publication
-  guard without inventing licence approval, and documents which trust assets live outside the
-  portable ZIP.
-- Verified locally: `packaging/Test-Packaging.ps1`, YAML lint for all workflows,
-  `Test-ReleaseVersion.ps1 -Tag v0.1.0`, and `git diff --check origin/main..HEAD`.
-- Expected gate: the standalone publication guard rejects the current repository because no tracked
-  root `LICENSE` exists.
-- NOT verified: current native CMake/CTest, hosted CI/review, runtime install QA, signing, or an
-  actual publication.
-- Residual risk: rollback restores fresh-install files and directories, but does not snapshot a
-  startup registration if the real registration operation partially mutates before failing.
-- Intended issues: [#4](https://github.com/Chris0Jeky/IdleHarbor/issues/4) and
-  [#5](https://github.com/Chris0Jeky/IdleHarbor/issues/5).
+Commits:
 
-### `agent/v0.1.0-ui-viewport`
+- `e8340cf` — fresh-install rollback and failure injection;
+- `a8d84c5` — embedded-version and tracked-root-`LICENSE` publication guards; and
+- `dd65ee8` — snapshots/restores managed installation files, the ownership marker, and owned
+  startup state when an update or startup mutation throws.
 
-Viewport implementation commit: `be6b42d77e73cac563e7bce76abe4a14fedbd4a4`
+Saved verification at `dd65ee8`:
 
-- Adds canonical DPI-scaled control geometry, work-area clamping, resize layout, vertical scrolling,
-  focus reveal, and pure layout/scroll helpers with tests.
-- Verified locally: the existing x64 Release build completed and CTest passed 7/7, including the
-  new `window_layout` test; the staged source passed `git diff --check` before commit.
-- NOT verified: hosted CI/review; a real desktop smoke for resize, scrollbar thumb, child-targeted
-  mouse wheel, high-resolution wheel deltas, focus auto-scroll, and mixed-DPI monitor movement.
-- Review before PR: the current wheel path handles top-level `WM_MOUSEWHEEL` and does not retain
-  partial wheel deltas. Confirm child-target routing and combo-popup behavior before calling #2
-  complete.
-- Intended issue: [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2).
+- both changed PowerShell files parse successfully under PowerShell 7.6.4;
+- `git diff --check` passes; and
+- `packaging/Test-Packaging.ps1` passes, including fresh-root rollback, preservation of a
+  pre-existing empty root, exact update file/marker restoration, preservation of an unknown user
+  file, successful update, and same-source/destination marker rollback.
 
-The settings-safety and viewport branches both change `src/app/main.cpp`. Integrate them
-sequentially and preserve both commit histories; merge the newly landed `main` into the remaining
-branch and resolve that overlap explicitly rather than force-rewriting a published branch.
+Earlier real installer smoke passed under PowerShell 7 and Windows PowerShell 5.1 for injected fresh
+failure, sentinel preservation, actual install, hash/marker validation, launch/exit, and clean
+uninstall. The complete packaging suite currently passes under PowerShell 7; its Windows PowerShell
+5.1 ZIP-entry comparison incompatibility is tracked by
+[#9](https://github.com/Chris0Jeky/IdleHarbor/issues/9).
 
-## Evidence already gathered on the landed base
+This branch is **not merge-ready yet**. The two prior HIGH review findings motivated `dd65ee8`, but
+that fix commit still needs a fresh-context review and real startup/update rollback smoke. It also
+needs `origin/main` merged into the branch, current native CMake/CTest, hosted exact-head CI, PR
+review, and the normal aging gate. Rollback covers caught PowerShell failures, not machine loss or
+process termination mid-transaction; stronger crash consistency would require a durable journal.
+No PR is open for this branch. Intended issues are
+[#4](https://github.com/Chris0Jeky/IdleHarbor/issues/4) and
+[#5](https://github.com/Chris0Jeky/IdleHarbor/issues/5).
 
-- Real Windows startup-collision smokes proved that foreign Startup-folder, HKCU Run, and scheduled
-  task entries are rejected before install-root mutation and remain preserved.
-- A forwarded invalid start returned promptly, displayed its owner-side error, accepted a follow-up
-  show command, and exited cleanly.
-- Power-only runtime control reached Running, accepted Stop, reported `Stopped: manually stopped`,
-  and exited cleanly.
-- UI Automation found 21 focusable controls; forward and reverse keyboard traversal worked and
-  Space activated Save. Enter intentionally does not start the application by default.
-- `powercfg /requests` was NOT verified because this machine requires an elevated shell and no
-  elevation was authorized.
+## Saved high-DPI viewport slice
 
-## GitHub queue
+Branch: `agent/v0.1.0-ui-viewport`  
+Implementation commit: `be6b42d77e73cac563e7bce76abe4a14fedbd4a4`
 
-- Milestone issues [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) through
-  [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) remain open.
-- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) appeared after the
-  product PR merged and was not reviewed in this session.
-- No follow-up product PR is open yet; the three branches above are checkpoints, not merge-ready
-  claims.
+The slice adds DPI-scaled control geometry, work-area clamping, resize layout, vertical scrolling,
+focus reveal, and pure layout/scroll helpers with tests. The saved x64 Release build completed and
+CTest passed 7/7, including `window_layout`; the committed source passed `git diff --check`.
 
-## Next safe slices
+This branch is **not merge-ready yet**. It predates PR #8 and both slices edit `src/app/main.cpp`.
+Merge `origin/main` into this published branch and resolve the overlap without rewriting history.
+Then finish child-target wheel routing, retain partial high-resolution wheel deltas, avoid swallowing
+combo-popup input, and run genuine resize, scrollbar-thumb, focus-reveal, mixed-DPI, and tray/UI
+smokes. Update docs, changelog, and screenshots only after the actual behavior is proven. Intended
+issue: [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2).
 
-1. Review `agent/v0.1.0-settings-safety`, perform its real GUI recovery/startup smoke, open a
-   ready-for-review PR that closes #3, and merge only after exact-head required CI, one review, and
-   the three-minute aging floor.
-2. Review `agent/v0.1.0-installer-trust`, run current native tests plus real install failure/rollback
-   smoke, then open the #4/#5 PR and use the same gate. The missing licence is an expected release
-   blocker, not a reason to weaken the guard.
-3. Merge the new main into `agent/v0.1.0-ui-viewport`, resolve the settings-window overlap, finish
-   child-target/high-resolution wheel routing, run the real resize/focus/mixed-DPI smoke, update
-   user docs/changelog and genuine screenshots, then open the #2 PR.
-4. Complete the portfolio visual evidence and manually upload the committed 1280x640 social preview
-   for #6. Automated browser attachment was denied; no repository setting was changed.
-5. Ask for an explicit answer to q-1. If MIT is approved, add the exact approved licence/copyright
-   in a focused reviewed change and update SBOM licence fields. Do not infer approval. q-2 may remain
-   explicitly unsigned for v0.1.0.
-6. Only after all exact-head release gates pass: create and push the annotated `v0.1.0` tag, verify
-   the published archives/checksums/SBOM/attestations and clean-machine install paths, then add
-   WinGet/Scoop manifests from real asset URLs and hashes.
+## GitHub and portfolio queue
 
-## Proving commands
+- Dependabot pull request [#7](https://github.com/Chris0Jeky/IdleHarbor/pull/7) is open with green
+  checks but still needs its one real review before merge.
+- Portfolio visuals and the repository social preview remain under
+  [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6). The existing 1280x640 asset needs a
+  contrast pass, and genuine Running, Paused, and tray screenshots still need to be captured.
+- The browser file chooser previously prevented automated social-preview upload; treat the GitHub
+  setting as a human/manual fallback if a safe automated path is still unavailable.
+- Hosted ARM64 evidence is build/test evidence only, not representative ARM64 runtime proof.
+- `powercfg /requests` remains NOT verified because this machine requires elevation and no elevation
+  was authorized.
 
-From a Windows developer PowerShell:
+## Human gates and release boundary
+
+`HUMAN_TODO.md` remains authoritative:
+
+- q-1: explicit open-source licence approval is unresolved. Do not add a `LICENSE`, infer the
+  copyright holder, tag, or publish a release until the user answers it.
+- q-2: Authenticode signing is optional. If no signing identity is supplied, document v0.1.0 as
+  unsigned and rely on checksums and provenance attestations.
+
+After q-1 is answered, land the exact approved licence and SBOM metadata through a focused reviewed
+change. Only after every exact-head release gate passes should `v0.1.0` be tagged. Verify the actual
+published archives, checksums, SBOM, attestations, and clean install paths before generating WinGet
+or Scoop manifests from real URLs and hashes.
+
+## Resume order
+
+1. Fetch `origin` and read `AGENTS.md`, `HUMAN_TODO.md`, and this file.
+2. Finish and review the installer rollback fix at `dd65ee8`; merge current `origin/main`, rerun its
+   scoped tests, and open the #4/#5 PR only when the branch is genuinely ready.
+3. Merge the newly landed `main` into `agent/v0.1.0-ui-viewport`, finish the wheel/input behavior,
+   and complete #2 with real visual/runtime evidence.
+4. Review Dependabot #7 and complete the portfolio evidence in #6.
+5. Ask the user for q-1 once implementation is otherwise release-ready; handle q-2 explicitly.
+6. Run a final end-to-end completion audit, then publish and verify v0.1.0. The broader project goal
+   remains active; this checkpoint is a pause, not a completion claim.
+
+## Useful local evidence
+
+Scratch smoke scripts are saved outside the repository under the session's `work` directory:
+
+- `test-settings-recovery.ps1`
+- `test-installer-transaction.ps1`
+- `test-forwarded-command.ps1`
+- `test-foreign-startup.ps1`
+- `test-power-request.ps1`
+- `capture-idleharbor.ps1`
+
+On this machine use the installed Visual Studio 2019 generator:
 
 ```powershell
-cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-Packaging.ps1
 ```
 
-CI additionally configures ARM64 and Win32. Hosted ARM64 evidence proves build/test only, not
-runtime behavior on representative ARM64 hardware.
+CI additionally configures ARM64 and Win32.
