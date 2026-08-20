@@ -52,8 +52,11 @@ non-critical session before relying on them.
 Normal settings live under the user's local application-data directory. Portable mode stores
 `IdleHarbor.ini` beside the executable; `--config PATH` takes precedence at owner-instance launch.
 Settings are validated, unknown keys are ignored, and writes use a temporary file followed by an
-atomic replacement. If an INI value is invalid, restore the profile defaults or remove the offending
-key and relaunch.
+atomic replacement. If an INI value is malformed, out of range, unsupported, or conflicts with
+another value, IdleHarbor shows every recovery warning, keeps the settings window visible and
+Stopped, and blocks automatic `--start` or stopped `--toggle` commands. Review the fallback values,
+correct the offending key, and press **Save** before relying on automatic startup. An explicit Start
+action remains user-controlled.
 
 For active hours, use minutes from midnight:
 

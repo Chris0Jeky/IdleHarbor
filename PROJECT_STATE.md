@@ -32,6 +32,8 @@ Fresh local evidence at this checkpoint:
 - x86 Release built successfully and all 6 CTest tests passed.
 - `packaging/Test-Packaging.ps1` passed, including matching/mismatched release tags and SPDX checks.
 - `git diff --check` passed before this state update.
+- Settings-load recovery warnings are preserved and surfaced; automatic starts stay blocked until
+  recovered values are reviewed and saved, with malformed, range, and cross-field test coverage.
 
 The review-fix checkpoint is pushed to `origin/agent/v0.1.0-native-release`. The previous PR head
 `21ea6e4` was green in hosted x64, ARM64, x86, CodeQL analysis, and CodeQL scanning; hosted CI has
