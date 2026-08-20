@@ -9,6 +9,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-FileDigestHex([string]$Path, [string]$Algorithm) {
+    $hashAlgorithm = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        return [BitConverter]::ToString($hashAlgorithm.ComputeHash($stream)).Replace('-', '')
+    }
+    finally {
+        $stream.Dispose()
+        $hashAlgorithm.Dispose()
+    }
+}
+
 $root = (Resolve-Path -LiteralPath $InputDirectory).Path
 $output = [IO.Path]::GetFullPath($OutputPath)
 $entries = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object { [IO.Path]::GetFullPath($_.FullName) -ine $output } | Sort-Object FullName)
@@ -21,7 +33,7 @@ $lines = foreach ($entry in $entries) {
         throw "Checksum input escaped its declared root: $fullName"
     }
     $relative = $fullName.Substring($rootPrefix.Length).Replace('\', '/')
-    $hash = (Get-FileHash -LiteralPath $entry.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hash = (Get-FileDigestHex $entry.FullName 'SHA256').ToLowerInvariant()
     "${hash} *${relative}"
 }
 
