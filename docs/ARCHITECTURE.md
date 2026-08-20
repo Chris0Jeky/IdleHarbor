@@ -87,10 +87,13 @@ active session; destruction unregisters the hotkey and session notifications, re
 stops the timer and hooks, and clears the power request.
 
 The top-level window scales canonical control geometry for its current monitor, clamps its preferred
-rectangle to the monitor work area, and exposes a vertical viewport when the content is taller than
-the client area. Child controls forward wheel input to that viewport unless a combo list is open;
-partial wheel deltas are retained and Windows' configured wheel-scroll amount is respected. Dialog
-keyboard navigation runs through the same focus-reveal path.
+rectangle to the monitor work area, and keeps a fixed status/safety header and Start/Stop action bar
+outside a clipped settings viewport. When the body is taller than the available client area, that
+viewport exposes a native vertical scrollbar. Narrow work areas reflow paired labels and fields into
+one column and wrap or stack the action bar. Child controls forward wheel input to the viewport
+unless a combo list is open; partial wheel deltas are retained and Windows' configured wheel-scroll
+amount is respected. Dialog keyboard navigation reveals a newly focused body control, while pointer
+and scrollbar scrolling with unchanged focus remains stable.
 
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.

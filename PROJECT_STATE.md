@@ -30,20 +30,29 @@ installs require a valid ownership marker. Follow-up edge hardening remains trac
 
 ### High-DPI viewport
 
-The current branch, `agent/v0.1.0-ui-viewport`, incorporates the latest `origin/main` and contains:
+The merged baseline is `origin/main` at `7b1bcf3`. Ready-for-review PR
+[#18](https://github.com/Chris0Jeky/IdleHarbor/pull/18), on branch
+`agent/v0.1.0-viewport-safety`, remains open and unmerged. It carries the viewport hardening
+slice for issues #14 and #15, including:
 
 - `be6b42d`: canonical DPI-scaled geometry, work-area clamping, resize layout, vertical scrolling,
   focus reveal, and pure layout/scroll tests;
 - `c6eaa53`: child-targeted wheel routing, native combo-popup preservation, system wheel-setting
   support, and retained high-resolution wheel deltas.
+- Fixed safety regions keep live status and immediate Start/Stop visible while the settings body
+  scrolls; narrow widths reflow controls and action buttons.
+- Focus reveal is gated on actual focus changes, and fractional-DPI width decisions use exact
+  physical/logical conversion at 120%, 150%, and 175% scaling.
 
-The current local x64 Release build passes CTest 7/7. A real 200%-DPI desktop smoke resized the
-window, exercised three partial wheel messages over a child control, preserved native wheel handling
-for an open combo box, used native line/page scrolling, preserved an in-range scroll position across
-resize, revealed an off-screen control by direct focus and forward/reverse keyboard traversal,
-activated Save with Space, started/stopped a session, and hid/restored the window through the
-notification area. Only one display is attached, so a true cross-monitor mixed-DPI transition is
-not locally verifiable and must remain explicit.
+The current local x64 Release build passes CTest 7/7, including deterministic safety-region,
+focus-gating, fractional-DPI, and short-client Stop-bound tests. A real 200%-DPI desktop smoke at
+the earlier PR head resized the window, exercised three partial wheel messages over a child control,
+preserved native wheel handling for an open combo box, used native line/page scrolling, preserved an
+in-range scroll position across resize, revealed an off-screen control by direct focus and
+forward/reverse keyboard traversal, activated Save with Space, started/stopped a session, and
+hid/restored the window through the notification area. The fractional-DPI and short-client follow-up
+has not had a new desktop smoke. Only one display is attached, so a true cross-monitor mixed-DPI
+transition is not locally verifiable and must remain explicit.
 
 Before issue [#2](https://github.com/Chris0Jeky/IdleHarbor/issues/2) is closed, update user-facing
 docs and genuine screenshots, run a final exact-head native/desktop proof, obtain hosted CI and an

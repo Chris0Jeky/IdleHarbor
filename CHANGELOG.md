@@ -17,6 +17,9 @@ where practical.
 - Per-user installer, ownership marker, WhatIf preview, uninstall, and opt-in Task Scheduler/Startup-folder/HKCU Run choices.
 - CI build matrix, pinned actions, CodeQL workflow, portable release packaging, checksums, SPDX SBOMs, and GitHub attestations.
 - Per-monitor-DPI-aware resize and scrolling that keeps every setting and action keyboard reachable.
+- Fixed the live status and immediate Start/Stop actions outside the scrolling settings body; narrow
+  work areas now reflow settings and wrap or stack actions, and focus reveal no longer undoes pointer
+  or scrollbar scrolling when focus is unchanged.
 
 ### Changed
 
