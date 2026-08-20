@@ -407,6 +407,7 @@ bool SaveSettings(
 
     const auto& session = settings.session;
     output << "# IdleHarbor settings. Unknown keys are ignored; invalid values fall back safely.\r\n"
+           << "# distance is the motion multiplier (1-120); the key is retained for compatibility.\r\n"
            << "schema=" << kSettingsSchemaVersion << "\r\n"
            << "profile=" << core::profile_kind_name(session.profile) << "\r\n"
            << "motion=" << core::motion_mode_name(session.motion) << "\r\n"

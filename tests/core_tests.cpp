@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -64,26 +66,32 @@ bool test_motion_plans_are_deterministic_and_return_home() {
     const auto off = idleharbor::core::make_motion_plan(MotionMode::Off, 12);
     CHECK(off.relative_offsets.empty());
 
-    for (const auto mode : {MotionMode::Normal, MotionMode::Linear, MotionMode::Circle, MotionMode::Zen}) {
-        const auto first = idleharbor::core::make_motion_plan(mode, 12);
-        const auto second = idleharbor::core::make_motion_plan(mode, 12);
-        CHECK(first.mode == mode);
-        CHECK(first.distance == 12);
-        CHECK(first.relative_offsets == second.relative_offsets);
-        CHECK(!first.relative_offsets.empty());
-        CHECK(first.relative_offsets.back() == (Point{0, 0}));
-        for (const auto point : first.relative_offsets) {
-            CHECK(point.x <= 12 && point.x >= -12);
-            CHECK(point.y <= 12 && point.y >= -12);
-        }
-        if (mode != MotionMode::Zen) {
-            CHECK(first.relative_offsets.size() > 1);
-        }
-    }
+    const std::vector<Point> expected_normal{{4, 4}, {0, 0}};
+    const std::vector<Point> expected_linear{{4, 0}, {0, 0}};
+    const std::vector<Point> expected_circle{
+        {3, 2}, {5, 5}, {3, 8}, {0, 10}, {-3, 8}, {-5, 5}, {-3, 2}, {0, 0}};
+    const std::vector<Point> expected_zen{{0, 0}};
+    CHECK(idleharbor::core::make_motion_plan(MotionMode::Normal, 1).relative_offsets == expected_normal);
+    CHECK(idleharbor::core::make_motion_plan(MotionMode::Linear, 1).relative_offsets == expected_linear);
+    CHECK(idleharbor::core::make_motion_plan(MotionMode::Circle, 1).relative_offsets == expected_circle);
+    CHECK(idleharbor::core::make_motion_plan(MotionMode::Zen, 1).relative_offsets == expected_zen);
+
+    const auto scaled = idleharbor::core::make_motion_plan(MotionMode::Circle, 12);
+    CHECK(scaled.mode == MotionMode::Circle);
+    CHECK(scaled.distance == 12);
+    const std::vector<Point> expected_scaled{
+        {36, 24}, {60, 60}, {36, 96}, {0, 120}, {-36, 96}, {-60, 60}, {-36, 24}, {0, 0}};
+    CHECK(scaled.relative_offsets == expected_scaled);
 
     const auto clamped = idleharbor::core::make_motion_plan(MotionMode::Linear, 1000);
     CHECK(clamped.distance == Settings::kMaximumDistance);
-    CHECK(clamped.relative_offsets.front() == (Point{120, 0}));
+    const std::vector<Point> expected_clamped{{480, 0}, {0, 0}};
+    CHECK(clamped.relative_offsets == expected_clamped);
+    const auto overflow_safe = idleharbor::core::make_motion_plan(
+        MotionMode::Circle, std::numeric_limits<std::uint32_t>::max());
+    CHECK(overflow_safe.distance == Settings::kMaximumDistance);
+    CHECK(overflow_safe.relative_offsets.back() == (Point{0, 0}));
+    CHECK(overflow_safe.relative_offsets.front() == (Point{360, 240}));
     return true;
 }
 
