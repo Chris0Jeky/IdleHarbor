@@ -311,7 +311,7 @@ class Application final {
         ApplyEmergencyHotkeySetting();
 
         RefreshControls();
-        std::wstring initial_status;
+        std::wstring initial_status = L"Stopped: ready";
         if (!settings_load_warnings_.empty()) {
             initial_status = L"Stopped: settings recovered; review and save before automatic start";
         } else if (!tray_added_) {
