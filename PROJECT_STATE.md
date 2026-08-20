@@ -90,10 +90,12 @@ The follow-up branch `agent/v0.1.0-scrollbar-release` addresses issue #32 and th
 republishes scrollbar visibility and range from content height versus viewport height. Its bounded
 transaction also ignores re-entrant `WM_SIZE` notifications and preserves the requested scroll
 position until the final stable layout is known, preventing a temporary columns probe from losing
-an in-range near-bottom position. A native height-only transition at a 570-logical-pixel width
-preserves an in-range position through a short stacked-bar resize, then clears it after expansion to
-roughly a 700-logical-pixel viewport height under both PowerShell 7 and Windows PowerShell 5.1.
-The branch is pushed and awaiting review; it is not merged.
+an in-range near-bottom position. Deterministic layout coverage models the 570-to-700 logical
+boundary across supported DPI values. On this desktop, the normal minimum window size yields a
+587-logical-pixel viewport and the usable work area caps the tall probe at 670 logical pixels; the
+native harness preserved position 24 through a 570-to-580 height-only resize, then cleared the range,
+hid the scrollbar, and returned to column geometry at 670 under both PowerShell 7 and Windows
+PowerShell 5.1. A physical 560-576 logical viewport remains unverified on the attached display.
 
 `HUMAN_TODO.md` remains authoritative:
 
