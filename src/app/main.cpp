@@ -1555,7 +1555,10 @@ class Application final {
         SetChecked(notifications_, settings_.show_notifications);
         SetChecked(emergency_hotkey_, settings_.emergency_hotkey);
         suppress_dirty_tracking_ = previous_suppression;
-        UpdateButtons();
+        // UpdateDirtyPresentation() refreshes the status card first and enables
+        // the Save action last. Enabling Save here as well would publish the
+        // affordance before the status text that explains it, leaving an
+        // observable window where the card still reads as saved.
         UpdateDirtyPresentation();
     }
 
