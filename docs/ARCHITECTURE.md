@@ -98,6 +98,14 @@ visual layout, including the fixed footer's Start, Stop, Save order. It reveals 
 and also re-reveals the still-focused body control after resize/DPI layout changes; pointer and
 scrollbar scrolling with unchanged focus remains stable.
 
+Reveal is classified by how focus was reached. Each queued message is tagged as keyboard or pointer
+input before it is dispatched, so a control clicked with the mouse is never scrolled out from under
+the pointer; only keyboard focus moves and layout changes reveal. While any combo list is open the
+body neither scrolls nor repaints, because the list is a popup anchored to a control the layout would
+otherwise move. Combo selections are queued on `CBN_SELCHANGE` and applied from a posted message once
+the list has closed (retried on `CBN_CLOSEUP`), so no `CB_SETCURSEL` or forced repaint reaches a
+control that is still mid-gesture. Body controls are repositioned in one `BeginDeferWindowPos` batch.
+
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.
 
