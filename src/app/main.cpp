@@ -32,6 +32,7 @@
 namespace {
 
 using idleharbor::app::CommandLineOptions;
+using idleharbor::app::FocusRevealTrigger;
 using idleharbor::app::RequestedCommand;
 using idleharbor::core::DecisionAction;
 using idleharbor::core::EngineState;
@@ -442,6 +443,28 @@ class Application final {
         ObserveFocusChange();
     }
 
+    // Records how the user reached the control that is about to take focus.
+    // Called for every queued message before it is dispatched, so a focus
+    // change observed during dispatch already knows its own cause.
+    void NoteInputTrigger(const MSG& message) noexcept {
+        switch (message.message) {
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+        case WM_CHAR:
+            focus_trigger_ = FocusRevealTrigger::Keyboard;
+            break;
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONDBLCLK:
+        case WM_RBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_NCLBUTTONDOWN:
+            focus_trigger_ = FocusRevealTrigger::Pointer;
+            break;
+        default:
+            break;
+        }
+    }
+
     void ObserveFocusChange() {
         const HWND focused = GetFocus();
         const auto previous = reinterpret_cast<std::uintptr_t>(last_focus_);
@@ -450,7 +473,7 @@ class Application final {
             return;
         }
         last_focus_ = focused;
-        EnsureFocusedControlVisible();
+        EnsureFocusedControlVisible(focus_trigger_);
     }
 
     [[nodiscard]] bool HandleTabNavigation(const MSG& message) {
@@ -887,6 +910,9 @@ class Application final {
     }
 
     void ScrollTo(const int position) {
+        if (!idleharbor::app::BodyLayoutIsMovable(IsAnyComboBoxDropped())) {
+            return;
+        }
         const int target = idleharbor::app::ClampScrollPosition(position, ContentHeight(), ViewportHeight());
         if (target == scroll_position_) {
             return;
@@ -968,7 +994,22 @@ class Application final {
         return is_combo && SendMessageW(window, CB_GETDROPPEDSTATE, 0, 0) != FALSE;
     }
 
-    void EnsureFocusedControlVisible() {
+    // A drop-down list is a popup anchored to its combo box. While one is open
+    // the body must hold still: moving the combo moves the anchor out from
+    // under the pointer, and repainting it forces stale text under the list.
+    [[nodiscard]] bool IsAnyComboBoxDropped() const noexcept {
+        for (const HWND combo : {profile_, motion_, power_}) {
+            if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void EnsureFocusedControlVisible(const FocusRevealTrigger trigger) {
+        if (!idleharbor::app::ShouldRevealFocusedControl(trigger, IsAnyComboBoxDropped())) {
+            return;
+        }
         const HWND focused = GetFocus();
         if (focused == nullptr || (focused != window_ && IsChild(window_, focused) == FALSE)) {
             return;
@@ -1049,7 +1090,7 @@ class Application final {
             }
         }
         UpdateViewport();
-        EnsureFocusedControlVisible();
+        EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
     }
 
     void CreateControls() {
@@ -2142,7 +2183,7 @@ class Application final {
                 ShowWindow(window_, SW_HIDE);
             } else if (w_param != SIZE_MINIMIZED) {
                 UpdateViewport();
-                EnsureFocusedControlVisible();
+                EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
             }
             return 0;
         case WM_GETMINMAXINFO:
@@ -2242,6 +2283,7 @@ class Application final {
     bool disconnected_ = false;
     bool exiting_ = false;
     HWND last_focus_ = nullptr;
+    FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
     int scroll_position_ = 0;
     bool updating_viewport_ = false;
     int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
@@ -2373,6 +2415,7 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
 
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        application.NoteInputTrigger(message);
         if (!application.HandleTabNavigation(message) && IsDialogMessageW(application.window(), &message) == FALSE) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
