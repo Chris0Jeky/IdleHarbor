@@ -274,6 +274,28 @@ void test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi() {
     }
 }
 
+void test_pointer_focus_does_not_scroll_the_body() {
+    using idleharbor::app::FocusRevealTrigger;
+    using idleharbor::app::ShouldRevealFocusedControl;
+    CHECK(ShouldRevealFocusedControl(FocusRevealTrigger::Keyboard, false));
+    CHECK(ShouldRevealFocusedControl(FocusRevealTrigger::Layout, false));
+    CHECK(!ShouldRevealFocusedControl(FocusRevealTrigger::Pointer, false));
+}
+
+void test_open_popup_freezes_every_reveal_trigger() {
+    using idleharbor::app::FocusRevealTrigger;
+    using idleharbor::app::ShouldRevealFocusedControl;
+    CHECK(!ShouldRevealFocusedControl(FocusRevealTrigger::Keyboard, true));
+    CHECK(!ShouldRevealFocusedControl(FocusRevealTrigger::Pointer, true));
+    CHECK(!ShouldRevealFocusedControl(FocusRevealTrigger::Layout, true));
+}
+
+void test_body_layout_is_frozen_while_a_popup_is_open() {
+    using idleharbor::app::BodyLayoutIsMovable;
+    CHECK(BodyLayoutIsMovable(false));
+    CHECK(!BodyLayoutIsMovable(true));
+}
+
 }  // namespace
 
 int main() {
@@ -296,5 +318,8 @@ int main() {
     test_viewport_fill_widths_respect_the_effective_client_width();
     test_stacked_stop_stays_inside_short_clients();
     test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();
+    test_pointer_focus_does_not_scroll_the_body();
+    test_open_popup_freezes_every_reveal_trigger();
+    test_body_layout_is_frozen_while_a_popup_is_open();
     return failures == 0 ? 0 : 1;
 }
