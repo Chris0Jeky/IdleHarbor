@@ -781,6 +781,10 @@ class Application final {
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
         body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
+        // Position every child in one deferred batch. Individual SetWindowPos
+        // calls each repaint immediately, so a scroll of thirty controls tore
+        // its way down the viewport instead of moving as one surface.
+        HDWP batch = BeginDeferWindowPos(static_cast<int>(child_layouts_.size()));
         for (const auto& child : child_layouts_) {
             int x = 0;
             int y = 0;
@@ -808,6 +812,23 @@ class Application final {
                 y = Scale(child.arranged_y) - scroll_position_;
                 width = Scale(child.arranged_width);
             }
+            if (batch != nullptr) {
+                const HDWP next = DeferWindowPos(
+                    batch,
+                    child.window,
+                    nullptr,
+                    x,
+                    y,
+                    width,
+                    height,
+                    SWP_NOACTIVATE | SWP_NOZORDER);
+                if (next != nullptr) {
+                    batch = next;
+                    continue;
+                }
+                // DeferWindowPos destroys the structure when it fails.
+                batch = nullptr;
+            }
             SetWindowPos(
                 child.window,
                 nullptr,
@@ -816,6 +837,9 @@ class Application final {
                 width,
                 height,
                 SWP_NOACTIVATE | SWP_NOZORDER);
+        }
+        if (batch != nullptr) {
+            EndDeferWindowPos(batch);
         }
     }
 
