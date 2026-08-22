@@ -60,6 +60,7 @@ constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
 constexpr UINT kDeferredCommandMessage = WM_APP + 3;
 constexpr UINT kDeferredFocusMessage = WM_APP + 4;
+constexpr UINT kDeferredSelectionMessage = WM_APP + 5;
 constexpr UINT kTimerId = 1;
 constexpr UINT_PTR kChildSubclassId = 1;
 constexpr int kEmergencyHotkeyId = 1;
@@ -821,6 +822,12 @@ class Application final {
     void RepaintSettingsViewport() const noexcept {
         const HWND target = settings_viewport_ != nullptr ? settings_viewport_ : window_;
         if (target == nullptr) {
+            return;
+        }
+        // An open drop-down list has not committed its highlighted item to the
+        // combo box yet. Forcing a synchronous erase and repaint now would draw
+        // the previous selection and leave it on screen until the next paint.
+        if (!idleharbor::app::BodyLayoutIsMovable(IsAnyComboBoxDropped())) {
             return;
         }
         // Body controls are child windows moved inside a clipped child viewport.
@@ -1700,6 +1707,59 @@ class Application final {
         }
     }
 
+    [[nodiscard]] HWND ComboBoxForId(const int control_id) const noexcept {
+        switch (control_id) {
+        case kProfile:
+            return profile_;
+        case kMotion:
+            return motion_;
+        case kPower:
+            return power_;
+        default:
+            return nullptr;
+        }
+    }
+
+    [[nodiscard]] static bool IsComboBoxNotification(const int control_id, const int notification) noexcept {
+        const bool is_combo = control_id == kProfile || control_id == kMotion || control_id == kPower;
+        return is_combo && (notification == CBN_SELCHANGE || notification == CBN_CLOSEUP);
+    }
+
+    // CBN_SELCHANGE arrives while the drop-down list is still up and the combo
+    // box has not repainted its own field yet. Applying the setting here would
+    // send CB_SETCURSEL and repaint into a control that is mid-gesture, which
+    // is why the field appeared to keep its old value until it lost focus.
+    // Queue the work instead and run it once the list has closed.
+    void QueueComboBoxSelection(const int control_id, const int notification) {
+        if (notification == CBN_SELCHANGE) {
+            queued_combo_selection_ = control_id;
+        }
+        if (queued_combo_selection_ == 0) {
+            return;
+        }
+        if (PostMessageW(window_, kDeferredSelectionMessage, 0, 0) == FALSE) {
+            ApplyQueuedComboBoxSelection();
+        }
+    }
+
+    void ApplyQueuedComboBoxSelection() {
+        const int control_id = queued_combo_selection_;
+        if (control_id == 0) {
+            return;
+        }
+        const HWND combo = ComboBoxForId(control_id);
+        if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+            // Still open: the matching CBN_CLOSEUP queues another attempt.
+            return;
+        }
+        queued_combo_selection_ = 0;
+        if (control_id == kProfile) {
+            ApplySelectedProfile();
+        } else {
+            UpdateDirtyStateFromControls();
+        }
+    }
+
     void ApplySelectedProfile() {
         const int index = ComboIndex(profile_);
         if (index < 0 || index >= static_cast<int>(kProfiles.size())) {
@@ -2093,17 +2153,14 @@ class Application final {
             CreateControls();
             return 0;
         case WM_COMMAND:
-            if (LOWORD(w_param) == kProfile && HIWORD(w_param) == CBN_SELCHANGE) {
-                ApplySelectedProfile();
+            if (IsComboBoxNotification(LOWORD(w_param), HIWORD(w_param))) {
+                QueueComboBoxSelection(LOWORD(w_param), HIWORD(w_param));
             } else if (LOWORD(w_param) == kStart && HIWORD(w_param) == BN_CLICKED) {
                 StartSession();
             } else if (LOWORD(w_param) == kStop && HIWORD(w_param) == BN_CLICKED) {
                 StopSession();
             } else if (LOWORD(w_param) == kSave && HIWORD(w_param) == BN_CLICKED) {
                 Save();
-            } else if ((LOWORD(w_param) == kMotion || LOWORD(w_param) == kPower) &&
-                       HIWORD(w_param) == CBN_SELCHANGE) {
-                UpdateDirtyStateFromControls();
             } else if (HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) {
                 UpdateDirtyStateFromControls();
             }
@@ -2141,6 +2198,9 @@ class Application final {
             return 0;
         case kDeferredCommandMessage:
             ProcessDeferredCommand();
+            return 0;
+        case kDeferredSelectionMessage:
+            ApplyQueuedComboBoxSelection();
             return 0;
         case kDeferredFocusMessage: {
             const HWND target = reinterpret_cast<HWND>(w_param);
@@ -2284,6 +2344,7 @@ class Application final {
     bool exiting_ = false;
     HWND last_focus_ = nullptr;
     FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
+    int queued_combo_selection_ = 0;
     int scroll_position_ = 0;
     bool updating_viewport_ = false;
     int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
