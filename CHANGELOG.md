@@ -14,6 +14,8 @@ where practical.
   be picked on the first attempt. The body holds still while any drop-down list is open.
 - Scrolling the settings body moves its controls as one surface instead of repositioning them one at
   a time.
+- The status card now reports unsaved changes before the Save action becomes available, instead of
+  briefly showing an enabled Save action beside a saved-looking status.
 
 ## [0.1.0] - 2026-08-20
 
