@@ -1749,11 +1749,12 @@ class Application final {
         return is_combo && (notification == CBN_SELCHANGE || notification == CBN_CLOSEUP);
     }
 
-    // CBN_SELCHANGE arrives while the drop-down list is still up and the combo
-    // box has not repainted its own field yet. Applying the setting here would
-    // send CB_SETCURSEL and repaint into a control that is mid-gesture, which
-    // is why the field appeared to keep its old value until it lost focus.
-    // Queue the work instead and run it once the list has closed.
+    // A pointer-driven CBN_SELCHANGE arrives while the drop-down list is still
+    // up and the combo box has not repainted its own field yet. Applying the
+    // setting there would send CB_SETCURSEL and force a repaint into a control
+    // that is mid-gesture, which is why the field appeared to keep its old
+    // value until it lost focus. Keyboard and programmatic changes reach a
+    // closed control and stay synchronous.
     void QueueComboBoxSelection(const int control_id, const int notification) {
         if (notification == CBN_SELCHANGE) {
             queued_combo_selection_ = control_id;
@@ -1761,8 +1762,11 @@ class Application final {
         if (queued_combo_selection_ == 0) {
             return;
         }
-        if (PostMessageW(window_, kDeferredSelectionMessage, 0, 0) == FALSE) {
-            ApplyQueuedComboBoxSelection();
+        ApplyQueuedComboBoxSelection();
+        if (queued_combo_selection_ != 0) {
+            // The list is still open. CBN_CLOSEUP queues another attempt; the
+            // posted message is the backstop if that notification never lands.
+            PostMessageW(window_, kDeferredSelectionMessage, 0, 0);
         }
     }
 
