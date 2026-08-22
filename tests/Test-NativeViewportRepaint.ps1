@@ -72,6 +72,9 @@ public static class NativeViewportRepaint {
     [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr window);
 
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr window);
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     public static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
 
@@ -210,6 +213,24 @@ public static class NativeViewportRepaint {
 '@
 }
 
+function Wait-ForInitializedWindow([int]$ProcessId, [int]$TimeoutSeconds = 10) {
+    # The main window is findable from WM_CREATE, well before Initialize()
+    # refreshes the controls and publishes the initial status. Initialize()
+    # shows the window as its last step, so visibility is the readiness signal
+    # for every assertion about the status card or the Save action.
+    $window = [IntPtr]::Zero
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        Start-Sleep -Milliseconds 100
+        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$ProcessId)
+        if ($window -ne [IntPtr]::Zero -and
+            [IdleHarbor.NativeViewportRepaint]::IsWindowVisible($window)) {
+            return $window
+        }
+    } while ([DateTime]::UtcNow -lt $deadline)
+    return [IntPtr]::Zero
+}
+
 function Get-ViewportScrollInfo([IntPtr]$Viewport) {
     $info = New-Object IdleHarbor.NativeViewportRepaint+SCROLLINFO
     $info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($info)
@@ -328,11 +349,7 @@ try {
     $overrideConfigPath = Join-Path $tempRoot 'override-settings.ini'
     $process = Start-Process -FilePath $executablePath -ArgumentList @(
         '--show', '--config', $overrideConfigPath, '--motion', 'off') -PassThru
-    $overrideDeadline = [DateTime]::UtcNow.AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 100
-        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$process.Id)
-    } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $overrideDeadline)
+    $window = Wait-ForInitializedWindow $process.Id
     if ($window -eq [IntPtr]::Zero) {
         throw 'The runtime-override owner did not expose its main window within 10 seconds.'
     }
@@ -357,11 +374,7 @@ try {
 
     $arguments = @('--show', '--config', $configPath)
     $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -PassThru
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 100
-        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$process.Id)
-    } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $deadline)
+    $window = Wait-ForInitializedWindow $process.Id
     if ($window -eq [IntPtr]::Zero) {
         throw 'IdleHarbor did not expose its main window within 10 seconds.'
     }
