@@ -17,6 +17,16 @@ and check the published checksum, SPDX SBOM, and GitHub provenance before runnin
 The status text and tray tooltip identify Running, Paused, and Stopped states. Pause reasons are
 shown so a user can understand why a pulse is not being emitted.
 
+## Finding out what a control does
+
+Every control in the settings window explains itself. Rest the pointer on a field, its label, a
+check box, the Start/Stop/Save buttons, or the status card, and a short description appears after
+about a second. Hovering a label gives the same description as the field beside it, so the name is
+enough — you do not have to find the input first.
+
+Descriptions are unavailable while a session is running, because Windows does not deliver hover to
+the disabled controls. Stop the session to read them.
+
 ## Window, scaling, and keyboard navigation
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
@@ -55,7 +65,7 @@ an execution-state request. They are independent:
 An application may implement idle detection differently. Zen is not guaranteed to work everywhere,
 and visible movement is not evidence of human presence.
 
-For visible modes, the `--distance` setting is a multiplier from **1** to **120**, not a raw pixel
+For visible modes, the motion size (`--distance`) is a scale from **1** to **120**, not a raw pixel
 radius. IdleHarbor uses independently designed bounded motion paths and translates them into
 cumulative safe-anchor points that finish at the captured pointer position.
 
