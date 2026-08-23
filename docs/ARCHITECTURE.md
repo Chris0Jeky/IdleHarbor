@@ -119,6 +119,12 @@ Body controls all share the settings viewport as their parent and are reposition
 `BeginDeferWindowPos` batch; the status card and action buttons belong to the top-level window and are
 positioned directly, because one deferred-position structure cannot mix parents.
 
+Each field is followed by a `BodyControlKind::Hint` static: a short printed explanation in a
+one-step-smaller font, never a tab stop. Its height is the height its own text wraps to, measured with
+`DT_CALCRECT`, so it is not a constant. Hints keep a fixed `kHintWidth` rather than filling the body,
+which makes the height reserved at creation exactly the height rendered at any window size and holds
+the text to a readable line length; the stacked layout is narrower than that width and re-measures.
+
 One shared tooltip control owns every control description. Tools are registered with
 `TTF_IDISHWND | TTF_SUBCLASS` against the control handle, with the label and its field carrying the
 same text. Static controls report themselves transparent to hit-testing, so the labels and the

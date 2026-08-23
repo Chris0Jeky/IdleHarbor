@@ -25,6 +25,20 @@ $expectedTools = [ordered]@{
 }
 $expectedTotal = ($expectedTools.Values | Measure-Object -Sum).Sum
 
+# Each field also carries a short explanation printed under it. A distinctive
+# opening phrase per hint is enough to prove the static exists with the right
+# text, without pinning the whole sentence.
+$expectedHints = @(
+    'Starting values you can edit.',
+    'Off emits nothing.',
+    'Independent of motion, but not both off',
+    'Time between motion pulses.',
+    'A 1 to 120 scale for the visible path',
+    'Quiet time required after you really type',
+    'Pauses at or below this level',
+    'Ends the session on its own after this long.'
+)
+
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 
 if (-not ('IdleHarbor.ControlHelpTips' -as [type])) {
@@ -54,6 +68,38 @@ public static class ControlHelpTips {
 
     [DllImport("user32.dll")]
     public static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr window, StringBuilder text, int maximum);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    public static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetParent(IntPtr window);
+
+    // The scrolling settings body. Its own children are the labels, headings,
+    // fields, and printed explanations; the status card and the action buttons
+    // belong to the top-level window instead.
+    public static IntPtr FindSettingsViewport(IntPtr owner) {
+        const int GWL_STYLE = -16;
+        const long WS_VSCROLL = 0x00200000L;
+        IntPtr result = IntPtr.Zero;
+        EnumChildWindows(owner, (window, data) => {
+            if (GetParent(window) != owner) {
+                return true;
+            }
+            if ((GetWindowLongPtr(window, GWL_STYLE).ToInt64() & WS_VSCROLL) != 0) {
+                result = window;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return result;
+    }
 
     public static IntPtr FindMainWindow(uint targetProcessId) {
         IntPtr result = IntPtr.Zero;
@@ -103,6 +149,23 @@ public static class ControlHelpTips {
 '@
 }
 
+function Get-StaticTexts([IntPtr]$Owner) {
+    $texts = New-Object 'System.Collections.Generic.List[string]'
+    $callback = [IdleHarbor.ControlHelpTips+EnumWindowsProc] {
+        param([IntPtr]$window, [IntPtr]$data)
+        $className = New-Object Text.StringBuilder 256
+        [void][IdleHarbor.ControlHelpTips]::GetClassName($window, $className, $className.Capacity)
+        if ($className.ToString() -eq 'Static') {
+            $text = New-Object Text.StringBuilder 1024
+            [void][IdleHarbor.ControlHelpTips]::GetWindowText($window, $text, $text.Capacity)
+            $texts.Add($text.ToString())
+        }
+        return $true
+    }
+    [void][IdleHarbor.ControlHelpTips]::EnumChildWindows($Owner, $callback, [IntPtr]::Zero)
+    return $texts
+}
+
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-help-tips-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 $configPath = Join-Path $tempRoot 'settings.ini'
@@ -135,7 +198,24 @@ try {
         throw "Expected $expectedTotal help tips ($breakdown) but the tooltip holds $toolCount."
     }
 
-    Write-Output "Control help tips passed: $toolCount controls explain themselves on hover."
+    $viewport = [IdleHarbor.ControlHelpTips]::FindSettingsViewport($window)
+    if ($viewport -eq [IntPtr]::Zero) {
+        throw 'Could not find the scrolling settings body.'
+    }
+    $staticTexts = Get-StaticTexts $viewport
+    $missing = @($expectedHints | Where-Object {
+        $prefix = $_
+        -not ($staticTexts | Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) })
+    })
+    if ($missing.Count -ne 0) {
+        throw "These fields lost their printed explanation: $($missing -join ' | ')"
+    }
+    $blank = @($staticTexts | Where-Object { [string]::IsNullOrWhiteSpace($_) })
+    if ($blank.Count -ne 0) {
+        throw "$($blank.Count) label or explanation in the settings body has no text."
+    }
+
+    Write-Output "Control help tips passed: $toolCount controls explain themselves on hover, $($expectedHints.Count) fields carry a printed explanation."
 }
 finally {
     if ($null -ne $process) {

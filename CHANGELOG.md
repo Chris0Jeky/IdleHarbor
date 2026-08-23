@@ -8,8 +8,10 @@ where practical.
 
 ### Added
 
-- Every settings control now explains itself on hover, including the labels, the Start, Stop, and
-  Save actions, and the status card. Hovering a label gives the same description as the field beside
+- Each settings field now carries a short explanation printed under it, so the window can be read
+  straight through without hovering anything.
+- Every settings control also explains itself in more detail on hover, including the labels, the
+  Start, Stop, and Save actions, and the status card. Hovering a label gives the same description as the field beside
   it. During a running session the settings are disabled and Windows does not deliver hover to a
   disabled control, so only the labels, the status card, and Stop still describe themselves.
 
