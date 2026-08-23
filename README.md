@@ -123,12 +123,12 @@ Motion modes are selectable independently of power requests:
 | Motion | Behavior |
 | --- | --- |
 | Off | No pointer/input pulse; useful with a power request |
-| Normal | Small visible diagonal path, scaled by the distance multiplier |
+| Normal | Small visible diagonal path, scaled by the motion size |
 | Zen | Virtual mouse input intended not to move the visible pointer |
-| Circle | Bounded circular path, scaled by the distance multiplier |
-| Linear | Horizontal back-and-forth path, scaled by the distance multiplier |
+| Circle | Bounded circular path, scaled by the motion size |
+| Linear | Horizontal back-and-forth path, scaled by the motion size |
 
-The distance setting is a multiplier from **1** to **120**, not a raw pixel radius. Visible motion
+The motion size (`--distance`) is a scale from **1** to **120**, not a raw pixel radius. Visible motion
 uses independently designed IdleHarbor paths that remain bounded around a safe anchor and return
 the cursor to its captured position. Project provenance is recorded in
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
@@ -162,7 +162,7 @@ Motion:   --motion off|zen|diagonal|linear|circle
 Power:    --power none|system|display
 Timing:   --interval DURATION, --random, --no-random, --pause-on-input DURATION,
           --stop-after DURATION
-Safety:   --distance MULTIPLIER (1..120), --battery-threshold 0..100,
+Safety:   --distance SIZE (1..120), --battery-threshold 0..100,
           --pause-on-fullscreen, --no-pause-on-fullscreen
 Window:   --minimized, --close-to-tray, --no-close-to-tray
 Storage:  --portable, --config PATH

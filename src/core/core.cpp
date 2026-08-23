@@ -52,7 +52,7 @@ ValidationResult validate(const Settings& settings) {
         add_error(result, "random minimum must be between 1 second and the interval");
     }
     if (settings.distance < Settings::kMinimumDistance || settings.distance > Settings::kMaximumDistance) {
-        add_error(result, "distance multiplier must be between 1 and 120");
+        add_error(result, "motion size must be between 1 and 120");
     }
     if (settings.user_activity_cooldown < Settings::kMinimumInterval ||
         settings.user_activity_cooldown > Settings::kMaximumInterval) {

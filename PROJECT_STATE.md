@@ -65,9 +65,16 @@ Two pre-existing intermittent failures in `tests\Test-NativeViewportRepaint.ps1`
 window that was findable from `WM_CREATE` but not yet initialized. The script now passed five
 consecutive runs at 192 DPI with an identical capture hash.
 
-`docs/assets` still records the `v0.1.0` release captures. Any settings-window layout change made
-after this point leaves those screenshots stale until the next release capture, which must be taken
-from a released executable.
+`docs/assets` still records the `v0.1.0` release captures. Any settings-window change made after this
+point -- a layout change or a renamed label alike -- leaves those screenshots stale until the next
+release capture, which must be taken from a released executable. The captures currently show the
+former "Power request" and "Motion multiplier (1-120)" labels.
+
+PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) merged those fixes. Follow-ups
+[#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
+[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from its review and remain
+open. On-hover explanations for every settings control follow on `agent/ux-control-help`, with
+`tests\Test-ControlHelpTips.ps1` proving each control is registered.
 
 ## Distribution status
 
@@ -106,7 +113,9 @@ queue remains:
 - [#48](https://github.com/Chris0Jeky/IdleHarbor/issues/48): restore the scheduler command after packaging tests;
 - [#49](https://github.com/Chris0Jeky/IdleHarbor/issues/49): make documentation capture more portable;
 - [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50): sanitize rounded screenshot corners;
-- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation.
+- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation;
+- [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55): classify focus changes that bypass the message loop;
+- [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56): a forwarded command can discard a pending combo selection.
 
 ## Human decisions
 
@@ -136,6 +145,7 @@ cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TES
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
+.\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0

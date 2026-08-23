@@ -17,6 +17,18 @@ and check the published checksum, SPDX SBOM, and GitHub provenance before runnin
 The status text and tray tooltip identify Running, Paused, and Stopped states. Pause reasons are
 shown so a user can understand why a pulse is not being emitted.
 
+## Finding out what a control does
+
+Every control in the settings window explains itself. Rest the pointer on a field, its label, a
+check box, the Start/Stop/Save buttons, or the status card, and a short description appears after
+about a second. Hovering a label gives the same description as the field beside it, so the name is
+enough — you do not have to find the input first.
+
+While a session is running its settings are disabled, and Windows does not deliver hover to a
+disabled control. The labels, the status card, and **Stop** stay enabled, so every field's
+description is still reachable from the label beside it. The nine check boxes have no separate
+label, so theirs — along with **Start** and **Save** — are only available once the session stops.
+
 ## Window, scaling, and keyboard navigation
 
 The settings window is per-monitor-DPI aware, resizable, and kept inside the current monitor's work
@@ -45,6 +57,8 @@ to that monitor's usable work area.
 Motion determines whether and how IdleHarbor emits input. Power determines whether Windows receives
 an execution-state request. They are independent:
 
+In the settings window these are the **Motion** and **Keep awake** fields.
+
 | Need | Suggested setting |
 | --- | --- |
 | Keep Windows available without moving the pointer | Motion **Off**, power **System** or **Display** |
@@ -52,10 +66,13 @@ an execution-state request. They are independent:
 | Prefer a quiet compatibility attempt | Motion **Zen**, power **None** |
 | Make movement obvious | Motion **Circle** or **Linear**, power as required |
 
+Motion **Off** with keep awake **None** is refused, because that combination would neither emit
+input nor keep the system awake. Every other pair is accepted.
+
 An application may implement idle detection differently. Zen is not guaranteed to work everywhere,
 and visible movement is not evidence of human presence.
 
-For visible modes, the `--distance` setting is a multiplier from **1** to **120**, not a raw pixel
+For visible modes, the motion size (`--distance`) is a scale from **1** to **120**, not a raw pixel
 radius. IdleHarbor uses independently designed bounded motion paths and translates them into
 cumulative safe-anchor points that finish at the captured pointer position.
 
@@ -80,7 +97,8 @@ The policy engine can pause or stop for:
 
 - genuine mouse or keyboard input, followed by a configurable quiet cooldown;
 - workstation lock/unlock and local or remote session connect/disconnect;
-- low battery or any battery power when that option is enabled;
+- the battery reaching or falling below the low-battery threshold, or any battery power at all when
+  that option is enabled;
 - a foreground window covering its monitor in fullscreen mode;
 - an active-hours window in the advanced settings;
 - a configured maximum session duration;
@@ -113,7 +131,7 @@ status in visible dialogs rather than a console stream.
 `battery-saver`, or `custom`. `--motion`/`--mode` accepts `off`, `zen`, `diagonal`, `linear`, or
 `circle`; `--power` accepts `none`, `system`, or `display`.
 
-`--interval`, `--distance` (the motion multiplier, 1–120), `--random`, `--no-random`, `--pause-on-input`, `--stop-after`,
+`--interval`, `--distance` (the motion size, 1–120), `--random`, `--no-random`, `--pause-on-input`, `--stop-after`,
 `--battery-threshold`, `--pause-on-fullscreen`, and `--no-pause-on-fullscreen` control session
 behavior. `--minimized` starts hidden in the notification area. `--close-to-tray` and
 `--no-close-to-tray` control close behavior. `--portable` and `--config PATH` choose storage at
@@ -148,7 +166,7 @@ active_hours_end_minute=1080
 ```
 
 Other persisted keys include `profile`, `motion`, `power`, `interval_seconds`,
-`random_minimum_seconds`, `distance` (the motion multiplier, 1–120), `randomize`, `pause_on_user_activity`,
+`random_minimum_seconds`, `distance` (the motion size, 1–120), `randomize`, `pause_on_user_activity`,
 `user_activity_cooldown_seconds`, `pause_when_locked`, `pause_when_disconnected`, `pause_on_battery`,
 `pause_on_low_battery`, `low_battery_threshold`, `pause_when_fullscreen`, `max_duration_seconds`,
 `start_minimized`, `close_to_tray`, `show_notifications`, and `emergency_hotkey`.
