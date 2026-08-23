@@ -883,12 +883,13 @@ class Application final {
         }
         // An open drop-down list has not committed its highlighted item to the
         // combo box yet, so forcing a synchronous paint now would draw the
-        // previous selection. Still invalidate the same descendants: the
-        // resulting WM_PAINT is served once the list closes, which keeps the
-        // whole transaction repainted rather than skipping it. A state change
-        // that lands while a list is open -- the emergency hotkey, or a
-        // forwarded start disabling every control -- must not leave stale
-        // fragments behind.
+        // previous selection over it. Still invalidate the same descendants and
+        // let the ordinary WM_PAINT serve them: the list is a separate top-level
+        // popup that RDW_ALLCHILDREN never reaches, so repainting the combo's
+        // own field underneath is harmless. Skipping the invalidation is not --
+        // a state change that lands while a list is open, such as the emergency
+        // hotkey or a forwarded start disabling every control, would leave the
+        // stale fragments issue #34 exists to prevent.
         if (IsAnyComboBoxDropped()) {
             RedrawWindow(target, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
             return;

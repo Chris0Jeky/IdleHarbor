@@ -105,7 +105,8 @@ the focus change, so driving that same control from the keyboard still reveals i
 
 A combo list is a popup anchored to a control the layout would otherwise move, so while one is open
 the body does not scroll and its repaints are queued rather than forced: the same descendants are
-invalidated, and the resulting `WM_PAINT` is served once the list closes. Resize and DPI transactions
+invalidated and served by an ordinary `WM_PAINT` instead of a synchronous one. The list is a separate
+top-level popup that `RDW_ALLCHILDREN` never reaches. Resize and DPI transactions
 cannot be deferred that way, so they close any open list before repositioning. Only a list the user
 can still close counts as open -- a hidden window or a combo disabled by a session start never freezes
 the body. Combo selections are applied immediately when the list is already closed (keyboard and
