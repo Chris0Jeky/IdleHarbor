@@ -852,10 +852,12 @@ class Application final {
         const int logical_height = idleharbor::app::LogicalPixels(
             static_cast<int>(measured.bottom - measured.top),
             static_cast<int>(dpi_));
-        // The ceiling only guards against a pathological measurement; every
-        // shipped hint is one or two lines. A hint long enough to reach it would
-        // be clipped, so keep the texts short.
-        return std::clamp(logical_height, 16, 160);
+        // No ceiling: a static clips rather than grows, so capping the height
+        // would silently drop lines. ComputeStackedBodyLayout can hand a hint a
+        // few dozen logical pixels on a very narrow work area -- the layout tests
+        // cover 80- and 99-pixel viewports -- where an explanation wraps to many
+        // more lines than any cap would allow. The body simply scrolls further.
+        return std::max(logical_height, 16);
     }
 
     [[nodiscard]] int ViewportHeight() const noexcept {
