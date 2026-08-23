@@ -124,8 +124,11 @@ One shared tooltip control owns every control description. Tools are registered 
 same text. Static controls report themselves transparent to hit-testing, so the labels and the
 owner-drawn status card take `SS_NOTIFY` to receive the hover; the dirty-state path is bounded to the
 edit and check control IDs so the resulting `STN_CLICKED` (numerically `BN_CLICKED`) does not reach
-it. The wrap width is rescaled with the rest of the UI on a DPI change. Descriptions do not appear
-while a session is running, because Windows does not deliver hover to disabled controls.
+it; `kFirstDirtyControl`/`kLastDirtyControl` and their static assertions bound that range, because an
+edit or check added outside it would never mark the settings dirty. The wrap width is rescaled with
+the rest of the UI on a DPI change. An active session disables the settings controls and Windows does
+not deliver hover to a disabled control, so during a session only the labels, the status card, and
+Stop still describe themselves.
 
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.

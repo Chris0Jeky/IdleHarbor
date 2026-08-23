@@ -41,9 +41,6 @@ public static class ControlHelpTips {
     public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
 
     [DllImport("user32.dll")]
-    public static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr data);
-
-    [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -78,8 +75,12 @@ public static class ControlHelpTips {
     }
 
     // The tooltip is an owned pop-up of the main window, not a child, so it is
-    // reached through the top-level list rather than EnumChildWindows.
-    public static IntPtr FindToolTip(uint targetProcessId) {
+    // reached through the top-level list rather than a child enumeration. Match
+    // on the owner as well as the class: a themed control may create a tooltip
+    // of its own in the same process, and reading the tool count from that one
+    // would fail for a reason the message does not describe.
+    public static IntPtr FindToolTip(uint targetProcessId, IntPtr owner) {
+        const uint GW_OWNER = 4;
         IntPtr result = IntPtr.Zero;
         EnumWindows((window, data) => {
             uint processId;
@@ -89,7 +90,7 @@ public static class ControlHelpTips {
             }
             StringBuilder className = new StringBuilder(256);
             GetClassName(window, className, className.Capacity);
-            if (className.ToString() == "tooltips_class32") {
+            if (className.ToString() == "tooltips_class32" && GetWindow(window, GW_OWNER) == owner) {
                 result = window;
                 return false;
             }
@@ -120,7 +121,7 @@ try {
         throw 'IdleHarbor did not show its main window within 10 seconds.'
     }
 
-    $tooltip = [IdleHarbor.ControlHelpTips]::FindToolTip([uint32]$process.Id)
+    $tooltip = [IdleHarbor.ControlHelpTips]::FindToolTip([uint32]$process.Id, $window)
     if ($tooltip -eq [IntPtr]::Zero) {
         throw 'The settings window did not create a tooltip control, so no control explains itself on hover.'
     }
@@ -141,7 +142,12 @@ finally {
         $process.Refresh()
         if (-not $process.HasExited) {
             Start-Process -FilePath $executablePath -ArgumentList '--exit' -WindowStyle Hidden -Wait
-            $process.WaitForExit(5000) | Out-Null
+            if (-not $process.WaitForExit(5000)) {
+                # Leaving a window on the user's desktop would also make the next
+                # run fail at the single-instance guard for an unrelated reason.
+                $process.Kill()
+                $process.WaitForExit(5000) | Out-Null
+            }
         }
     }
     $temporaryPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'

@@ -10,12 +10,15 @@ where practical.
 
 - Every settings control now explains itself on hover, including the labels, the Start, Stop, and
   Save actions, and the status card. Hovering a label gives the same description as the field beside
-  it. Descriptions are unavailable while a session is running, because the controls are disabled.
+  it. During a running session the settings are disabled and Windows does not deliver hover to a
+  disabled control, so only the labels, the status card, and Stop still describe themselves.
 
 ### Changed
 
-- Renamed two labels for what they do rather than how: "Power request" is now "Keep awake", and
-  "Motion multiplier" is now "Motion size".
+- Renamed four labels for what they do rather than how: "Power request" is now "Keep awake",
+  "Motion multiplier" is now "Motion size", "Pause after genuine input" is now "Pause after real
+  input", and the low-battery threshold now names its unit. The out-of-range message for the motion
+  size was still calling it a multiplier and now matches the label.
 
 ### Fixed
 

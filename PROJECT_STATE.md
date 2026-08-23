@@ -65,9 +65,10 @@ Two pre-existing intermittent failures in `tests\Test-NativeViewportRepaint.ps1`
 window that was findable from `WM_CREATE` but not yet initialized. The script now passed five
 consecutive runs at 192 DPI with an identical capture hash.
 
-`docs/assets` still records the `v0.1.0` release captures. Any settings-window layout change made
-after this point leaves those screenshots stale until the next release capture, which must be taken
-from a released executable.
+`docs/assets` still records the `v0.1.0` release captures. Any settings-window change made after this
+point -- a layout change or a renamed label alike -- leaves those screenshots stale until the next
+release capture, which must be taken from a released executable. The captures currently show the
+former "Power request" and "Motion multiplier (1-120)" labels.
 
 PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) merged those fixes. Follow-ups
 [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and

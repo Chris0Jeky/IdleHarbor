@@ -75,8 +75,77 @@ constexpr int kBaseBodyOrigin = 52;
 constexpr int kBaseBodyContentHeight = 570;
 constexpr int kBaseTipWidth = 320;
 constexpr int kTipInitialDelayMs = 700;
-constexpr int kTipVisibleMs = 30'000;
+// Above the platform default (~5s) because the descriptions run to several
+// lines, but bounded: a description anchored to the status card sits over the
+// one control that must stay readable.
+constexpr int kTipVisibleMs = 12'000;
 constexpr int kTipReshowDelayMs = 200;
+
+// Control descriptions shown on hover. A label and the field beside it share one
+// constant, so the two halves of a pair cannot drift apart.
+constexpr wchar_t kProfileTip[] =
+    L"A set of starting values, not a locked mode. Choosing a different profile replaces the "
+    L"Session, Pulse, and Safeguards settings with its defaults; the Window & notifications "
+    L"settings are left alone. Edit anything afterwards and press Save to keep the result.";
+constexpr wchar_t kMotionTip[] =
+    L"Whether input is emitted by moving the pointer, and how far. Off emits nothing at all. "
+    L"Zen emits virtual mouse input that is intended not to move the visible pointer. Normal, "
+    L"Linear, and Circle trace a visible path and return the pointer exactly where it started; "
+    L"Circle is much the largest of the three. Motion is independent of the keep-awake request.";
+constexpr wchar_t kPowerTip[] =
+    L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
+    L"machine from sleeping. Display and system also keeps the screen on. Independent of "
+    L"motion, so either, both, or neither can be used.";
+constexpr wchar_t kIntervalTip[] =
+    L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
+    L"one motion step, one keep-awake refresh, or both.";
+constexpr wchar_t kDistanceTip[] =
+    L"How far a visible motion path travels. A 1 to 120 scale applied to the bounded path, "
+    L"not a pixel radius. It applies to Normal, Linear, and Circle only; Off and Zen do not "
+    L"move the pointer.";
+constexpr wchar_t kRandomizeTip[] =
+    L"Wait a random time up to the pulse interval instead of a fixed period, so the rhythm "
+    L"is not perfectly regular.";
+constexpr wchar_t kPauseInputTip[] =
+    L"How long you must be idle after genuinely typing or moving the mouse before IdleHarbor "
+    L"resumes. Set 0 to remove the pause entirely, which means it keeps pulsing while you work.";
+constexpr wchar_t kLockPauseTip[] = L"Stop emitting while the workstation is locked with Win+L, and resume when you unlock it.";
+constexpr wchar_t kDisconnectTip[] =
+    L"Stop emitting while this session is disconnected, such as after a Remote Desktop client "
+    L"closes without signing out.";
+constexpr wchar_t kBatteryTip[] =
+    L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
+    L"low-battery safeguard off.";
+constexpr wchar_t kOnBatteryTip[] =
+    L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
+    L"separate from the low-battery threshold above.";
+constexpr wchar_t kFullscreenTip[] =
+    L"Pause while a full-screen application owns the foreground, so a film, game, or "
+    L"presentation is not disturbed.";
+constexpr wchar_t kMaxDurationTip[] =
+    L"Stop the session automatically after this many seconds. Set 0 to let it run until you "
+    L"stop it.";
+constexpr wchar_t kStartMinimizedTip[] = L"Launch straight to the notification area instead of showing this window.";
+constexpr wchar_t kCloseToTrayTip[] =
+    L"Closing this window hides it to the notification area instead of exiting. Use Exit in "
+    L"the notification-area menu to quit.";
+constexpr wchar_t kNotificationsTip[] =
+    L"Show a notification when a safeguard pauses or stops the session, so a change of state "
+    L"is never silent.";
+constexpr wchar_t kHotkeyTip[] =
+    L"Register Ctrl+Alt+Shift+F12 across the whole system so a running session can be stopped "
+    L"instantly from any application.";
+constexpr wchar_t kStatusTip[] =
+    L"The current state: Running, Paused, or Stopped. When a safeguard has paused or stopped "
+    L"the session, the reason is named here. It also reports when settings have been edited "
+    L"but not yet saved.";
+constexpr wchar_t kStartTip[] =
+    L"Begin a session with the values shown above. Unsaved edits apply to this session; press "
+    L"Save to keep them for the next launch.";
+constexpr wchar_t kStopTip[] =
+    L"End the session immediately. No further input is emitted and any keep-awake request is "
+    L"released.";
+constexpr wchar_t kSaveTip[] = L"Write the settings shown above to disk so they become the defaults at the next launch.";
 
 enum ControlId : int {
     kStatus = 100,
@@ -101,6 +170,14 @@ enum ControlId : int {
     kStop = 121,
     kSave = 122,
 };
+
+// The contiguous edit and check range whose changes mark the settings dirty.
+// A new edit or check MUST land inside it and extend kLastDirtyControl,
+// otherwise toggling it never enables Save and the value is silently lost.
+constexpr int kFirstDirtyControl = kInterval;
+constexpr int kLastDirtyControl = kEmergencyHotkey;
+static_assert(kFirstDirtyControl < kLastDirtyControl, "the dirty-control range must be non-empty");
+static_assert(kLastDirtyControl < kStart, "the dirty-control range must not reach the action buttons");
 
 constexpr std::array<ProfileKind, 7> kProfiles{
     ProfileKind::Balanced,
@@ -1178,11 +1255,11 @@ class Application final {
                     reinterpret_cast<WPARAM>(child.kind == BodyControlKind::Heading ? heading_for_children : replacement_font),
                     TRUE);
             }
+            ApplyHelpTipMetrics(replacement_font);
             if (ui_font_ != nullptr) {
                 DeleteObject(ui_font_);
             }
             ui_font_ = replacement_font;
-            ApplyHelpTipMetrics();
             if (replacement_heading_font != nullptr) {
                 if (heading_font_ != nullptr) {
                     DeleteObject(heading_font_);
@@ -1190,6 +1267,9 @@ class Application final {
                 heading_font_ = replacement_heading_font;
             }
         }
+        // The wrap width follows the window's scale whether or not a replacement
+        // font could be created.
+        ApplyHelpTipMetrics(ui_font_);
         UpdateViewport();
         EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
     }
@@ -1215,21 +1295,21 @@ class Application final {
             return;
         }
         SetWindowPos(help_tips_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        ApplyHelpTipMetrics();
+        ApplyHelpTipMetrics(ui_font_);
         SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_INITIAL, MAKELPARAM(kTipInitialDelayMs, 0));
         SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_AUTOPOP, MAKELPARAM(kTipVisibleMs, 0));
         SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_RESHOW, MAKELPARAM(kTipReshowDelayMs, 0));
     }
 
-    void ApplyHelpTipMetrics() const noexcept {
+    void ApplyHelpTipMetrics(const HFONT font) const noexcept {
         if (help_tips_ == nullptr) {
             return;
         }
         // A positive maximum width is what turns a tooltip multi-line, so the
-        // longer explanations wrap instead of running off the monitor.
+        // longer descriptions wrap instead of running off the monitor.
         SendMessageW(help_tips_, TTM_SETMAXTIPWIDTH, 0, Scale(kBaseTipWidth));
-        if (ui_font_ != nullptr) {
-            SendMessageW(help_tips_, WM_SETFONT, reinterpret_cast<WPARAM>(ui_font_), TRUE);
+        if (font != nullptr) {
+            SendMessageW(help_tips_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         }
     }
 
@@ -1411,27 +1491,19 @@ class Application final {
             instance_,
             nullptr);
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-        AddHelpTip(
-            status_,
-            L"The current state: Running, Paused, or Stopped. When a safeguard has paused or "
-            L"stopped the session, the reason is named here. It also reports when settings have "
-            L"been edited but not yet saved.");
+        AddHelpTip(status_, kStatusTip);
         TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
         add_heading(L"Session", 56);
         add_label(
             L"Profile",
             86,
-            L"A set of starting values, not a locked mode. Choosing a profile replaces every "
-            L"setting below with its defaults; edit them freely afterwards and press Save to keep "
-            L"the result.");
+            kProfileTip);
         add_combo(
             profile_,
             86,
             kProfile,
-            L"A set of starting values, not a locked mode. Choosing a profile replaces every "
-            L"setting below with its defaults; edit them freely afterwards and press Save to keep "
-            L"the result.");
+            kProfileTip);
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
@@ -1440,16 +1512,12 @@ class Application final {
         add_label(
             L"Motion",
             120,
-            L"Whether the pointer is moved, and how visibly. Off emits no input at all. Zen moves "
-            L"least, then Normal, Circle, and Linear. The pointer always finishes exactly where it "
-            L"started. Motion is independent of the keep-awake request.");
+            kMotionTip);
         add_combo(
             motion_,
             120,
             kMotion,
-            L"Whether the pointer is moved, and how visibly. Off emits no input at all. Zen moves "
-            L"least, then Normal, Circle, and Linear. The pointer always finishes exactly where it "
-            L"started. Motion is independent of the keep-awake request.");
+            kMotionTip);
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -1464,16 +1532,12 @@ class Application final {
         add_label(
             L"Keep awake",
             154,
-            L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
-            L"machine from sleeping. Display and system also keeps the screen on. Independent of "
-            L"motion, so either, both, or neither can be used.");
+            kPowerTip);
         add_combo(
             power_,
             154,
             kPower,
-            L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
-            L"machine from sleeping. Display and system also keeps the screen on. Independent of "
-            L"motion, so either, both, or neither can be used.");
+            kPowerTip);
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
@@ -1483,124 +1547,104 @@ class Application final {
         add_label(
             L"Pulse interval (seconds)",
             220,
-            L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
-            L"one motion step, one keep-awake refresh, or both.");
+            kIntervalTip);
         add_edit(
             interval_,
             220,
             kInterval,
-            L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
-            L"one motion step, one keep-awake refresh, or both.");
+            kIntervalTip);
         add_label(
             L"Motion size (1-120)",
             254,
-            L"How far a visible motion pattern travels. A 1 to 120 scale applied to the bounded "
-            L"motion path, not a pixel radius. It has no effect when motion is Off.");
+            kDistanceTip);
         add_edit(
             distance_,
             254,
             kDistance,
-            L"How far a visible motion pattern travels. A 1 to 120 scale applied to the bounded "
-            L"motion path, not a pixel radius. It has no effect when motion is Off.");
+            kDistanceTip);
         add_check(
             randomize_,
             L"Randomize pulse interval",
             286,
             kRandomize,
-            L"Wait a random time up to the pulse interval instead of a fixed period, so the rhythm "
-            L"is not perfectly regular.");
+            kRandomizeTip);
         add_heading(L"Safeguards", 322);
         add_label(
             L"Pause after real input (seconds; 0 disables)",
             352,
-            L"How long you must be idle after genuinely typing or moving the mouse before "
-            L"IdleHarbor resumes. Set 0 to remove the pause entirely, which means it keeps pulsing "
-            L"while you work.");
+            kPauseInputTip);
         add_edit(
             pause_input_,
             352,
             kPauseInput,
-            L"How long you must be idle after genuinely typing or moving the mouse before "
-            L"IdleHarbor resumes. Set 0 to remove the pause entirely, which means it keeps pulsing "
-            L"while you work.");
+            kPauseInputTip);
         add_check(
             lock_pause_,
             L"Pause while the workstation is locked",
             384,
             kLockPause,
-            L"Stop emitting while the workstation is locked with Win+L, and resume when you unlock "
-            L"it.");
+            kLockPauseTip);
         add_check(
             disconnect_pause_,
             L"Pause while the session is disconnected",
             416,
             kDisconnectPause,
-            L"Stop emitting while this session is disconnected, such as after a Remote Desktop "
-            L"client closes without signing out.");
+            kDisconnectTip);
         add_label(
             L"Low-battery threshold (percent; 0 disables)",
             450,
-            L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
-            L"low-battery safeguard off.");
+            kBatteryTip);
         add_edit(
             battery_,
             450,
             kBattery,
-            L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
-            L"low-battery safeguard off.");
+            kBatteryTip);
         add_check(
             pause_on_battery_,
             L"Pause whenever the device is on battery",
             482,
             kPauseOnBattery,
-            L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
-            L"separate from the low-battery threshold above.");
+            kOnBatteryTip);
         add_check(
             fullscreen_,
             L"Pause while a full-screen application is foreground",
             514,
             kFullscreen,
-            L"Pause while a full-screen application owns the foreground, so a film, game, or "
-            L"presentation is not disturbed.");
+            kFullscreenTip);
         add_heading(L"Window & notifications", 550);
         add_label(
             L"Maximum session duration (seconds; 0 disables)",
             580,
-            L"Stop the session automatically after this many seconds. Set 0 to let it run until you "
-            L"stop it.");
+            kMaxDurationTip);
         add_edit(
             max_duration_,
             580,
             kMaxDuration,
-            L"Stop the session automatically after this many seconds. Set 0 to let it run until you "
-            L"stop it.");
+            kMaxDurationTip);
         add_check(
             start_minimized_,
             L"Start minimized to the notification area",
             612,
             kStartMinimized,
-            L"Launch straight to the notification area instead of showing this window.");
+            kStartMinimizedTip);
         add_check(
             close_to_tray_,
             L"Close button hides to the notification area",
             644,
             kCloseToTray,
-            L"Closing this window hides it to the notification area instead of exiting. Use Exit in "
-            L"the notification-area menu to quit.");
+            kCloseToTrayTip);
         add_check(
             notifications_,
             L"Show safety state notifications",
             676,
             kNotifications,
-            L"Show a notification when a safeguard pauses or stops the session, so a change of state "
-            L"is never silent.");
+            kNotificationsTip);
         add_check(
             emergency_hotkey_,
             L"Enable emergency stop: Ctrl+Alt+Shift+F12",
             708,
             kEmergencyHotkey,
-            L"Register Ctrl+Alt+Shift+F12 across the whole system so a running session can be "
-            L"stopped instantly from any application.");
+            kHotkeyTip);
 
         const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
@@ -1634,21 +1678,19 @@ class Application final {
             L"Start",
             20,
             kStart,
-            L"Begin a session with the values shown above. Unsaved edits apply to this session; "
-            L"press Save to keep them for the next launch.");
+            kStartTip);
         add_button(
             stop_,
             L"Stop",
             145,
             kStop,
-            L"End the session immediately. No further input is emitted and any keep-awake request "
-            L"is released.");
+            kStopTip);
         add_button(
             save_,
             L"Save",
             270,
             kSave,
-            L"Write the settings shown above to disk so they become the defaults at the next launch.");
+            kSaveTip);
         UpdateViewport();
     }
 
@@ -1931,7 +1973,7 @@ class Application final {
             session.random_minimum = Seconds{1};
         }
         if (!read_number(distance_, 120, value) || value == 0) {
-            error = L"Motion multiplier must be between 1 and 120.";
+            error = L"Motion size must be between 1 and 120.";
             return false;
         }
         session.distance = static_cast<std::uint32_t>(value);
@@ -2495,12 +2537,11 @@ class Application final {
             } else if (LOWORD(w_param) == kSave && HIWORD(w_param) == BN_CLICKED) {
                 Save();
             } else if ((HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) &&
-                       LOWORD(w_param) >= kInterval && LOWORD(w_param) <= kEmergencyHotkey) {
-                // kInterval..kEmergencyHotkey is exactly the edit and check
-                // range. Bounding it keeps STN_CLICKED from the labels and the
-                // status card -- which now carry SS_NOTIFY so their tooltips
-                // see a hover -- out of the dirty-state path; STN_CLICKED and
-                // BN_CLICKED are both 0.
+                       LOWORD(w_param) >= kFirstDirtyControl && LOWORD(w_param) <= kLastDirtyControl) {
+                // Bounding this to the edit and check range keeps STN_CLICKED
+                // from the labels and the status card -- which carry SS_NOTIFY
+                // so their descriptions see a hover -- out of the dirty-state
+                // path; STN_CLICKED and BN_CLICKED are both 0.
                 UpdateDirtyStateFromControls();
             }
             return 0;
@@ -2632,6 +2673,12 @@ class Application final {
             if (heading_font_ != nullptr) {
                 DeleteObject(heading_font_);
                 heading_font_ = nullptr;
+            }
+            if (help_tips_ != nullptr) {
+                // Owner destruction would take it anyway; releasing it here keeps
+                // the handle from outliving the window it describes.
+                DestroyWindow(help_tips_);
+                help_tips_ = nullptr;
             }
             PostQuitMessage(0);
             return 0;
