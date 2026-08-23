@@ -781,11 +781,8 @@ class Application final {
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
         body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
-        // Position every child in one deferred batch. Individual SetWindowPos
-        // calls each repaint immediately, so a scroll of thirty controls tore
-        // its way down the viewport instead of moving as one surface.
-        HDWP batch = BeginDeferWindowPos(static_cast<int>(child_layouts_.size()));
-        for (const auto& child : child_layouts_) {
+
+        const auto placement_for = [&](const ChildLayout& child) {
             int x = 0;
             int y = 0;
             int width = 0;
@@ -812,34 +809,65 @@ class Application final {
                 y = Scale(child.arranged_y) - scroll_position_;
                 width = Scale(child.arranged_width);
             }
-            if (batch != nullptr) {
-                const HDWP next = DeferWindowPos(
-                    batch,
-                    child.window,
-                    nullptr,
-                    x,
-                    y,
-                    width,
-                    height,
-                    SWP_NOACTIVATE | SWP_NOZORDER);
-                if (next != nullptr) {
-                    batch = next;
-                    continue;
-                }
-                // DeferWindowPos destroys the structure when it fails.
-                batch = nullptr;
-            }
+            return idleharbor::app::PixelRect{x, y, x + width, y + height};
+        };
+        const auto position_directly = [&](const ChildLayout& child) {
+            const auto place = placement_for(child);
             SetWindowPos(
                 child.window,
                 nullptr,
-                x,
-                y,
-                width,
-                height,
+                place.left,
+                place.top,
+                place.right - place.left,
+                place.bottom - place.top,
                 SWP_NOACTIVATE | SWP_NOZORDER);
+        };
+
+        // Every window in one deferred-position structure must share a parent.
+        // The status card and the action buttons belong to the top-level window
+        // and never move while scrolling, so they are positioned directly; only
+        // the body, whose controls all belong to the clipped viewport, is
+        // batched. Positioning those one at a time repainted each in turn, so a
+        // single scroll step tore its way down the viewport.
+        std::size_t body_count = 0;
+        for (const auto& child : child_layouts_) {
+            if (child.region == LayoutRegion::Body) {
+                ++body_count;
+            } else {
+                position_directly(child);
+            }
         }
-        if (batch != nullptr) {
-            EndDeferWindowPos(batch);
+        if (body_count == 0) {
+            return;
+        }
+        HDWP batch = BeginDeferWindowPos(static_cast<int>(body_count));
+        for (const auto& child : child_layouts_) {
+            if (child.region != LayoutRegion::Body || batch == nullptr) {
+                continue;
+            }
+            const auto place = placement_for(child);
+            const HDWP next = DeferWindowPos(
+                batch,
+                child.window,
+                nullptr,
+                place.left,
+                place.top,
+                place.right - place.left,
+                place.bottom - place.top,
+                SWP_NOACTIVATE | SWP_NOZORDER);
+            // A failed DeferWindowPos has already destroyed the structure.
+            batch = next;
+        }
+        if (batch != nullptr && EndDeferWindowPos(batch) != FALSE) {
+            return;
+        }
+        // The batch was never created, could not be extended, or could not be
+        // applied. Position the whole body directly so no control is left at a
+        // stale position by a partially built batch.
+        for (const auto& child : child_layouts_) {
+            if (child.region == LayoutRegion::Body) {
+                position_directly(child);
+            }
         }
     }
 
