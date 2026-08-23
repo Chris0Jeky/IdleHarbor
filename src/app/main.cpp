@@ -32,6 +32,7 @@
 namespace {
 
 using idleharbor::app::CommandLineOptions;
+using idleharbor::app::FocusRevealTrigger;
 using idleharbor::app::RequestedCommand;
 using idleharbor::core::DecisionAction;
 using idleharbor::core::EngineState;
@@ -59,6 +60,7 @@ constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kGenuineInputMessage = WM_APP + 2;
 constexpr UINT kDeferredCommandMessage = WM_APP + 3;
 constexpr UINT kDeferredFocusMessage = WM_APP + 4;
+constexpr UINT kDeferredSelectionMessage = WM_APP + 5;
 constexpr UINT kTimerId = 1;
 constexpr UINT_PTR kChildSubclassId = 1;
 constexpr int kEmergencyHotkeyId = 1;
@@ -442,6 +444,28 @@ class Application final {
         ObserveFocusChange();
     }
 
+    // Records how the user reached the control that is about to take focus.
+    // Called for every queued message before it is dispatched, so a focus
+    // change observed during dispatch already knows its own cause.
+    void NoteInputTrigger(const MSG& message) noexcept {
+        switch (message.message) {
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+        case WM_CHAR:
+            focus_trigger_ = FocusRevealTrigger::Keyboard;
+            break;
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONDBLCLK:
+        case WM_RBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_NCLBUTTONDOWN:
+            focus_trigger_ = FocusRevealTrigger::Pointer;
+            break;
+        default:
+            break;
+        }
+    }
+
     void ObserveFocusChange() {
         const HWND focused = GetFocus();
         const auto previous = reinterpret_cast<std::uintptr_t>(last_focus_);
@@ -449,8 +473,13 @@ class Application final {
         if (!idleharbor::app::FocusChanged(previous, current)) {
             return;
         }
-        last_focus_ = focused;
-        EnsureFocusedControlVisible();
+        // Consume the focus change only when the reveal actually ran. A click
+        // on a clipped control deliberately does not scroll, but the user may
+        // then drive that same control from the keyboard; leaving the change
+        // unconsumed is what lets the next keyboard message reveal it.
+        if (EnsureFocusedControlVisible(focus_trigger_)) {
+            last_focus_ = focused;
+        }
     }
 
     [[nodiscard]] bool HandleTabNavigation(const MSG& message) {
@@ -757,7 +786,8 @@ class Application final {
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
         body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
-        for (const auto& child : child_layouts_) {
+
+        const auto placement_for = [&](const ChildLayout& child) {
             int x = 0;
             int y = 0;
             int width = 0;
@@ -784,20 +814,84 @@ class Application final {
                 y = Scale(child.arranged_y) - scroll_position_;
                 width = Scale(child.arranged_width);
             }
+            return idleharbor::app::PixelRect{x, y, x + width, y + height};
+        };
+        const auto position_directly = [&](const ChildLayout& child) {
+            const auto place = placement_for(child);
             SetWindowPos(
                 child.window,
                 nullptr,
-                x,
-                y,
-                width,
-                height,
+                place.left,
+                place.top,
+                place.right - place.left,
+                place.bottom - place.top,
                 SWP_NOACTIVATE | SWP_NOZORDER);
+        };
+
+        // Every window in one deferred-position structure must share a parent.
+        // The status card and the action buttons belong to the top-level window
+        // and never move while scrolling, so they are positioned directly; only
+        // the body, whose controls all belong to the clipped viewport, is
+        // batched. Positioning those one at a time repainted each in turn, so a
+        // single scroll step tore its way down the viewport.
+        std::size_t body_count = 0;
+        for (const auto& child : child_layouts_) {
+            if (child.region == LayoutRegion::Body) {
+                ++body_count;
+            } else {
+                position_directly(child);
+            }
+        }
+        if (body_count == 0) {
+            return;
+        }
+        HDWP batch = BeginDeferWindowPos(static_cast<int>(body_count));
+        for (const auto& child : child_layouts_) {
+            if (child.region != LayoutRegion::Body || batch == nullptr) {
+                continue;
+            }
+            const auto place = placement_for(child);
+            const HDWP next = DeferWindowPos(
+                batch,
+                child.window,
+                nullptr,
+                place.left,
+                place.top,
+                place.right - place.left,
+                place.bottom - place.top,
+                SWP_NOACTIVATE | SWP_NOZORDER);
+            // A failed DeferWindowPos has already destroyed the structure.
+            batch = next;
+        }
+        if (batch != nullptr && EndDeferWindowPos(batch) != FALSE) {
+            return;
+        }
+        // The batch was never created, could not be extended, or could not be
+        // applied. Position the whole body directly so no control is left at a
+        // stale position by a partially built batch.
+        for (const auto& child : child_layouts_) {
+            if (child.region == LayoutRegion::Body) {
+                position_directly(child);
+            }
         }
     }
 
     void RepaintSettingsViewport() const noexcept {
         const HWND target = settings_viewport_ != nullptr ? settings_viewport_ : window_;
         if (target == nullptr) {
+            return;
+        }
+        // An open drop-down list has not committed its highlighted item to the
+        // combo box yet, so forcing a synchronous paint now would draw the
+        // previous selection over it. Still invalidate the same descendants and
+        // let the ordinary WM_PAINT serve them: the list is a separate top-level
+        // popup that RDW_ALLCHILDREN never reaches, so repainting the combo's
+        // own field underneath is harmless. Skipping the invalidation is not --
+        // a state change that lands while a list is open, such as the emergency
+        // hotkey or a forwarded start disabling every control, would leave the
+        // stale fragments issue #34 exists to prevent.
+        if (IsAnyComboBoxDropped()) {
+            RedrawWindow(target, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
             return;
         }
         // Body controls are child windows moved inside a clipped child viewport.
@@ -829,6 +923,10 @@ class Application final {
         if (updating_viewport_) {
             return;
         }
+        // A resize or DPI change repositions and force-repaints every body
+        // control, including one an open list is anchored to. Nothing here can
+        // be deferred, so close the list instead of displacing it.
+        CloseOpenComboBoxLists();
         updating_viewport_ = true;
         constexpr int kMaxLayoutPasses = 4;
         const int requested_scroll_position = scroll_position_;
@@ -887,6 +985,10 @@ class Application final {
     }
 
     void ScrollTo(const int position) {
+        // Moving the body would move the control an open list is anchored to.
+        if (IsAnyComboBoxDropped()) {
+            return;
+        }
         const int target = idleharbor::app::ClampScrollPosition(position, ContentHeight(), ViewportHeight());
         if (target == scroll_position_) {
             return;
@@ -968,19 +1070,53 @@ class Application final {
         return is_combo && SendMessageW(window, CB_GETDROPPEDSTATE, 0, 0) != FALSE;
     }
 
-    void EnsureFocusedControlVisible() {
+    // A drop-down list is a popup anchored to its combo box. While one is open
+    // the body must hold still: moving the combo moves the anchor out from
+    // under the pointer, and repainting it forces stale text under the list.
+    //
+    // Only a list the user can still close counts. A hidden window or a combo
+    // that a session start has disabled must never be able to hold the body
+    // frozen, because nothing would be left to close the list.
+    [[nodiscard]] bool IsAnyComboBoxDropped() const noexcept {
+        if (window_ == nullptr || IsWindowVisible(window_) == FALSE) {
+            return false;
+        }
+        for (const HWND combo : {profile_, motion_, power_}) {
+            if (combo == nullptr || IsWindowEnabled(combo) == FALSE) {
+                continue;
+            }
+            if (SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Layout transactions reposition the very control a list is anchored to.
+    // Close the list first so the transaction has nothing to displace.
+    void CloseOpenComboBoxLists() noexcept {
+        for (const HWND combo : {profile_, motion_, power_}) {
+            if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+                SendMessageW(combo, CB_SHOWDROPDOWN, FALSE, 0);
+            }
+        }
+    }
+
+    // Returns false only when policy suppressed the reveal, so the caller can
+    // leave the focus change unconsumed and re-evaluate it later.
+    bool EnsureFocusedControlVisible(const FocusRevealTrigger trigger) {
+        if (!idleharbor::app::ShouldRevealFocusedControl(trigger, IsAnyComboBoxDropped())) {
+            return false;
+        }
         const HWND focused = GetFocus();
         if (focused == nullptr || (focused != window_ && IsChild(window_, focused) == FALSE)) {
-            return;
+            return true;
         }
         const auto layout = std::find_if(child_layouts_.begin(), child_layouts_.end(), [&](const ChildLayout& child) {
             return child.window == focused;
         });
-        if (layout == child_layouts_.end()) {
-            return;
-        }
-        if (layout->region != LayoutRegion::Body) {
-            return;
+        if (layout == child_layouts_.end() || layout->region != LayoutRegion::Body) {
+            return true;
         }
         const int top = Scale(layout->arranged_y);
         const int bottom = top + Scale(layout->focus_height);
@@ -990,6 +1126,7 @@ class Application final {
             bottom,
             ContentHeight(),
             ViewportHeight()));
+        return true;
     }
 
     void ApplyDpiChange(const UINT new_dpi, const RECT& suggested) {
@@ -1049,7 +1186,7 @@ class Application final {
             }
         }
         UpdateViewport();
-        EnsureFocusedControlVisible();
+        EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
     }
 
     void CreateControls() {
@@ -1388,13 +1525,17 @@ class Application final {
     }
 
     void UpdateDirtyPresentation() {
-        if (save_ != nullptr) {
-            SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
-        }
+        // Order matters: the status card explains the Save action, so it is
+        // published before the button is relabelled and before UpdateButtons
+        // enables it. Anything observing the window mid-transaction then sees a
+        // stale card only while Save still reads as unavailable.
         if (status_ != nullptr) {
             SetControlText(status_, DisplayStatusText());
             InvalidateRect(status_, nullptr, TRUE);
             UpdateWindow(status_);
+        }
+        if (save_ != nullptr) {
+            SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
         }
         UpdateTrayTooltip();
         UpdateButtons();
@@ -1483,7 +1624,10 @@ class Application final {
         SetChecked(notifications_, settings_.show_notifications);
         SetChecked(emergency_hotkey_, settings_.emergency_hotkey);
         suppress_dirty_tracking_ = previous_suppression;
-        UpdateButtons();
+        // UpdateDirtyPresentation() publishes the status card first and enables
+        // the Save action last. Enabling Save here as well would publish the
+        // affordance before the status text that explains it, leaving an
+        // observable window where the card still reads as saved.
         UpdateDirtyPresentation();
     }
 
@@ -1659,9 +1803,76 @@ class Application final {
         }
     }
 
+    [[nodiscard]] HWND ComboBoxForId(const int control_id) const noexcept {
+        switch (control_id) {
+        case kProfile:
+            return profile_;
+        case kMotion:
+            return motion_;
+        case kPower:
+            return power_;
+        default:
+            return nullptr;
+        }
+    }
+
+    [[nodiscard]] static bool IsComboBoxNotification(const int control_id, const int notification) noexcept {
+        const bool is_combo = control_id == kProfile || control_id == kMotion || control_id == kPower;
+        return is_combo && (notification == CBN_SELCHANGE || notification == CBN_CLOSEUP);
+    }
+
+    // A pointer-driven CBN_SELCHANGE arrives while the drop-down list is still
+    // up and the combo box has not repainted its own field yet. Applying the
+    // setting there would send CB_SETCURSEL and force a repaint into a control
+    // that is mid-gesture, which is why the field appeared to keep its old
+    // value until it lost focus. Keyboard and programmatic changes reach a
+    // closed control and stay synchronous.
+    void QueueComboBoxSelection(const int control_id, const int notification) {
+        if (notification == CBN_SELCHANGE) {
+            queued_combo_selection_ = control_id;
+        }
+        if (queued_combo_selection_ == 0) {
+            return;
+        }
+        ApplyQueuedComboBoxSelection();
+        if (queued_combo_selection_ != 0) {
+            // The list is still open. CBN_CLOSEUP drives the real retry; this
+            // posted message covers the case where that notification arrives
+            // while CB_GETDROPPEDSTATE still reports the list as open.
+            PostMessageW(window_, kDeferredSelectionMessage, 0, 0);
+        }
+    }
+
+    void ApplyQueuedComboBoxSelection() {
+        const int control_id = queued_combo_selection_;
+        if (control_id == 0) {
+            return;
+        }
+        const HWND combo = ComboBoxForId(control_id);
+        if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+            // Still open: the matching CBN_CLOSEUP queues another attempt.
+            return;
+        }
+        queued_combo_selection_ = 0;
+        if (control_id == kProfile) {
+            ApplySelectedProfile();
+        } else {
+            UpdateDirtyStateFromControls();
+        }
+    }
+
     void ApplySelectedProfile() {
         const int index = ComboIndex(profile_);
         if (index < 0 || index >= static_cast<int>(kProfiles.size())) {
+            return;
+        }
+        // Loading a profile replaces every session setting with its defaults,
+        // so it must happen only when the selection genuinely moved. Dismissing
+        // the list with Escape reverts the combo to the profile already in
+        // effect and still reports a closeup; reloading there would discard the
+        // user's edits behind a cancelled gesture. Re-picking the current entry
+        // is the same no-op.
+        if (kProfiles[static_cast<std::size_t>(index)] == settings_.session.profile) {
             return;
         }
         const auto app_start_minimized = settings_.start_minimized;
@@ -2052,17 +2263,14 @@ class Application final {
             CreateControls();
             return 0;
         case WM_COMMAND:
-            if (LOWORD(w_param) == kProfile && HIWORD(w_param) == CBN_SELCHANGE) {
-                ApplySelectedProfile();
+            if (IsComboBoxNotification(LOWORD(w_param), HIWORD(w_param))) {
+                QueueComboBoxSelection(LOWORD(w_param), HIWORD(w_param));
             } else if (LOWORD(w_param) == kStart && HIWORD(w_param) == BN_CLICKED) {
                 StartSession();
             } else if (LOWORD(w_param) == kStop && HIWORD(w_param) == BN_CLICKED) {
                 StopSession();
             } else if (LOWORD(w_param) == kSave && HIWORD(w_param) == BN_CLICKED) {
                 Save();
-            } else if ((LOWORD(w_param) == kMotion || LOWORD(w_param) == kPower) &&
-                       HIWORD(w_param) == CBN_SELCHANGE) {
-                UpdateDirtyStateFromControls();
             } else if (HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) {
                 UpdateDirtyStateFromControls();
             }
@@ -2100,6 +2308,9 @@ class Application final {
             return 0;
         case kDeferredCommandMessage:
             ProcessDeferredCommand();
+            return 0;
+        case kDeferredSelectionMessage:
+            ApplyQueuedComboBoxSelection();
             return 0;
         case kDeferredFocusMessage: {
             const HWND target = reinterpret_cast<HWND>(w_param);
@@ -2142,7 +2353,7 @@ class Application final {
                 ShowWindow(window_, SW_HIDE);
             } else if (w_param != SIZE_MINIMIZED) {
                 UpdateViewport();
-                EnsureFocusedControlVisible();
+                EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
             }
             return 0;
         case WM_GETMINMAXINFO:
@@ -2242,6 +2453,8 @@ class Application final {
     bool disconnected_ = false;
     bool exiting_ = false;
     HWND last_focus_ = nullptr;
+    FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
+    int queued_combo_selection_ = 0;
     int scroll_position_ = 0;
     bool updating_viewport_ = false;
     int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
@@ -2373,6 +2586,7 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
 
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        application.NoteInputTrigger(message);
         if (!application.HandleTabNavigation(message) && IsDialogMessageW(application.window(), &message) == FALSE) {
             TranslateMessage(&message);
             DispatchMessageW(&message);

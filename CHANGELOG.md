@@ -6,6 +6,19 @@ where practical.
 
 ## [Unreleased]
 
+### Fixed
+
+- Selecting a profile, motion mode, or power request now updates the field immediately instead of
+  appearing to keep its previous value until focus moved elsewhere.
+- Clicking a combo box no longer scrolls the settings body out from under the pointer, so a mode can
+  be picked on the first attempt. The body holds still while any drop-down list is open.
+- Scrolling the settings body moves its controls as one surface instead of repositioning them one at
+  a time.
+- The status card now reports unsaved changes before the Save action is relabelled or enabled, instead
+  of briefly showing an available Save action beside a saved-looking status.
+- Dismissing the profile list with Escape, or re-selecting the profile already in effect, no longer
+  reloads that profile's defaults over settings you had edited.
+
 ## [0.1.0] - 2026-08-20
 
 ### Added

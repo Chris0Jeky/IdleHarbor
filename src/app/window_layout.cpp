@@ -196,4 +196,17 @@ bool FocusChanged(const std::uintptr_t previous_focus, const std::uintptr_t curr
     return previous_focus != current_focus;
 }
 
+bool ShouldRevealFocusedControl(const FocusRevealTrigger trigger, const bool popup_open) noexcept {
+    // A dropped combo box owns the pointer and paints a popup anchored to the
+    // control it belongs to. Scrolling the body underneath it moves that anchor
+    // mid-gesture, which is what makes a selection need a second attempt.
+    if (popup_open) {
+        return false;
+    }
+    // A pointer already put the control under the user's eye, so revealing it
+    // only yanks the surface the user is aiming at. Keyboard focus moves and
+    // layout changes are the cases that genuinely need the reveal.
+    return trigger != FocusRevealTrigger::Pointer;
+}
+
 }  // namespace idleharbor::app

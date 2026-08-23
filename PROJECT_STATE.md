@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-20
+Last updated: 2026-08-23
 
 ## Current milestone
 
@@ -44,6 +44,30 @@ The stopped, running, safety-paused, scrolled, and tray-menu screenshots were re
 installed public release at 192 DPI and visually inspected. `docs/assets/capture-manifest.json`
 records release source `d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`, the released executable
 hash, exact PNG dimensions, and hashes. The original reported corruption is absent in every state.
+
+## In-flight work after `v0.1.0`
+
+Settings-window interaction fixes are on `agent/ux-combo-interaction`
+(PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54)), addressing reported clunkiness when
+choosing a profile, motion mode, or power request:
+
+- focus reveal is classified by keyboard versus pointer input, so clicking a combo box no longer
+  scrolls the body out from under the pointer; a suppressed reveal is not consumed;
+- a combo selection made with the pointer is applied on `CBN_CLOSEUP` rather than into a control that
+  is still mid-gesture, and a profile already in effect is never reloaded over edited settings;
+- while a list is open the body does not scroll and its repaints are queued rather than forced;
+  resize and DPI transactions close the list instead;
+- body controls are repositioned in one `BeginDeferWindowPos` batch (fixed header and footer controls
+  have a different parent and stay direct).
+
+Two pre-existing intermittent failures in `tests\Test-NativeViewportRepaint.ps1` were fixed with it:
+`RefreshControls` published the Save action ahead of the status card, and the test asserted on a
+window that was findable from `WM_CREATE` but not yet initialized. The script now passed five
+consecutive runs at 192 DPI with an identical capture hash.
+
+`docs/assets` still records the `v0.1.0` release captures. Any settings-window layout change made
+after this point leaves those screenshots stale until the next release capture, which must be taken
+from a released executable.
 
 ## Distribution status
 

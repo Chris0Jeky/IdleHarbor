@@ -98,6 +98,27 @@ visual layout, including the fixed footer's Start, Stop, Save order. It reveals 
 and also re-reveals the still-focused body control after resize/DPI layout changes; pointer and
 scrollbar scrolling with unchanged focus remains stable.
 
+Reveal is classified by how focus was reached. Each queued message is tagged as keyboard or pointer
+input before it is dispatched, so a control clicked with the mouse is never scrolled out from under
+the pointer; only keyboard focus moves and layout changes reveal. A suppressed reveal does not consume
+the focus change, so driving that same control from the keyboard still reveals it.
+
+A combo list is a popup anchored to a control the layout would otherwise move, so while one is open
+the body does not scroll and its repaints are queued rather than forced: the same descendants are
+invalidated and served by an ordinary `WM_PAINT` instead of a synchronous one. The list is a separate
+top-level popup that `RDW_ALLCHILDREN` never reaches. Resize and DPI transactions
+cannot be deferred that way, so they close any open list before repositioning. Only a list the user
+can still close counts as open -- a hidden window or a combo disabled by a session start never freezes
+the body. Combo selections are applied immediately when the list is already closed (keyboard and
+forwarded changes) and otherwise queued and applied on `CBN_CLOSEUP`, so no `CB_SETCURSEL` or forced
+repaint reaches a control that is still mid-gesture. Selecting the profile already in effect, which is
+also what dismissing the list with Escape leaves selected, never reloads that profile's defaults over
+edited settings.
+
+Body controls all share the settings viewport as their parent and are repositioned in one
+`BeginDeferWindowPos` batch; the status card and action buttons belong to the top-level window and are
+positioned directly, because one deferred-position structure cannot mix parents.
+
 No service, elevation, process hiding, network client, telemetry, or concealed startup path is part
 of the design.
 
