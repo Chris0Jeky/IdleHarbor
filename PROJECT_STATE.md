@@ -112,7 +112,9 @@ queue remains:
 - [#48](https://github.com/Chris0Jeky/IdleHarbor/issues/48): restore the scheduler command after packaging tests;
 - [#49](https://github.com/Chris0Jeky/IdleHarbor/issues/49): make documentation capture more portable;
 - [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50): sanitize rounded screenshot corners;
-- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation.
+- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation;
+- [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55): classify focus changes that bypass the message loop;
+- [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56): a forwarded command can discard a pending combo selection.
 
 ## Human decisions
 
