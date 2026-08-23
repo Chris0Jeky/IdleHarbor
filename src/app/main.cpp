@@ -94,11 +94,13 @@ constexpr wchar_t kMotionTip[] =
     L"Circle is much the largest of the three. Motion is independent of the keep-awake request.";
 constexpr wchar_t kPowerTip[] =
     L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
-    L"machine from sleeping. Display and system also keeps the screen on. Independent of "
-    L"motion, so either, both, or neither can be used.";
+    L"machine from sleeping. Display and system also keeps the screen on. This is independent of "
+    L"motion, so either or both can be used -- but not neither: motion Off with no keep-awake "
+    L"request is refused, because nothing would be keeping the system awake.";
 constexpr wchar_t kIntervalTip[] =
-    L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
-    L"one motion step, one keep-awake refresh, or both.";
+    L"How long to wait between one motion pulse and the next, from 1 to 86400 seconds. The "
+    L"keep-awake request is continuous for as long as the session runs, so this interval does "
+    L"not affect it.";
 constexpr wchar_t kDistanceTip[] =
     L"How far a visible motion path travels. A 1 to 120 scale applied to the bounded path, "
     L"not a pixel radius. It applies to Normal, Linear, and Circle only; Off and Zen do not "
@@ -114,8 +116,8 @@ constexpr wchar_t kDisconnectTip[] =
     L"Stop emitting while this session is disconnected, such as after a Remote Desktop client "
     L"closes without signing out.";
 constexpr wchar_t kBatteryTip[] =
-    L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
-    L"low-battery safeguard off.";
+    L"Pause once the battery is at or below this percentage, from 1 to 100. A threshold of 30 "
+    L"pauses at 30, not at 29. Set 0 to turn the low-battery safeguard off.";
 constexpr wchar_t kOnBatteryTip[] =
     L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
     L"separate from the low-battery threshold above.";
@@ -128,7 +130,9 @@ constexpr wchar_t kMaxDurationTip[] =
 constexpr wchar_t kStartMinimizedTip[] = L"Launch straight to the notification area instead of showing this window.";
 constexpr wchar_t kCloseToTrayTip[] =
     L"Closing this window hides it to the notification area instead of exiting. Use Exit in "
-    L"the notification-area menu to quit.";
+    L"the notification-area menu to quit. If the notification icon is unavailable, closing "
+    L"exits and stops any running session, because there would be nothing left to restore the "
+    L"window from.";
 constexpr wchar_t kNotificationsTip[] =
     L"Show a notification when a safeguard pauses or stops the session, so a change of state "
     L"is never silent.";

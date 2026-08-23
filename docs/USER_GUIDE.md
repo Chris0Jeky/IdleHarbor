@@ -66,6 +66,9 @@ In the settings window these are the **Motion** and **Keep awake** fields.
 | Prefer a quiet compatibility attempt | Motion **Zen**, power **None** |
 | Make movement obvious | Motion **Circle** or **Linear**, power as required |
 
+Motion **Off** with keep awake **None** is refused, because that combination would neither emit
+input nor keep the system awake. Every other pair is accepted.
+
 An application may implement idle detection differently. Zen is not guaranteed to work everywhere,
 and visible movement is not evidence of human presence.
 
@@ -94,7 +97,8 @@ The policy engine can pause or stop for:
 
 - genuine mouse or keyboard input, followed by a configurable quiet cooldown;
 - workstation lock/unlock and local or remote session connect/disconnect;
-- low battery or any battery power when that option is enabled;
+- the battery reaching or falling below the low-battery threshold, or any battery power at all when
+  that option is enabled;
 - a foreground window covering its monitor in fullscreen mode;
 - an active-hours window in the advanced settings;
 - a configured maximum session duration;
