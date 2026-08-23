@@ -73,6 +73,10 @@ constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
 constexpr int kBaseBodyOrigin = 52;
 constexpr int kBaseBodyContentHeight = 570;
+constexpr int kBaseTipWidth = 320;
+constexpr int kTipInitialDelayMs = 700;
+constexpr int kTipVisibleMs = 30'000;
+constexpr int kTipReshowDelayMs = 200;
 
 enum ControlId : int {
     kStatus = 100,
@@ -1178,6 +1182,7 @@ class Application final {
                 DeleteObject(ui_font_);
             }
             ui_font_ = replacement_font;
+            ApplyHelpTipMetrics();
             if (replacement_heading_font != nullptr) {
                 if (heading_font_ != nullptr) {
                     DeleteObject(heading_font_);
@@ -1187,6 +1192,60 @@ class Application final {
         }
         UpdateViewport();
         EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
+    }
+
+    void CreateHelpTips() {
+        // One shared tooltip control owns every explanation. TTF_SUBCLASS lets
+        // it watch each control's own mouse messages, which composes with the
+        // SetWindowSubclass TrackChild already installs.
+        help_tips_ = CreateWindowExW(
+            WS_EX_TOPMOST,
+            TOOLTIPS_CLASSW,
+            nullptr,
+            WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            window_,
+            nullptr,
+            instance_,
+            nullptr);
+        if (help_tips_ == nullptr) {
+            return;
+        }
+        SetWindowPos(help_tips_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        ApplyHelpTipMetrics();
+        SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_INITIAL, MAKELPARAM(kTipInitialDelayMs, 0));
+        SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_AUTOPOP, MAKELPARAM(kTipVisibleMs, 0));
+        SendMessageW(help_tips_, TTM_SETDELAYTIME, TTDT_RESHOW, MAKELPARAM(kTipReshowDelayMs, 0));
+    }
+
+    void ApplyHelpTipMetrics() const noexcept {
+        if (help_tips_ == nullptr) {
+            return;
+        }
+        // A positive maximum width is what turns a tooltip multi-line, so the
+        // longer explanations wrap instead of running off the monitor.
+        SendMessageW(help_tips_, TTM_SETMAXTIPWIDTH, 0, Scale(kBaseTipWidth));
+        if (ui_font_ != nullptr) {
+            SendMessageW(help_tips_, WM_SETFONT, reinterpret_cast<WPARAM>(ui_font_), TRUE);
+        }
+    }
+
+    // `text` must outlive the tooltip; every caller passes a string literal.
+    void AddHelpTip(const HWND control, const wchar_t* const text) const noexcept {
+        if (help_tips_ == nullptr || control == nullptr || text == nullptr) {
+            return;
+        }
+        TOOLINFOW tool{};
+        tool.cbSize = sizeof(tool);
+        tool.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+        tool.hwnd = GetParent(control);
+        tool.uId = reinterpret_cast<UINT_PTR>(control);
+        tool.hinst = instance_;
+        tool.lpszText = const_cast<LPWSTR>(text);
+        SendMessageW(help_tips_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
     }
 
     void CreateControls() {
@@ -1208,6 +1267,7 @@ class Application final {
             DEFAULT_PITCH | FF_DONTCARE,
             L"Segoe UI");
         const HFONT heading = heading_font_ != nullptr ? heading_font_ : font;
+        CreateHelpTips();
         const auto scale = [&](const int value) { return ScaleForDpi(value, dpi_); };
         settings_viewport_ = CreateWindowExW(
             WS_EX_CONTROLPARENT,
@@ -1226,12 +1286,15 @@ class Application final {
             SetWindowSubclass(settings_viewport_, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
         }
         const HWND body_parent = settings_viewport_ != nullptr ? settings_viewport_ : window_;
-        const auto add_label = [&](const wchar_t* text, const int y) {
+        const auto add_label = [&](const wchar_t* text, const int y, const wchar_t* tip) {
             const HWND control = CreateWindowExW(
                 0,
                 L"STATIC",
                 text,
-                WS_CHILD | WS_VISIBLE,
+                // A plain static reports itself transparent to hit-testing, so
+                // the tooltip would never see a hover. SS_NOTIFY makes the label
+                // explain the field beside it.
+                WS_CHILD | WS_VISIBLE | SS_NOTIFY,
                 scale(20),
                 scale(y),
                 scale(270),
@@ -1241,6 +1304,7 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            AddHelpTip(control, tip);
             TrackChild(control, 20, y, 270, 24, 24, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Label);
         };
         const auto add_heading = [&](const wchar_t* text, const int y) {
@@ -1260,7 +1324,7 @@ class Application final {
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(heading), TRUE);
             TrackChild(control, 20, y, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
         };
-        const auto add_combo = [&](HWND& target, const int y, const int id) {
+        const auto add_combo = [&](HWND& target, const int y, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
                 0,
                 L"COMBOBOX",
@@ -1275,6 +1339,7 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            AddHelpTip(target, tip);
             TrackChild(
                 target,
                 300,
@@ -1286,7 +1351,7 @@ class Application final {
                 LayoutRegion::Body,
                 BodyControlKind::Field);
         };
-        const auto add_edit = [&](HWND& target, const int y, const int id) {
+        const auto add_edit = [&](HWND& target, const int y, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
                 L"EDIT",
@@ -1301,9 +1366,10 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            AddHelpTip(target, tip);
             TrackChild(target, 300, y - 3, 145, 26, 26, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Field);
         };
-        const auto add_check = [&](HWND& target, const wchar_t* text, const int y, const int id) {
+        const auto add_check = [&](HWND& target, const wchar_t* text, const int y, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
                 0,
                 L"BUTTON",
@@ -1318,6 +1384,7 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            AddHelpTip(target, tip);
             TrackChild(
                 target,
                 20,
@@ -1334,7 +1401,7 @@ class Application final {
             WS_EX_CLIENTEDGE,
             L"STATIC",
             L"Stopped: ready",
-            WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
+            WS_CHILD | WS_VISIBLE | SS_OWNERDRAW | SS_NOTIFY,
             scale(20),
             scale(18),
             scale(525),
@@ -1344,18 +1411,45 @@ class Application final {
             instance_,
             nullptr);
         SendMessageW(status_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        AddHelpTip(
+            status_,
+            L"The current state: Running, Paused, or Stopped. When a safeguard has paused or "
+            L"stopped the session, the reason is named here. It also reports when settings have "
+            L"been edited but not yet saved.");
         TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
         add_heading(L"Session", 56);
-        add_label(L"Profile", 86);
-        add_combo(profile_, 86, kProfile);
+        add_label(
+            L"Profile",
+            86,
+            L"A set of starting values, not a locked mode. Choosing a profile replaces every "
+            L"setting below with its defaults; edit them freely afterwards and press Save to keep "
+            L"the result.");
+        add_combo(
+            profile_,
+            86,
+            kProfile,
+            L"A set of starting values, not a locked mode. Choosing a profile replaces every "
+            L"setting below with its defaults; edit them freely afterwards and press Save to keep "
+            L"the result.");
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Motion", 120);
-        add_combo(motion_, 120, kMotion);
+        add_label(
+            L"Motion",
+            120,
+            L"Whether the pointer is moved, and how visibly. Off emits no input at all. Zen moves "
+            L"least, then Normal, Circle, and Linear. The pointer always finishes exactly where it "
+            L"started. Motion is independent of the keep-awake request.");
+        add_combo(
+            motion_,
+            120,
+            kMotion,
+            L"Whether the pointer is moved, and how visibly. Off emits no input at all. Zen moves "
+            L"least, then Normal, Circle, and Linear. The pointer always finishes exactly where it "
+            L"started. Motion is independent of the keep-awake request.");
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -1367,37 +1461,148 @@ class Application final {
             SendMessageW(motion_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Power request", 154);
-        add_combo(power_, 154, kPower);
+        add_label(
+            L"Keep awake",
+            154,
+            L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
+            L"machine from sleeping. Display and system also keeps the screen on. Independent of "
+            L"motion, so either, both, or neither can be used.");
+        add_combo(
+            power_,
+            154,
+            kPower,
+            L"Whether Windows is asked to stay awake. None makes no request. System sleep keeps the "
+            L"machine from sleeping. Display and system also keeps the screen on. Independent of "
+            L"motion, so either, both, or neither can be used.");
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
         add_heading(L"Pulse", 190);
-        add_label(L"Pulse interval (seconds)", 220);
-        add_edit(interval_, 220, kInterval);
-        add_label(L"Motion multiplier (1-120)", 254);
-        add_edit(distance_, 254, kDistance);
-        add_check(randomize_, L"Randomize pulse interval", 286, kRandomize);
+        add_label(
+            L"Pulse interval (seconds)",
+            220,
+            L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
+            L"one motion step, one keep-awake refresh, or both.");
+        add_edit(
+            interval_,
+            220,
+            kInterval,
+            L"How long to wait between one pulse and the next, from 1 to 86400 seconds. A pulse is "
+            L"one motion step, one keep-awake refresh, or both.");
+        add_label(
+            L"Motion size (1-120)",
+            254,
+            L"How far a visible motion pattern travels. A 1 to 120 scale applied to the bounded "
+            L"motion path, not a pixel radius. It has no effect when motion is Off.");
+        add_edit(
+            distance_,
+            254,
+            kDistance,
+            L"How far a visible motion pattern travels. A 1 to 120 scale applied to the bounded "
+            L"motion path, not a pixel radius. It has no effect when motion is Off.");
+        add_check(
+            randomize_,
+            L"Randomize pulse interval",
+            286,
+            kRandomize,
+            L"Wait a random time up to the pulse interval instead of a fixed period, so the rhythm "
+            L"is not perfectly regular.");
         add_heading(L"Safeguards", 322);
-        add_label(L"Pause after genuine input (seconds; 0 disables)", 352);
-        add_edit(pause_input_, 352, kPauseInput);
-        add_check(lock_pause_, L"Pause while the workstation is locked", 384, kLockPause);
-        add_check(disconnect_pause_, L"Pause while the session is disconnected", 416, kDisconnectPause);
-        add_label(L"Low-battery threshold (0 disables)", 450);
-        add_edit(battery_, 450, kBattery);
-        add_check(pause_on_battery_, L"Pause whenever the device is on battery", 482, kPauseOnBattery);
-        add_check(fullscreen_, L"Pause while a full-screen application is foreground", 514, kFullscreen);
+        add_label(
+            L"Pause after real input (seconds; 0 disables)",
+            352,
+            L"How long you must be idle after genuinely typing or moving the mouse before "
+            L"IdleHarbor resumes. Set 0 to remove the pause entirely, which means it keeps pulsing "
+            L"while you work.");
+        add_edit(
+            pause_input_,
+            352,
+            kPauseInput,
+            L"How long you must be idle after genuinely typing or moving the mouse before "
+            L"IdleHarbor resumes. Set 0 to remove the pause entirely, which means it keeps pulsing "
+            L"while you work.");
+        add_check(
+            lock_pause_,
+            L"Pause while the workstation is locked",
+            384,
+            kLockPause,
+            L"Stop emitting while the workstation is locked with Win+L, and resume when you unlock "
+            L"it.");
+        add_check(
+            disconnect_pause_,
+            L"Pause while the session is disconnected",
+            416,
+            kDisconnectPause,
+            L"Stop emitting while this session is disconnected, such as after a Remote Desktop "
+            L"client closes without signing out.");
+        add_label(
+            L"Low-battery threshold (percent; 0 disables)",
+            450,
+            L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
+            L"low-battery safeguard off.");
+        add_edit(
+            battery_,
+            450,
+            kBattery,
+            L"Pause when the battery falls below this percentage, from 1 to 100. Set 0 to turn the "
+            L"low-battery safeguard off.");
+        add_check(
+            pause_on_battery_,
+            L"Pause whenever the device is on battery",
+            482,
+            kPauseOnBattery,
+            L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
+            L"separate from the low-battery threshold above.");
+        add_check(
+            fullscreen_,
+            L"Pause while a full-screen application is foreground",
+            514,
+            kFullscreen,
+            L"Pause while a full-screen application owns the foreground, so a film, game, or "
+            L"presentation is not disturbed.");
         add_heading(L"Window & notifications", 550);
-        add_label(L"Maximum session duration (seconds; 0 disables)", 580);
-        add_edit(max_duration_, 580, kMaxDuration);
-        add_check(start_minimized_, L"Start minimized to the notification area", 612, kStartMinimized);
-        add_check(close_to_tray_, L"Close button hides to the notification area", 644, kCloseToTray);
-        add_check(notifications_, L"Show safety state notifications", 676, kNotifications);
-        add_check(emergency_hotkey_, L"Enable emergency stop: Ctrl+Alt+Shift+F12", 708, kEmergencyHotkey);
+        add_label(
+            L"Maximum session duration (seconds; 0 disables)",
+            580,
+            L"Stop the session automatically after this many seconds. Set 0 to let it run until you "
+            L"stop it.");
+        add_edit(
+            max_duration_,
+            580,
+            kMaxDuration,
+            L"Stop the session automatically after this many seconds. Set 0 to let it run until you "
+            L"stop it.");
+        add_check(
+            start_minimized_,
+            L"Start minimized to the notification area",
+            612,
+            kStartMinimized,
+            L"Launch straight to the notification area instead of showing this window.");
+        add_check(
+            close_to_tray_,
+            L"Close button hides to the notification area",
+            644,
+            kCloseToTray,
+            L"Closing this window hides it to the notification area instead of exiting. Use Exit in "
+            L"the notification-area menu to quit.");
+        add_check(
+            notifications_,
+            L"Show safety state notifications",
+            676,
+            kNotifications,
+            L"Show a notification when a safeguard pauses or stops the session, so a change of state "
+            L"is never silent.");
+        add_check(
+            emergency_hotkey_,
+            L"Enable emergency stop: Ctrl+Alt+Shift+F12",
+            708,
+            kEmergencyHotkey,
+            L"Register Ctrl+Alt+Shift+F12 across the whole system so a running session can be "
+            L"stopped instantly from any application.");
 
-        const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id) {
+        const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
                 0,
                 L"BUTTON",
@@ -1412,6 +1617,7 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            AddHelpTip(target, tip);
             TrackChild(
                 target,
                 x,
@@ -1423,9 +1629,26 @@ class Application final {
                 LayoutRegion::FixedBottom,
                 BodyControlKind::Generic);
         };
-        add_button(start_, L"Start", 20, kStart);
-        add_button(stop_, L"Stop", 145, kStop);
-        add_button(save_, L"Save", 270, kSave);
+        add_button(
+            start_,
+            L"Start",
+            20,
+            kStart,
+            L"Begin a session with the values shown above. Unsaved edits apply to this session; "
+            L"press Save to keep them for the next launch.");
+        add_button(
+            stop_,
+            L"Stop",
+            145,
+            kStop,
+            L"End the session immediately. No further input is emitted and any keep-awake request "
+            L"is released.");
+        add_button(
+            save_,
+            L"Save",
+            270,
+            kSave,
+            L"Write the settings shown above to disk so they become the defaults at the next launch.");
         UpdateViewport();
     }
 
@@ -2271,7 +2494,13 @@ class Application final {
                 StopSession();
             } else if (LOWORD(w_param) == kSave && HIWORD(w_param) == BN_CLICKED) {
                 Save();
-            } else if (HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) {
+            } else if ((HIWORD(w_param) == EN_CHANGE || HIWORD(w_param) == BN_CLICKED) &&
+                       LOWORD(w_param) >= kInterval && LOWORD(w_param) <= kEmergencyHotkey) {
+                // kInterval..kEmergencyHotkey is exactly the edit and check
+                // range. Bounding it keeps STN_CLICKED from the labels and the
+                // status card -- which now carry SS_NOTIFY so their tooltips
+                // see a hover -- out of the dirty-state path; STN_CLICKED and
+                // BN_CLICKED are both 0.
                 UpdateDirtyStateFromControls();
             }
             return 0;
@@ -2452,6 +2681,7 @@ class Application final {
     bool locked_ = false;
     bool disconnected_ = false;
     bool exiting_ = false;
+    HWND help_tips_ = nullptr;
     HWND last_focus_ = nullptr;
     FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
     int queued_combo_selection_ = 0;
