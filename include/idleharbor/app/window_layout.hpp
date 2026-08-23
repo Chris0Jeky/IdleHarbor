@@ -83,6 +83,5 @@ struct StackedBodyLayout {
 [[nodiscard]] StackedBodyLayout ComputeStackedBodyLayout(int logical_client_width) noexcept;
 [[nodiscard]] bool FocusChanged(std::uintptr_t previous_focus, std::uintptr_t current_focus) noexcept;
 [[nodiscard]] bool ShouldRevealFocusedControl(FocusRevealTrigger trigger, bool popup_open) noexcept;
-[[nodiscard]] bool BodyLayoutIsMovable(bool popup_open) noexcept;
 
 }  // namespace idleharbor::app

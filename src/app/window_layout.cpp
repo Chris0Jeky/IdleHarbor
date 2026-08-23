@@ -209,8 +209,4 @@ bool ShouldRevealFocusedControl(const FocusRevealTrigger trigger, const bool pop
     return trigger != FocusRevealTrigger::Pointer;
 }
 
-bool BodyLayoutIsMovable(const bool popup_open) noexcept {
-    return !popup_open;
-}
-
 }  // namespace idleharbor::app

@@ -473,8 +473,13 @@ class Application final {
         if (!idleharbor::app::FocusChanged(previous, current)) {
             return;
         }
-        last_focus_ = focused;
-        EnsureFocusedControlVisible(focus_trigger_);
+        // Consume the focus change only when the reveal actually ran. A click
+        // on a clipped control deliberately does not scroll, but the user may
+        // then drive that same control from the keyboard; leaving the change
+        // unconsumed is what lets the next keyboard message reveal it.
+        if (EnsureFocusedControlVisible(focus_trigger_)) {
+            last_focus_ = focused;
+        }
     }
 
     [[nodiscard]] bool HandleTabNavigation(const MSG& message) {
@@ -877,9 +882,15 @@ class Application final {
             return;
         }
         // An open drop-down list has not committed its highlighted item to the
-        // combo box yet. Forcing a synchronous erase and repaint now would draw
-        // the previous selection and leave it on screen until the next paint.
-        if (!idleharbor::app::BodyLayoutIsMovable(IsAnyComboBoxDropped())) {
+        // combo box yet, so forcing a synchronous paint now would draw the
+        // previous selection. Still invalidate the same descendants: the
+        // resulting WM_PAINT is served once the list closes, which keeps the
+        // whole transaction repainted rather than skipping it. A state change
+        // that lands while a list is open -- the emergency hotkey, or a
+        // forwarded start disabling every control -- must not leave stale
+        // fragments behind.
+        if (IsAnyComboBoxDropped()) {
+            RedrawWindow(target, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
             return;
         }
         // Body controls are child windows moved inside a clipped child viewport.
@@ -911,6 +922,10 @@ class Application final {
         if (updating_viewport_) {
             return;
         }
+        // A resize or DPI change repositions and force-repaints every body
+        // control, including one an open list is anchored to. Nothing here can
+        // be deferred, so close the list instead of displacing it.
+        CloseOpenComboBoxLists();
         updating_viewport_ = true;
         constexpr int kMaxLayoutPasses = 4;
         const int requested_scroll_position = scroll_position_;
@@ -969,7 +984,8 @@ class Application final {
     }
 
     void ScrollTo(const int position) {
-        if (!idleharbor::app::BodyLayoutIsMovable(IsAnyComboBoxDropped())) {
+        // Moving the body would move the control an open list is anchored to.
+        if (IsAnyComboBoxDropped()) {
             return;
         }
         const int target = idleharbor::app::ClampScrollPosition(position, ContentHeight(), ViewportHeight());
@@ -1056,31 +1072,50 @@ class Application final {
     // A drop-down list is a popup anchored to its combo box. While one is open
     // the body must hold still: moving the combo moves the anchor out from
     // under the pointer, and repainting it forces stale text under the list.
+    //
+    // Only a list the user can still close counts. A hidden window or a combo
+    // that a session start has disabled must never be able to hold the body
+    // frozen, because nothing would be left to close the list.
     [[nodiscard]] bool IsAnyComboBoxDropped() const noexcept {
+        if (window_ == nullptr || IsWindowVisible(window_) == FALSE) {
+            return false;
+        }
         for (const HWND combo : {profile_, motion_, power_}) {
-            if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+            if (combo == nullptr || IsWindowEnabled(combo) == FALSE) {
+                continue;
+            }
+            if (SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
                 return true;
             }
         }
         return false;
     }
 
-    void EnsureFocusedControlVisible(const FocusRevealTrigger trigger) {
+    // Layout transactions reposition the very control a list is anchored to.
+    // Close the list first so the transaction has nothing to displace.
+    void CloseOpenComboBoxLists() noexcept {
+        for (const HWND combo : {profile_, motion_, power_}) {
+            if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
+                SendMessageW(combo, CB_SHOWDROPDOWN, FALSE, 0);
+            }
+        }
+    }
+
+    // Returns false only when policy suppressed the reveal, so the caller can
+    // leave the focus change unconsumed and re-evaluate it later.
+    bool EnsureFocusedControlVisible(const FocusRevealTrigger trigger) {
         if (!idleharbor::app::ShouldRevealFocusedControl(trigger, IsAnyComboBoxDropped())) {
-            return;
+            return false;
         }
         const HWND focused = GetFocus();
         if (focused == nullptr || (focused != window_ && IsChild(window_, focused) == FALSE)) {
-            return;
+            return true;
         }
         const auto layout = std::find_if(child_layouts_.begin(), child_layouts_.end(), [&](const ChildLayout& child) {
             return child.window == focused;
         });
-        if (layout == child_layouts_.end()) {
-            return;
-        }
-        if (layout->region != LayoutRegion::Body) {
-            return;
+        if (layout == child_layouts_.end() || layout->region != LayoutRegion::Body) {
+            return true;
         }
         const int top = Scale(layout->arranged_y);
         const int bottom = top + Scale(layout->focus_height);
@@ -1090,6 +1125,7 @@ class Application final {
             bottom,
             ContentHeight(),
             ViewportHeight()));
+        return true;
     }
 
     void ApplyDpiChange(const UINT new_dpi, const RECT& suggested) {
@@ -1488,13 +1524,17 @@ class Application final {
     }
 
     void UpdateDirtyPresentation() {
-        if (save_ != nullptr) {
-            SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
-        }
+        // Order matters: the status card explains the Save action, so it is
+        // published before the button is relabelled and before UpdateButtons
+        // enables it. Anything observing the window mid-transaction then sees a
+        // stale card only while Save still reads as unavailable.
         if (status_ != nullptr) {
             SetControlText(status_, DisplayStatusText());
             InvalidateRect(status_, nullptr, TRUE);
             UpdateWindow(status_);
+        }
+        if (save_ != nullptr) {
+            SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
         }
         UpdateTrayTooltip();
         UpdateButtons();
@@ -1583,7 +1623,7 @@ class Application final {
         SetChecked(notifications_, settings_.show_notifications);
         SetChecked(emergency_hotkey_, settings_.emergency_hotkey);
         suppress_dirty_tracking_ = previous_suppression;
-        // UpdateDirtyPresentation() refreshes the status card first and enables
+        // UpdateDirtyPresentation() publishes the status card first and enables
         // the Save action last. Enabling Save here as well would publish the
         // affordance before the status text that explains it, leaving an
         // observable window where the card still reads as saved.
@@ -1795,8 +1835,9 @@ class Application final {
         }
         ApplyQueuedComboBoxSelection();
         if (queued_combo_selection_ != 0) {
-            // The list is still open. CBN_CLOSEUP queues another attempt; the
-            // posted message is the backstop if that notification never lands.
+            // The list is still open. CBN_CLOSEUP drives the real retry; this
+            // posted message covers the case where that notification arrives
+            // while CB_GETDROPPEDSTATE still reports the list as open.
             PostMessageW(window_, kDeferredSelectionMessage, 0, 0);
         }
     }
@@ -1822,6 +1863,15 @@ class Application final {
     void ApplySelectedProfile() {
         const int index = ComboIndex(profile_);
         if (index < 0 || index >= static_cast<int>(kProfiles.size())) {
+            return;
+        }
+        // Loading a profile replaces every session setting with its defaults,
+        // so it must happen only when the selection genuinely moved. Dismissing
+        // the list with Escape reverts the combo to the profile already in
+        // effect and still reports a closeup; reloading there would discard the
+        // user's edits behind a cancelled gesture. Re-picking the current entry
+        // is the same no-op.
+        if (kProfiles[static_cast<std::size_t>(index)] == settings_.session.profile) {
             return;
         }
         const auto app_start_minimized = settings_.start_minimized;
