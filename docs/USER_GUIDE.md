@@ -100,8 +100,8 @@ The policy engine can pause or stop for:
 
 - genuine mouse or keyboard input, followed by a configurable quiet cooldown;
 - workstation lock/unlock and local or remote session connect/disconnect;
-- the battery reaching or falling below the low-battery threshold, or any battery power at all when
-  that option is enabled;
+- while running on battery, the charge reaching or falling below the low-battery threshold; or any
+  battery power at all when that option is enabled;
 - a foreground window covering its monitor in fullscreen mode;
 - an active-hours window in the advanced settings;
 - a configured maximum session duration;

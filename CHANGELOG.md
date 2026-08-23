@@ -10,6 +10,8 @@ where practical.
 
 - Each settings field now carries a short explanation printed under it, so the window can be read
   straight through without hovering anything.
+- The maximum session duration moved from "Window & notifications" to "Safeguards". It is a session
+  setting that a profile replaces, unlike everything else under the former heading.
 - Every settings control also explains itself in more detail on hover, including the labels, the
   Start, Stop, and Save actions, and the status card. Hovering a label gives the same description as the field beside
   it. During a running session the settings are disabled and Windows does not deliver hover to a

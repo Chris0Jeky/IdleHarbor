@@ -71,7 +71,13 @@ constexpr int kBaseWindowHeight = 700;
 constexpr int kBaseWindowMargin = 12;
 constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
+// The body's own origin inside the viewport. The layout cursor must place its
+// first control at or below this, or that control renders above the viewport's
+// top edge; the first heading lands at 56.
 constexpr int kBaseBodyOrigin = 52;
+// A floor for the scrollable content height, not the body's actual height --
+// the real body is well past this, so the floor never binds. It exists only so
+// a body that somehow measured as tiny still gets a usable scroll range.
 constexpr int kBaseBodyContentHeight = 570;
 constexpr int kBaseTipWidth = 320;
 // A hint keeps this width rather than filling the body, so the height reserved
@@ -89,9 +95,10 @@ constexpr int kTipReshowDelayMs = 200;
 // Control descriptions shown on hover. A label and the field beside it share one
 // constant, so the two halves of a pair cannot drift apart.
 constexpr wchar_t kProfileTip[] =
-    L"A set of starting values, not a locked mode. Choosing a different profile replaces the "
-    L"Session, Pulse, and Safeguards settings with its defaults; the Window & notifications "
-    L"settings are left alone. Edit anything afterwards and press Save to keep the result.";
+    L"A set of starting values, not a locked mode. Choosing a different profile replaces every "
+    L"Session, Pulse, and Safeguards setting with its defaults, including the maximum session "
+    L"duration; the Window & notifications settings are application settings and are left alone. "
+    L"Edit anything afterwards and press Save to keep the result.";
 constexpr wchar_t kMotionTip[] =
     L"Whether input is emitted by moving the pointer, and how far. Off emits nothing at all. "
     L"Zen emits virtual mouse input that is intended not to move the visible pointer. Normal, "
@@ -121,8 +128,9 @@ constexpr wchar_t kDisconnectTip[] =
     L"Stop emitting while this session is disconnected, such as after a Remote Desktop client "
     L"closes without signing out.";
 constexpr wchar_t kBatteryTip[] =
-    L"Pause once the battery is at or below this percentage, from 1 to 100. A threshold of 30 "
-    L"pauses at 30, not at 29. Set 0 to turn the low-battery safeguard off.";
+    L"While the device is running on battery, pause once the charge is at or below this "
+    L"percentage, from 1 to 100. A threshold of 30 pauses at 30, not at 29. Plugged in, this "
+    L"never pauses whatever the charge. Set 0 to turn the low-battery safeguard off.";
 constexpr wchar_t kOnBatteryTip[] =
     L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
     L"separate from the low-battery threshold above.";
@@ -160,8 +168,8 @@ constexpr wchar_t kSaveTip[] = L"Write the settings shown above to disk so they 
 // descriptions above rather than repeating them: this is what a reader needs
 // without reaching for the pointer, so it stays to a line or two.
 constexpr wchar_t kProfileHint[] =
-    L"Starting values you can edit. Session, Pulse, and Safeguards are replaced; Window & "
-    L"notifications are left alone.";
+    L"Starting values you can edit. Every Session, Pulse, and Safeguards setting is replaced; "
+    L"Window & notifications are left alone.";
 constexpr wchar_t kMotionHint[] =
     L"Off emits nothing. Zen emits input without moving the pointer. Normal, Linear, and Circle "
     L"draw a visible path and return the pointer to where it was.";
@@ -175,7 +183,9 @@ constexpr wchar_t kDistanceHint[] = L"A 1 to 120 scale for the visible path, not
 constexpr wchar_t kPauseInputHint[] =
     L"Quiet time required after you really type or move the mouse. 0 keeps pulsing while you "
     L"work.";
-constexpr wchar_t kBatteryHint[] = L"Pauses at or below this level, so 30 pauses at 30. 0 turns the safeguard off.";
+constexpr wchar_t kBatteryHint[] =
+    L"On battery only: pauses at or below this level, so 30 pauses at 30. 0 turns the safeguard "
+    L"off.";
 constexpr wchar_t kMaxDurationHint[] = L"Ends the session on its own after this long. 0 runs until you stop it.";
 
 enum ControlId : int {
@@ -824,9 +834,12 @@ class Application final {
     // A wrapped explanation is exactly as tall as its own text at the width it is
     // given, so its height cannot be a constant.
     [[nodiscard]] int MeasureHintHeight(const std::wstring& text, const int logical_width) const noexcept {
+        // Two lines: a static clips rather than grows, so an unmeasurable hint
+        // must reserve more than it is likely to need, never less.
+        constexpr int kUnmeasuredHeight = 40;
         const HDC screen = GetDC(nullptr);
         if (screen == nullptr) {
-            return 20;
+            return kUnmeasuredHeight;
         }
         const HFONT face = hint_font_ != nullptr ? hint_font_ : ui_font_;
         const HGDIOBJ previous = face != nullptr ? SelectObject(screen, face) : nullptr;
@@ -839,6 +852,9 @@ class Application final {
         const int logical_height = idleharbor::app::LogicalPixels(
             static_cast<int>(measured.bottom - measured.top),
             static_cast<int>(dpi_));
+        // The ceiling only guards against a pathological measurement; every
+        // shipped hint is one or two lines. A hint long enough to reach it would
+        // be clipped, so keep the texts short.
         return std::clamp(logical_height, 16, 160);
     }
 
@@ -913,18 +929,24 @@ class Application final {
             if (child.region != LayoutRegion::Body) {
                 continue;
             }
+            // A hint is as tall as its text wraps to at the width it is given.
+            // The stacked body is narrower than kHintWidth, and returning to the
+            // two-column layout restores it, so this has to run for both -- a
+            // stacked pass would otherwise leave a permanently taller hint
+            // overlapping the control below it. Measure before the width is used.
+            const auto measure_hint = [&](ChildLayout& hint, const int width) {
+                if (hint.kind != BodyControlKind::Hint || width == hint.measured_width) {
+                    return;
+                }
+                hint.measured_width = width;
+                hint.height = MeasureHintHeight(ControlText(hint.window), width);
+                hint.focus_height = hint.height;
+            };
             if (stacked) {
                 child.arranged_x = stacked_body.left;
                 child.arranged_y = narrow_y;
+                measure_hint(child, stacked_body.width);
                 child.arranged_width = stacked_body.width;
-                // The stacked body is narrower than kHintWidth, so a hint
-                // wraps to more lines here than the creation-time reservation
-                // allowed. Re-measure before the cursor steps past it.
-                if (child.kind == BodyControlKind::Hint && child.arranged_width != child.measured_width) {
-                    child.measured_width = child.arranged_width;
-                    child.height = MeasureHintHeight(ControlText(child.window), child.arranged_width);
-                    child.focus_height = child.height;
-                }
                 if (child.kind == BodyControlKind::Heading) {
                     narrow_y += 36;
                 } else if (child.kind == BodyControlKind::Label) {
@@ -942,6 +964,7 @@ class Application final {
                 child.arranged_width = child.width_mode == ChildWidthMode::Fill
                                            ? std::max(80, logical_client_width - child.x - 20)
                                            : child.width;
+                measure_hint(child, child.arranged_width);
             }
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
@@ -1332,11 +1355,18 @@ class Application final {
                 }
                 heading_font_ = replacement_heading_font;
             }
-            if (replacement_hint_font != nullptr) {
-                if (hint_font_ != nullptr) {
-                    DeleteObject(hint_font_);
+            if (hint_font_ != nullptr) {
+                DeleteObject(hint_font_);
+            }
+            // Null when the replacement could not be created: the children were
+            // given replacement_font, so measuring must fall back to it too
+            // rather than keep measuring with the old DPI's face.
+            hint_font_ = replacement_hint_font;
+            // The face changed size, so every reserved height is stale.
+            for (auto& child : child_layouts_) {
+                if (child.kind == BodyControlKind::Hint) {
+                    child.measured_width = 0;
                 }
-                hint_font_ = replacement_hint_font;
             }
         }
         // The wrap width follows the window's scale whether or not a replacement
@@ -1588,8 +1618,10 @@ class Application final {
         TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
         // Body controls flow from a running cursor, so inserting an explanation
-        // does not mean renumbering every control below it.
-        int body_y = 50;
+        // does not mean renumbering every control below it. Each kind advances by
+        // a fixed step, which is why a couple of gaps differ by two pixels from
+        // the hand-numbered layout this replaced.
+        int body_y = kBaseBodyOrigin - 2;
         const auto place_heading = [&](const wchar_t* text) {
             body_y += 6;
             add_heading(text, body_y);
@@ -1673,12 +1705,15 @@ class Application final {
             L"Pause while a full-screen application is foreground",
             kFullscreen,
             kFullscreenTip);
-
-        place_heading(L"Window & notifications");
         add_label(L"Maximum session duration (seconds; 0 disables)", body_y, kMaxDurationTip);
         add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
         body_y += 28;
         place_hint(kMaxDurationHint);
+
+        // Everything under this heading is an application setting rather than a
+        // session one, which is what lets the profile description promise the
+        // section is left alone.
+        place_heading(L"Window & notifications");
         place_check(
             start_minimized_,
             L"Start minimized to the notification area",
