@@ -46,6 +46,7 @@ Windows PowerShell 5.1 for the packaging ones):
 
 ```powershell
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
+.\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0

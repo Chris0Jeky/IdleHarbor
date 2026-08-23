@@ -69,6 +69,12 @@ consecutive runs at 192 DPI with an identical capture hash.
 after this point leaves those screenshots stale until the next release capture, which must be taken
 from a released executable.
 
+PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) merged those fixes. Follow-ups
+[#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
+[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from its review and remain
+open. On-hover explanations for every settings control follow on `agent/ux-control-help`, with
+`tests\Test-ControlHelpTips.ps1` proving each control is registered.
+
 ## Distribution status
 
 - **GitHub Release:** published and verified at
@@ -136,6 +142,7 @@ cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TES
 cmake --build build/x64 --config Release --parallel
 ctest --test-dir build/x64 -C Release --output-on-failure
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
+.\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0
