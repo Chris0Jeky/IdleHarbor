@@ -82,9 +82,32 @@ behaviour; each was checked against the source and corrected. Follow-ups
 [#58](https://github.com/Chris0Jeky/IdleHarbor/issues/58) and
 [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59) came out of it.
 
-Printed per-field explanations follow on `agent/ux-inline-hints`, which also moves the body from
-hard-coded control offsets to a running layout cursor. `tests\Test-ControlHelpTips.ps1` proves both
-surfaces: 29 registered hover descriptions and 8 printed explanations.
+PR [#60](https://github.com/Chris0Jeky/IdleHarbor/pull/60) added a printed explanation under each of
+the eight fields whose label is a noun phrase, moved the body from hard-coded control offsets to a
+running layout cursor, and regrouped the maximum session duration under Safeguards (it is a session
+setting a profile replaces, unlike everything else that was under "Window & notifications"). It
+closed [#58](https://github.com/Chris0Jeky/IdleHarbor/issues/58).
+
+`tests\Test-ControlHelpTips.ps1` proves both surfaces: 29 registered hover descriptions, and 8
+printed explanations each tall enough for its own wrapped text. That last assertion was earned --
+the first version of it passed against a build with hint heights forced to a single line, because
+clipping does not overlap anything. It now measures the required height itself and fails on that
+build.
+
+## Settings-window UX state
+
+The three merged PRs above leave the settings window with: pointer-driven focus that does not scroll
+the body, combo selections applied after the list closes, a hover description on all 29 interactive
+controls, and a printed explanation under each of the eight noun-phrase fields. Four labels were
+renamed ("Keep awake", "Motion size", "Pause after real input", and the low-battery threshold's unit),
+and the corresponding text in `--help`, `README.md`, the generated INI comment, and `core::validate`'s
+out-of-range message was aligned.
+
+Reviews of these three PRs found ten statements that misdescribed actual behaviour -- profile scope,
+Zen's motion, Circle versus Linear visibility, the pulse/keep-awake relationship, the low-battery
+comparison and its on-battery precondition, and the close-to-tray fallback. Each was checked against
+`src/core/core.cpp` or `src/app/main.cpp` and corrected. No automated check can catch that class of
+error; only reading the text against the source does.
 
 ## Distribution status
 
@@ -125,7 +148,8 @@ queue remains:
 - [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50): sanitize rounded screenshot corners;
 - [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation;
 - [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55): classify focus changes that bypass the message loop;
-- [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56): a forwarded command can discard a pending combo selection.
+- [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56): a forwarded command can discard a pending combo selection;
+- [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59): factor the shared setup and teardown out of the native test scripts.
 
 ## Human decisions
 
@@ -144,6 +168,8 @@ queue remains:
 3. Run the Chocolatey install/uninstall test in a suitable environment and publish with the owner's
    Chocolatey API key.
 4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
+5. Recapture `docs/assets` at the next release: every screenshot predates the settings-window label
+   renames and the printed explanations.
 5. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
 
 ## Proving commands
