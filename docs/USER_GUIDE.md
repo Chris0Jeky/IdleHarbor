@@ -19,10 +19,13 @@ shown so a user can understand why a pulse is not being emitted.
 
 ## Finding out what a control does
 
-Every control in the settings window explains itself. Rest the pointer on a field, its label, a
-check box, the Start/Stop/Save buttons, or the status card, and a short description appears after
-about a second. Hovering a label gives the same description as the field beside it, so the name is
-enough — you do not have to find the input first.
+Each field carries a short explanation printed under it, so the window can be read straight through
+without hovering anything. The check boxes are written as full sentences and need none.
+
+Every control also explains itself in more detail on hover. Rest the pointer on a field, its label, a
+check box, the Start/Stop/Save buttons, or the status card, and a description appears after about a
+second. Hovering a label gives the same description as the field beside it, so the name is enough —
+you do not have to find the input first.
 
 While a session is running its settings are disabled, and Windows does not deliver hover to a
 disabled control. The labels, the status card, and **Stop** stay enabled, so every field's
@@ -97,8 +100,8 @@ The policy engine can pause or stop for:
 
 - genuine mouse or keyboard input, followed by a configurable quiet cooldown;
 - workstation lock/unlock and local or remote session connect/disconnect;
-- the battery reaching or falling below the low-battery threshold, or any battery power at all when
-  that option is enabled;
+- while running on battery, the charge reaching or falling below the low-battery threshold; or any
+  battery power at all when that option is enabled;
 - a foreground window covering its monitor in fullscreen mode;
 - an active-hours window in the advanced settings;
 - a configured maximum session duration;

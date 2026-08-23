@@ -73,8 +73,18 @@ former "Power request" and "Motion multiplier (1-120)" labels.
 PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) merged those fixes. Follow-ups
 [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
 [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from its review and remain
-open. On-hover explanations for every settings control follow on `agent/ux-control-help`, with
-`tests\Test-ControlHelpTips.ps1` proving each control is registered.
+open.
+
+PR [#57](https://github.com/Chris0Jeky/IdleHarbor/pull/57) added an on-hover description for all 29
+interactive controls and renamed four labels ("Keep awake", "Motion size", "Pause after real input",
+and the low-battery threshold's unit). Its review found seven descriptions that misstated actual
+behaviour; each was checked against the source and corrected. Follow-ups
+[#58](https://github.com/Chris0Jeky/IdleHarbor/issues/58) and
+[#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59) came out of it.
+
+Printed per-field explanations follow on `agent/ux-inline-hints`, which also moves the body from
+hard-coded control offsets to a running layout cursor. `tests\Test-ControlHelpTips.ps1` proves both
+surfaces: 29 registered hover descriptions and 8 printed explanations.
 
 ## Distribution status
 

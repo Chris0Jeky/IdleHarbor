@@ -71,9 +71,20 @@ constexpr int kBaseWindowHeight = 700;
 constexpr int kBaseWindowMargin = 12;
 constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
+// The body's own origin inside the viewport. The layout cursor must place its
+// first control at or below this, or that control renders above the viewport's
+// top edge; the first heading lands at 56.
 constexpr int kBaseBodyOrigin = 52;
+// A floor for the scrollable content height, not the body's actual height --
+// the real body is well past this, so the floor never binds. It exists only so
+// a body that somehow measured as tiny still gets a usable scroll range.
 constexpr int kBaseBodyContentHeight = 570;
 constexpr int kBaseTipWidth = 320;
+// A hint keeps this width rather than filling the body, so the height reserved
+// for it at creation is exactly the height it renders at, whatever the window
+// size. It also holds the text to a readable line length on a wide monitor.
+// Only the stacked layout, which is narrower than this, has to re-measure.
+constexpr int kHintWidth = 520;
 constexpr int kTipInitialDelayMs = 700;
 // Above the platform default (~5s) because the descriptions run to several
 // lines, but bounded: a description anchored to the status card sits over the
@@ -84,9 +95,10 @@ constexpr int kTipReshowDelayMs = 200;
 // Control descriptions shown on hover. A label and the field beside it share one
 // constant, so the two halves of a pair cannot drift apart.
 constexpr wchar_t kProfileTip[] =
-    L"A set of starting values, not a locked mode. Choosing a different profile replaces the "
-    L"Session, Pulse, and Safeguards settings with its defaults; the Window & notifications "
-    L"settings are left alone. Edit anything afterwards and press Save to keep the result.";
+    L"A set of starting values, not a locked mode. Choosing a different profile replaces every "
+    L"Session, Pulse, and Safeguards setting with its defaults, including the maximum session "
+    L"duration; the Window & notifications settings are application settings and are left alone. "
+    L"Edit anything afterwards and press Save to keep the result.";
 constexpr wchar_t kMotionTip[] =
     L"Whether input is emitted by moving the pointer, and how far. Off emits nothing at all. "
     L"Zen emits virtual mouse input that is intended not to move the visible pointer. Normal, "
@@ -116,8 +128,9 @@ constexpr wchar_t kDisconnectTip[] =
     L"Stop emitting while this session is disconnected, such as after a Remote Desktop client "
     L"closes without signing out.";
 constexpr wchar_t kBatteryTip[] =
-    L"Pause once the battery is at or below this percentage, from 1 to 100. A threshold of 30 "
-    L"pauses at 30, not at 29. Set 0 to turn the low-battery safeguard off.";
+    L"While the device is running on battery, pause once the charge is at or below this "
+    L"percentage, from 1 to 100. A threshold of 30 pauses at 30, not at 29. Plugged in, this "
+    L"never pauses whatever the charge. Set 0 to turn the low-battery safeguard off.";
 constexpr wchar_t kOnBatteryTip[] =
     L"Pause as soon as the device runs on battery at all, whatever the charge level. This is "
     L"separate from the low-battery threshold above.";
@@ -150,6 +163,30 @@ constexpr wchar_t kStopTip[] =
     L"End the session immediately. No further input is emitted and any keep-awake request is "
     L"released.";
 constexpr wchar_t kSaveTip[] = L"Write the settings shown above to disk so they become the defaults at the next launch.";
+
+// Short explanations shown under each field. They complement the hover
+// descriptions above rather than repeating them: this is what a reader needs
+// without reaching for the pointer, so it stays to a line or two.
+constexpr wchar_t kProfileHint[] =
+    L"Starting values you can edit. Every Session, Pulse, and Safeguards setting is replaced; "
+    L"Window & notifications are left alone.";
+constexpr wchar_t kMotionHint[] =
+    L"Off emits nothing. Zen emits input without moving the pointer. Normal, Linear, and Circle "
+    L"draw a visible path and return the pointer to where it was.";
+constexpr wchar_t kPowerHint[] =
+    L"Independent of motion, but not both off: motion Off with no request is refused, because "
+    L"nothing would be keeping the system awake.";
+constexpr wchar_t kIntervalHint[] =
+    L"Time between motion pulses. The keep-awake request is continuous, so this does not change "
+    L"it.";
+constexpr wchar_t kDistanceHint[] = L"A 1 to 120 scale for the visible path, not a pixel count. Off and Zen ignore it.";
+constexpr wchar_t kPauseInputHint[] =
+    L"Quiet time required after you really type or move the mouse. 0 keeps pulsing while you "
+    L"work.";
+constexpr wchar_t kBatteryHint[] =
+    L"On battery only: pauses at or below this level, so 30 pauses at 30. 0 turns the safeguard "
+    L"off.";
+constexpr wchar_t kMaxDurationHint[] = L"Ends the session on its own after this long. 0 runs until you stop it.";
 
 enum ControlId : int {
     kStatus = 100,
@@ -331,13 +368,13 @@ int ScaleForDpi(const int value, const UINT dpi) noexcept {
     return MulDiv(value, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
 }
 
-HFONT CreateUiFont(const UINT dpi) noexcept {
+HFONT CreateScaledFont(const UINT dpi, const int point_size, const int weight) noexcept {
     return CreateFontW(
-        -MulDiv(9, static_cast<int>(dpi), 72),
+        -MulDiv(point_size, static_cast<int>(dpi), 72),
         0,
         0,
         0,
-        FW_NORMAL,
+        weight,
         FALSE,
         FALSE,
         FALSE,
@@ -347,6 +384,18 @@ HFONT CreateUiFont(const UINT dpi) noexcept {
         CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE,
         L"Segoe UI");
+}
+
+HFONT CreateUiFont(const UINT dpi) noexcept {
+    return CreateScaledFont(dpi, 9, FW_NORMAL);
+}
+
+HFONT CreateHeadingFont(const UINT dpi) noexcept {
+    return CreateScaledFont(dpi, 10, FW_SEMIBOLD);
+}
+
+HFONT CreateHintFont(const UINT dpi) noexcept {
+    return CreateScaledFont(dpi, 8, FW_NORMAL);
 }
 
 PowerRequestMode ToPlatformPowerMode(const PowerMode mode) {
@@ -678,6 +727,9 @@ class Application final {
         Heading,
         Field,
         Check,
+        // A wrapped explanation under a field, in a smaller font. Never a tab
+        // stop, so it does not lengthen keyboard traversal of the settings.
+        Hint,
     };
 
     struct ChildLayout {
@@ -693,6 +745,8 @@ class Application final {
         int arranged_x = 0;
         int arranged_y = 0;
         int arranged_width = 0;
+        // Width the wrapped height was last measured at; 0 until measured.
+        int measured_width = 0;
     };
 
     [[nodiscard]] int Scale(const int value) const noexcept { return ScaleForDpi(value, dpi_); }
@@ -777,6 +831,35 @@ class Application final {
 
     [[nodiscard]] int ContentHeight() const noexcept { return body_content_height_; }
 
+    // A wrapped explanation is exactly as tall as its own text at the width it is
+    // given, so its height cannot be a constant.
+    [[nodiscard]] int MeasureHintHeight(const std::wstring& text, const int logical_width) const noexcept {
+        // Two lines: a static clips rather than grows, so an unmeasurable hint
+        // must reserve more than it is likely to need, never less.
+        constexpr int kUnmeasuredHeight = 40;
+        const HDC screen = GetDC(nullptr);
+        if (screen == nullptr) {
+            return kUnmeasuredHeight;
+        }
+        const HFONT face = hint_font_ != nullptr ? hint_font_ : ui_font_;
+        const HGDIOBJ previous = face != nullptr ? SelectObject(screen, face) : nullptr;
+        RECT measured{0, 0, std::max(Scale(logical_width), 1), 0};
+        DrawTextW(screen, text.c_str(), -1, &measured, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+        if (previous != nullptr) {
+            SelectObject(screen, previous);
+        }
+        ReleaseDC(nullptr, screen);
+        const int logical_height = idleharbor::app::LogicalPixels(
+            static_cast<int>(measured.bottom - measured.top),
+            static_cast<int>(dpi_));
+        // No ceiling: a static clips rather than grows, so capping the height
+        // would silently drop lines. ComputeStackedBodyLayout can hand a hint a
+        // few dozen logical pixels on a very narrow work area -- the layout tests
+        // cover 80- and 99-pixel viewports -- where an explanation wraps to many
+        // more lines than any cap would allow. The body simply scrolls further.
+        return std::max(logical_height, 16);
+    }
+
     [[nodiscard]] int ViewportHeight() const noexcept {
         RECT viewport{};
         return settings_viewport_ != nullptr && GetClientRect(settings_viewport_, &viewport) != FALSE
@@ -848,9 +931,23 @@ class Application final {
             if (child.region != LayoutRegion::Body) {
                 continue;
             }
+            // A hint is as tall as its text wraps to at the width it is given.
+            // The stacked body is narrower than kHintWidth, and returning to the
+            // two-column layout restores it, so this has to run for both -- a
+            // stacked pass would otherwise leave a permanently taller hint
+            // overlapping the control below it. Measure before the width is used.
+            const auto measure_hint = [&](ChildLayout& hint, const int width) {
+                if (hint.kind != BodyControlKind::Hint || width == hint.measured_width) {
+                    return;
+                }
+                hint.measured_width = width;
+                hint.height = MeasureHintHeight(ControlText(hint.window), width);
+                hint.focus_height = hint.height;
+            };
             if (stacked) {
                 child.arranged_x = stacked_body.left;
                 child.arranged_y = narrow_y;
+                measure_hint(child, stacked_body.width);
                 child.arranged_width = stacked_body.width;
                 if (child.kind == BodyControlKind::Heading) {
                     narrow_y += 36;
@@ -858,6 +955,8 @@ class Application final {
                     narrow_y += 28;
                 } else if (child.kind == BodyControlKind::Field) {
                     narrow_y += 38;
+                } else if (child.kind == BodyControlKind::Hint) {
+                    narrow_y += child.focus_height + 6;
                 } else {
                     narrow_y += 34;
                 }
@@ -867,6 +966,7 @@ class Application final {
                 child.arranged_width = child.width_mode == ChildWidthMode::Fill
                                            ? std::max(80, logical_client_width - child.x - 20)
                                            : child.width;
+                measure_hint(child, child.arranged_width);
             }
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
@@ -1236,28 +1336,15 @@ class Application final {
 
         HFONT replacement_font = CreateUiFont(dpi_);
         if (replacement_font != nullptr) {
-            HFONT replacement_heading_font = CreateFontW(
-                -MulDiv(10, static_cast<int>(dpi_), 72),
-                0,
-                0,
-                0,
-                FW_SEMIBOLD,
-                FALSE,
-                FALSE,
-                FALSE,
-                DEFAULT_CHARSET,
-                OUT_DEFAULT_PRECIS,
-                CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY,
-                DEFAULT_PITCH | FF_DONTCARE,
-                L"Segoe UI");
+            HFONT replacement_heading_font = CreateHeadingFont(dpi_);
+            HFONT replacement_hint_font = CreateHintFont(dpi_);
             const HFONT heading_for_children = replacement_heading_font != nullptr ? replacement_heading_font : replacement_font;
+            const HFONT hint_for_children = replacement_hint_font != nullptr ? replacement_hint_font : replacement_font;
             for (const auto& child : child_layouts_) {
-                SendMessageW(
-                    child.window,
-                    WM_SETFONT,
-                    reinterpret_cast<WPARAM>(child.kind == BodyControlKind::Heading ? heading_for_children : replacement_font),
-                    TRUE);
+                const HFONT face = child.kind == BodyControlKind::Heading ? heading_for_children
+                                 : child.kind == BodyControlKind::Hint    ? hint_for_children
+                                                                         : replacement_font;
+                SendMessageW(child.window, WM_SETFONT, reinterpret_cast<WPARAM>(face), TRUE);
             }
             ApplyHelpTipMetrics(replacement_font);
             if (ui_font_ != nullptr) {
@@ -1269,6 +1356,19 @@ class Application final {
                     DeleteObject(heading_font_);
                 }
                 heading_font_ = replacement_heading_font;
+            }
+            if (hint_font_ != nullptr) {
+                DeleteObject(hint_font_);
+            }
+            // Null when the replacement could not be created: the children were
+            // given replacement_font, so measuring must fall back to it too
+            // rather than keep measuring with the old DPI's face.
+            hint_font_ = replacement_hint_font;
+            // The face changed size, so every reserved height is stale.
+            for (auto& child : child_layouts_) {
+                if (child.kind == BodyControlKind::Hint) {
+                    child.measured_width = 0;
+                }
             }
         }
         // The wrap width follows the window's scale whether or not a replacement
@@ -1335,22 +1435,10 @@ class Application final {
     void CreateControls() {
         ui_font_ = CreateUiFont(dpi_);
         const HFONT font = ui_font_ != nullptr ? ui_font_ : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-        heading_font_ = CreateFontW(
-            -MulDiv(10, static_cast<int>(dpi_), 72),
-            0,
-            0,
-            0,
-            FW_SEMIBOLD,
-            FALSE,
-            FALSE,
-            FALSE,
-            DEFAULT_CHARSET,
-            OUT_DEFAULT_PRECIS,
-            CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY,
-            DEFAULT_PITCH | FF_DONTCARE,
-            L"Segoe UI");
+        heading_font_ = CreateHeadingFont(dpi_);
+        hint_font_ = CreateHintFont(dpi_);
         const HFONT heading = heading_font_ != nullptr ? heading_font_ : font;
+        const HFONT hint_face = hint_font_ != nullptr ? hint_font_ : font;
         CreateHelpTips();
         const auto scale = [&](const int value) { return ScaleForDpi(value, dpi_); };
         settings_viewport_ = CreateWindowExW(
@@ -1453,6 +1541,39 @@ class Application final {
             AddHelpTip(target, tip);
             TrackChild(target, 300, y - 3, 145, 26, 26, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Field);
         };
+        // A wrapped explanation under a field. Its height depends on how many
+        // lines the text takes at this DPI, so it is measured rather than fixed.
+        const auto add_hint = [&](const wchar_t* text, const int y) {
+            const int height = MeasureHintHeight(text, kHintWidth);
+            const HWND control = CreateWindowExW(
+                0,
+                L"STATIC",
+                text,
+                WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+                scale(20),
+                scale(y),
+                scale(kHintWidth),
+                scale(height),
+                body_parent,
+                nullptr,
+                instance_,
+                nullptr);
+            SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(hint_face), TRUE);
+            TrackChild(
+                control,
+                20,
+                y,
+                kHintWidth,
+                height,
+                height,
+                ChildWidthMode::Fixed,
+                LayoutRegion::Body,
+                BodyControlKind::Hint);
+            // Record what that height was measured at, so a layout at a different
+            // width knows to measure again.
+            child_layouts_.back().measured_width = kHintWidth;
+            return height;
+        };
         const auto add_check = [&](HWND& target, const wchar_t* text, const int y, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
                 0,
@@ -1498,30 +1619,38 @@ class Application final {
         AddHelpTip(status_, kStatusTip);
         TrackChild(status_, 20, 18, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::FixedTop);
 
-        add_heading(L"Session", 56);
-        add_label(
-            L"Profile",
-            86,
-            kProfileTip);
-        add_combo(
-            profile_,
-            86,
-            kProfile,
-            kProfileTip);
+        // Body controls flow from a running cursor, so inserting an explanation
+        // does not mean renumbering every control below it. Each kind advances by
+        // a fixed step, which is why a couple of gaps differ by two pixels from
+        // the hand-numbered layout this replaced.
+        int body_y = kBaseBodyOrigin - 2;
+        const auto place_heading = [&](const wchar_t* text) {
+            body_y += 6;
+            add_heading(text, body_y);
+            body_y += 30;
+        };
+        const auto place_hint = [&](const wchar_t* text) {
+            body_y += add_hint(text, body_y) + 10;
+        };
+        const auto place_check = [&](HWND& target, const wchar_t* text, const int id, const wchar_t* tip) {
+            add_check(target, text, body_y, id, tip);
+            body_y += 32;
+        };
+
+        place_heading(L"Session");
+        add_label(L"Profile", body_y, kProfileTip);
+        add_combo(profile_, body_y, kProfile, kProfileTip);
+        body_y += 28;
+        place_hint(kProfileHint);
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(
-            L"Motion",
-            120,
-            kMotionTip);
-        add_combo(
-            motion_,
-            120,
-            kMotion,
-            kMotionTip);
+        add_label(L"Motion", body_y, kMotionTip);
+        add_combo(motion_, body_y, kMotion, kMotionTip);
+        body_y += 28;
+        place_hint(kMotionHint);
         const std::array<std::wstring, 5> motions{
             L"Off",
             L"Normal (diagonal)",
@@ -1533,120 +1662,78 @@ class Application final {
             SendMessageW(motion_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(
-            L"Keep awake",
-            154,
-            kPowerTip);
-        add_combo(
-            power_,
-            154,
-            kPower,
-            kPowerTip);
+        add_label(L"Keep awake", body_y, kPowerTip);
+        add_combo(power_, body_y, kPower, kPowerTip);
+        body_y += 28;
+        place_hint(kPowerHint);
         const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_heading(L"Pulse", 190);
-        add_label(
-            L"Pulse interval (seconds)",
-            220,
-            kIntervalTip);
-        add_edit(
-            interval_,
-            220,
-            kInterval,
-            kIntervalTip);
-        add_label(
-            L"Motion size (1-120)",
-            254,
-            kDistanceTip);
-        add_edit(
-            distance_,
-            254,
-            kDistance,
-            kDistanceTip);
-        add_check(
-            randomize_,
-            L"Randomize pulse interval",
-            286,
-            kRandomize,
-            kRandomizeTip);
-        add_heading(L"Safeguards", 322);
-        add_label(
-            L"Pause after real input (seconds; 0 disables)",
-            352,
-            kPauseInputTip);
-        add_edit(
-            pause_input_,
-            352,
-            kPauseInput,
-            kPauseInputTip);
-        add_check(
-            lock_pause_,
-            L"Pause while the workstation is locked",
-            384,
-            kLockPause,
-            kLockPauseTip);
-        add_check(
+        place_heading(L"Pulse");
+        add_label(L"Pulse interval (seconds)", body_y, kIntervalTip);
+        add_edit(interval_, body_y, kInterval, kIntervalTip);
+        body_y += 28;
+        place_hint(kIntervalHint);
+        add_label(L"Motion size (1-120)", body_y, kDistanceTip);
+        add_edit(distance_, body_y, kDistance, kDistanceTip);
+        body_y += 28;
+        place_hint(kDistanceHint);
+        place_check(randomize_, L"Randomize pulse interval", kRandomize, kRandomizeTip);
+
+        place_heading(L"Safeguards");
+        add_label(L"Pause after real input (seconds; 0 disables)", body_y, kPauseInputTip);
+        add_edit(pause_input_, body_y, kPauseInput, kPauseInputTip);
+        body_y += 28;
+        place_hint(kPauseInputHint);
+        place_check(lock_pause_, L"Pause while the workstation is locked", kLockPause, kLockPauseTip);
+        place_check(
             disconnect_pause_,
             L"Pause while the session is disconnected",
-            416,
             kDisconnectPause,
             kDisconnectTip);
-        add_label(
-            L"Low-battery threshold (percent; 0 disables)",
-            450,
-            kBatteryTip);
-        add_edit(
-            battery_,
-            450,
-            kBattery,
-            kBatteryTip);
-        add_check(
+        add_label(L"Low-battery threshold (percent; 0 disables)", body_y, kBatteryTip);
+        add_edit(battery_, body_y, kBattery, kBatteryTip);
+        body_y += 28;
+        place_hint(kBatteryHint);
+        place_check(
             pause_on_battery_,
             L"Pause whenever the device is on battery",
-            482,
             kPauseOnBattery,
             kOnBatteryTip);
-        add_check(
+        place_check(
             fullscreen_,
             L"Pause while a full-screen application is foreground",
-            514,
             kFullscreen,
             kFullscreenTip);
-        add_heading(L"Window & notifications", 550);
-        add_label(
-            L"Maximum session duration (seconds; 0 disables)",
-            580,
-            kMaxDurationTip);
-        add_edit(
-            max_duration_,
-            580,
-            kMaxDuration,
-            kMaxDurationTip);
-        add_check(
+        add_label(L"Maximum session duration (seconds; 0 disables)", body_y, kMaxDurationTip);
+        add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
+        body_y += 28;
+        place_hint(kMaxDurationHint);
+
+        // Everything under this heading is an application setting rather than a
+        // session one, which is what lets the profile description promise the
+        // section is left alone.
+        place_heading(L"Window & notifications");
+        place_check(
             start_minimized_,
             L"Start minimized to the notification area",
-            612,
             kStartMinimized,
             kStartMinimizedTip);
-        add_check(
+        place_check(
             close_to_tray_,
             L"Close button hides to the notification area",
-            644,
             kCloseToTray,
             kCloseToTrayTip);
-        add_check(
+        place_check(
             notifications_,
             L"Show safety state notifications",
-            676,
             kNotifications,
             kNotificationsTip);
-        add_check(
+        place_check(
             emergency_hotkey_,
             L"Enable emergency stop: Ctrl+Alt+Shift+F12",
-            708,
             kEmergencyHotkey,
             kHotkeyTip);
 
@@ -2678,6 +2765,10 @@ class Application final {
                 DeleteObject(heading_font_);
                 heading_font_ = nullptr;
             }
+            if (hint_font_ != nullptr) {
+                DeleteObject(hint_font_);
+                hint_font_ = nullptr;
+            }
             if (help_tips_ != nullptr) {
                 // Owner destruction would take it anyway; releasing it here keeps
                 // the handle from outliving the window it describes.
@@ -2733,6 +2824,7 @@ class Application final {
     bool disconnected_ = false;
     bool exiting_ = false;
     HWND help_tips_ = nullptr;
+    HFONT hint_font_ = nullptr;
     HWND last_focus_ = nullptr;
     FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
     int queued_combo_selection_ = 0;
