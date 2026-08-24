@@ -13,12 +13,13 @@
 
 <p align="center">
   <img src="docs/assets/idleharbor-window.png"
-       alt="IdleHarbor stopped settings window with its status card and fixed Start, Stop, and Save actions at 200 percent Windows display scaling"
+       alt="IdleHarbor stopped settings window showing the profile, motion, and keep-awake fields with a printed explanation under each, its status card, and fixed Start, Stop, and Save actions at 200 percent Windows display scaling"
        width="594">
 </p>
 
-This is a real capture of the public `v0.1.0` x64 release at 200% Windows display scaling, not a
-mock-up.
+This is a real capture of the public `v0.2.0` x64 release at 200% Windows display scaling, not a
+mock-up. Each field carries its own printed explanation, and every control describes itself in more
+detail on hover.
 
 | Running | Intelligently paused |
 | --- | --- |
@@ -86,10 +87,11 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The local Visual Studio 2019 x64 Release-QA executable for `0.2.0` is 536,064 bytes (523.5 KiB) with
-SHA-256 `fb1d645468bbd2e41e309cf2e4fe7ee5b915225340173ce77da1e2a2bc45e039`. The reproducible
-three-run resource baseline and its limitations are recorded in
-[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+The published `v0.2.0` x64 executable is 544,256 bytes (531.5 KiB) with SHA-256
+`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`. Across three repetitions of a
+60-second stopped window and a 60-second active window, it held a 13.7 MiB working set stopped and
+15.1 MiB while running a keep-awake session, at effectively zero CPU. That baseline, the exact
+method, and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

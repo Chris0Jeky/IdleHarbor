@@ -9,9 +9,9 @@ IdleHarbor `0.2.0` is the current published stable release. The immutable annota
 `2f0fe875f84023c049e82ea6cc963cf7ca938c71`. Release workflow
 [run 32719629776](https://github.com/Chris0Jeky/IdleHarbor/actions/runs/32719629776) published x64
 and ARM64 portable ZIPs, per-architecture SPDX 2.3 SBOMs, `SHA256SUMS.txt`, and GitHub/Sigstore
-provenance attestations. All four public assets were downloaded and independently verified against
-their release digests; `gh attestation verify` succeeds for both archives and binds to
-`refs/tags/v0.2.0` at that source digest. The released x64 executable is 544,256 bytes, SHA-256
+provenance attestations. All five public assets were downloaded, and the four that `SHA256SUMS.txt`
+covers were independently verified against it; `gh attestation verify` succeeds for both archives
+and binds to `refs/tags/v0.2.0` at that source digest. The released x64 executable is 544,256 bytes, SHA-256
 `bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`, reports `FileVersion 0.2.0`, and
 is `NotSigned` by intent.
 
@@ -43,11 +43,13 @@ PR [#31](https://github.com/Chris0Jeky/IdleHarbor/pull/31) was closed as superse
 ## Installed release on the development PC
 
 The verified public x64 build is installed per-user at
-`%LOCALAPPDATA%\Programs\IdleHarbor\IdleHarbor.exe`. Its SHA-256 is
-`e28bf9d739c9c7d7a20f66f41cf1c6015053d9b3277a5686ea3b5e8219d552e9`, matching the x64 SPDX
-SBOM. Existing settings were preserved byte-for-byte. The explicit Task Scheduler action remains
-`--start --minimized`, the Start Menu launcher remains visible, and exactly one released process
-was restored after final screenshot QA. The executable is intentionally `NotSigned`.
+`%LOCALAPPDATA%\Programs\IdleHarbor\IdleHarbor.exe`. It was upgraded from `0.1.0` to `0.2.0` on
+2026-08-24 with the released `install.ps1` run as `-Startup TaskScheduler -StartMenu Create
+-NoLaunch`. Its SHA-256 is
+`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`, matching the released archive
+and the x64 SPDX SBOM. `%LOCALAPPDATA%\IdleHarbor\settings.ini` is byte-for-byte unchanged across
+the upgrade, the explicit Task Scheduler action remains `--start --minimized`, and the Start Menu
+launcher remains visible. The executable is intentionally `NotSigned`.
 
 ## Repaint fix and final visual evidence
 
@@ -58,9 +60,13 @@ repaints the parent after layout convergence. The native smoke drives real wheel
 natural and explicit-reference repaint captures are pixel-identical.
 
 The stopped, running, safety-paused, scrolled, and tray-menu screenshots were recaptured from the
-installed public release at 192 DPI and visually inspected. `docs/assets/capture-manifest.json`
-records release source `d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`, the released executable
-hash, exact PNG dimensions, and hashes. The original reported corruption is absent in every state.
+installed public `0.2.0` release at 192 DPI and visually inspected. `docs/assets/capture-manifest.json`
+records source revision `b69c7b56ba5cd89419f849b25312b0b4cb92a5d4`, the released executable's
+identity and `NotSigned` state, exact PNG dimensions, and per-image hashes. That revision is `main`
+at capture time rather than the `v0.2.0` tag `2f0fe87`, because the capture tool records `HEAD`;
+the two trees differ only in `packaging/`, `PROJECT_STATE.md`, and `HUMAN_TODO.md`, and `src/` is
+identical, so the captured executable does correspond to the recorded source. The original reported
+corruption is absent in every state.
 
 ## Settings-window work after `v0.1.0`
 
@@ -82,10 +88,10 @@ Two pre-existing intermittent failures in `tests\Test-NativeViewportRepaint.ps1`
 window that was findable from `WM_CREATE` but not yet initialized. The script now passed five
 consecutive runs at 192 DPI with an identical capture hash.
 
-`docs/assets` still records the `v0.1.0` release captures. Any settings-window change made after this
-point -- a layout change or a renamed label alike -- leaves those screenshots stale until the next
-release capture, which must be taken from a released executable. The captures currently show the
-former "Power request" and "Motion multiplier (1-120)" labels.
+`docs/assets` records the `v0.2.0` release captures, taken on 2026-08-24 from the installed public
+release at 192 DPI and visually inspected. Any settings-window change made after this point -- a
+layout change or a renamed label alike -- leaves those screenshots stale until the next release
+capture, which must be taken from a released executable.
 
 Follow-ups [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
 [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from PR #54's review and remain
@@ -206,8 +212,8 @@ queue remains:
 3. Run the Chocolatey install/uninstall test in a suitable environment and publish with the owner's
    Chocolatey API key.
 4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
-5. Recapture `docs/assets` at the next release: every screenshot predates the settings-window label
-   renames and the printed explanations.
+5. Recapture `docs/assets` at the next release, from that release's executable. The current captures
+   are `v0.2.0`'s.
 6. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
 
 ## Proving commands
