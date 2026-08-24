@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-23
+Last updated: 2026-08-24
 
 ## Current milestone
 
@@ -47,8 +47,9 @@ hash, exact PNG dimensions, and hashes. The original reported corruption is abse
 
 ## Settings-window work after `v0.1.0`
 
-All of the following has merged. PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) addressed
-reported clunkiness when choosing a profile, motion mode, or power request:
+Every pull request named in this section has merged.
+PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) addressed reported clunkiness when
+choosing a profile, motion mode, or power request:
 
 - focus reveal is classified by keyboard versus pointer input, so clicking a combo box no longer
   scrolls the body out from under the pointer; a suppressed reveal is not consumed;
@@ -70,7 +71,8 @@ release capture, which must be taken from a released executable. The captures cu
 former "Power request" and "Motion multiplier (1-120)" labels.
 
 Follow-ups [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
-[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from its review and remain open.
+[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from PR #54's review and remain
+open.
 
 PR [#57](https://github.com/Chris0Jeky/IdleHarbor/pull/57) added an on-hover description for all 29
 interactive controls and renamed four labels ("Keep awake", "Motion size", "Pause after real input",
