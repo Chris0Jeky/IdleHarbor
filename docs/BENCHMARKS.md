@@ -3,6 +3,11 @@
 IdleHarbor includes a reproducible local measurement script rather than telemetry. Results below
 are a `v0.1.0` local baseline for one Windows machine, not a universal resource guarantee.
 
+They have not been re-measured for `0.2.0`. That release adds a tooltip control and eight static
+explanations to the settings window, so its executable and its handle and working-set figures differ
+from the ones below; the identified `v0.1.0` executable is what was actually measured, and the
+`README.md` footprint sentence names the `0.2.0` binary separately.
+
 ## v0.1.0 x64 local baseline
 
 Measured on 2026-08-20 from native source commit `f011f7a`. Later release-preparation commits changed

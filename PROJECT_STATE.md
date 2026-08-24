@@ -4,6 +4,12 @@ Last updated: 2026-08-24
 
 ## Current milestone
 
+`0.2.0` is being released. Its version is set in `CMakeLists.txt`, `include/idleharbor/version.hpp`,
+`resources/IdleHarbor.rc`, and `resources/app.manifest`, and `CHANGELOG.md` is dated; the annotated
+tag has not been pushed yet, so no `v0.2.0` release page or archives exist while this line stands.
+`packaging/chocolatey` still targets `v0.1.0` on purpose: it pins a published archive's SHA-256,
+which the release workflow only produces after the tag. `packaging/README.md` records that order.
+
 IdleHarbor `0.1.0` is the published first stable release. It is a native C++20/Win32 Windows
 mouse-jiggler and keep-awake utility with a platform-neutral policy core, validated local settings,
 strict CLI, bounded motion patterns, Windows power requests, genuine-input observation,
@@ -196,7 +202,7 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
-.\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0
+.\packaging\Test-ReleaseVersion.ps1 -Tag v0.2.0
 choco pack .\packaging\chocolatey\idleharbor.nuspec --output-directory .\out\chocolatey
 ```
 
