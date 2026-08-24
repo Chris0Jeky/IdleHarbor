@@ -163,6 +163,16 @@ Neither JSON-LD block is expected to produce a Google rich result: `SoftwareAppl
 sites since 2023. They are there so the page describes itself unambiguously to anything that reads
 structured data, not for a search decoration.
 
+The published site was rendered and inspected at 1280, 600, 390, and 360 CSS pixels: the header nav
+wraps, the action buttons stack, both card grids collapse to a single column, and nothing overflows
+horizontally at any of them. Every image, the sitemap, and the page itself return 200 with the
+expected content types.
+
+Test narrow viewports with an iframe of the target width, not with `--window-size`. Headless Chrome
+clamps its window to about 518 CSS pixels and then crops the screenshot to the requested width, so a
+narrower `--window-size` renders a 518-pixel layout and shows the left slice of it. That looks
+exactly like a horizontal-overflow bug and is not one.
+
 Its five version references are part of the release checklist, because the site is published by
 merging rather than by a workflow.
 
