@@ -1,9 +1,9 @@
 # Benchmark evidence
 
-IdleHarbor includes a reproducible local measurement script rather than telemetry. Results below
-are a `v0.2.0` local baseline for one Windows machine, not a universal resource guarantee.
+IdleHarbor includes a reproducible measurement script rather than telemetry. Results below are a
+`v0.2.0` baseline for one Windows machine, not a universal resource guarantee.
 
-## v0.2.0 x64 local baseline
+## v0.2.0 x64 baseline
 
 Measured on 2026-08-24 from the **published release** executable rather than a local build, so the
 numbers describe the binary people actually download. The exact executable is identified by SHA-256
@@ -44,16 +44,20 @@ expected to cost more than `0.1.0`. The figures move in both directions against 
 | Active private bytes | 2.115 MiB | 2.170 MiB | **up 0.055 MiB** |
 | Stopped handles | 163 | 158 | down 5 |
 | Active handles | 177 | 172 | down 5 |
-| Maximum threads (active) | 5 | 4 | down 1 |
 
-Private bytes rose, by about 0.12 MiB stopped. Working set and handle count fell. CPU was
-effectively zero in both releases, so it distinguishes nothing.
+Every row above compares medians. Thread count is left out because on that basis it did not move:
+both releases have a median of 4 in each phase, and only the *peak* differs (`0.1.0` reached 5 once
+during an active phase, `0.2.0` never did).
 
-None of this is a controlled comparison: `0.1.0` was measured from a local Visual Studio 2019 build
-and `0.2.0` from the released Visual Studio 2022 build, four days apart, on a machine whose
-conditions were not held constant. The only conclusion the data supports is that the settings-window
-work did not change IdleHarbor's footprint by an amount this method can distinguish from build and
-machine variation.
+Working set and handle count fell; private bytes rose, by about 0.12 MiB stopped. Those two
+directions are not noise inside the method -- the stopped private-bytes ranges do not even overlap
+(`1.974-1.987` against `2.074-2.111`) -- so this script can resolve a shift that size. CPU was
+effectively zero in both releases and distinguishes nothing.
+
+What it cannot resolve is *why*. `0.1.0` was measured from a local Visual Studio 2019 build and
+`0.2.0` from the released Visual Studio 2022 build, four days apart, on a machine whose conditions
+were not held constant, so neither direction is attributable to the settings-window work without a
+controlled comparison that has not been run.
 
 The binary imports only Windows system libraries (`SHELL32`, `WTSAPI32`, `ole32`, `USER32`,
 `KERNEL32`, and `GDI32`); it has no .NET, Qt, Electron, or separately installed Visual C++ runtime
@@ -72,9 +76,9 @@ Build Release, close other IdleHarbor instances, then run:
 ```
 
 Point `-Executable` at an extracted or installed release build instead to reproduce the table
-above. IdleHarbor is single-instance, so any other copy -- including one the Task Scheduler
-action started -- has to be closed first, or the measurement process forwards its command and
-exits.
+above. Close every other IdleHarbor first -- including one the Task Scheduler action started. The
+script checks for this and refuses with `Close existing IdleHarbor instances before running a
+controlled measurement.` rather than measuring the wrong process.
 
 The script records the executable hash and version, Windows version, architecture, logical processor
 count, per-run CPU time, normalized CPU percentage, working/private memory, handles, and threads. It

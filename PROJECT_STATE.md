@@ -9,9 +9,9 @@ IdleHarbor `0.2.0` is the current published stable release. The immutable annota
 `2f0fe875f84023c049e82ea6cc963cf7ca938c71`. Release workflow
 [run 32719629776](https://github.com/Chris0Jeky/IdleHarbor/actions/runs/32719629776) published x64
 and ARM64 portable ZIPs, per-architecture SPDX 2.3 SBOMs, `SHA256SUMS.txt`, and GitHub/Sigstore
-provenance attestations. All four public assets were downloaded and independently verified against
-their release digests; `gh attestation verify` succeeds for both archives and binds to
-`refs/tags/v0.2.0` at that source digest. The released x64 executable is 544,256 bytes, SHA-256
+provenance attestations. All five public assets were downloaded, and the four that `SHA256SUMS.txt`
+covers were independently verified against it; `gh attestation verify` succeeds for both archives
+and binds to `refs/tags/v0.2.0` at that source digest. The released x64 executable is 544,256 bytes, SHA-256
 `bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`, reports `FileVersion 0.2.0`, and
 is `NotSigned` by intent.
 
@@ -62,7 +62,10 @@ natural and explicit-reference repaint captures are pixel-identical.
 The stopped, running, safety-paused, scrolled, and tray-menu screenshots were recaptured from the
 installed public `0.2.0` release at 192 DPI and visually inspected. `docs/assets/capture-manifest.json`
 records source revision `b69c7b56ba5cd89419f849b25312b0b4cb92a5d4`, the released executable's
-identity and `NotSigned` state, exact PNG dimensions, and per-image hashes. The original reported
+identity and `NotSigned` state, exact PNG dimensions, and per-image hashes. That revision is `main`
+at capture time rather than the `v0.2.0` tag `2f0fe87`, because the capture tool records `HEAD`;
+the two trees differ only in `packaging/`, `PROJECT_STATE.md`, and `HUMAN_TODO.md`, and `src/` is
+identical, so the captured executable does correspond to the recorded source. The original reported
 corruption is absent in every state.
 
 ## Settings-window work after `v0.1.0`
