@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-23
+Last updated: 2026-08-24
 
 ## Current milestone
 
@@ -45,10 +45,10 @@ installed public release at 192 DPI and visually inspected. `docs/assets/capture
 records release source `d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`, the released executable
 hash, exact PNG dimensions, and hashes. The original reported corruption is absent in every state.
 
-## In-flight work after `v0.1.0`
+## Settings-window work after `v0.1.0`
 
-Settings-window interaction fixes are on `agent/ux-combo-interaction`
-(PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54)), addressing reported clunkiness when
+Every pull request named in this section has merged.
+PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) addressed reported clunkiness when
 choosing a profile, motion mode, or power request:
 
 - focus reveal is classified by keyboard versus pointer input, so clicking a combo box no longer
@@ -70,9 +70,8 @@ point -- a layout change or a renamed label alike -- leaves those screenshots st
 release capture, which must be taken from a released executable. The captures currently show the
 former "Power request" and "Motion multiplier (1-120)" labels.
 
-PR [#54](https://github.com/Chris0Jeky/IdleHarbor/pull/54) merged those fixes. Follow-ups
-[#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
-[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from its review and remain
+Follow-ups [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) and
+[#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56) were opened from PR #54's review and remain
 open.
 
 PR [#57](https://github.com/Chris0Jeky/IdleHarbor/pull/57) added an on-hover description for all 29
@@ -103,11 +102,24 @@ renamed ("Keep awake", "Motion size", "Pause after real input", and the low-batt
 and the corresponding text in `--help`, `README.md`, the generated INI comment, and `core::validate`'s
 out-of-range message was aligned.
 
-Reviews of these three PRs found ten statements that misdescribed actual behaviour -- profile scope,
-Zen's motion, Circle versus Linear visibility, the pulse/keep-awake relationship, the low-battery
-comparison and its on-battery precondition, and the close-to-tray fallback. Each was checked against
-`src/core/core.cpp` or `src/app/main.cpp` and corrected. No automated check can catch that class of
-error; only reading the text against the source does.
+Reviews of these three PRs found these statements misdescribing actual behaviour, each then checked
+against `src/core/core.cpp` or `src/app/main.cpp` and corrected:
+
+- a profile replaces every setting below it (it replaces `settings_.session` only);
+- Zen "moves least" (it emits virtual input intended not to move the pointer at all);
+- Circle is less visible than Linear (Circle's path is roughly twice the travel);
+- descriptions are unavailable during a session (the labels, status card, and Stop stay enabled);
+- motion Off with keep awake None is a supported pair (`core::validate` refuses it);
+- a pulse refreshes the keep-awake request (that request is continuous; `ApplyPower` runs on a mode
+  change);
+- the low-battery threshold pauses *below* the value (the comparison is `<=`) and does so regardless
+  of power source (it also requires `on_battery`);
+- closing always hides to the notification area (with the icon unavailable it exits and stops the
+  session);
+- the queued viewport repaint waits for the list to close (the list is a separate popup;
+  `RDW_ALLCHILDREN` never reaches it).
+
+No automated check can catch that class of error; only reading the text against the source does.
 
 ## Distribution status
 
@@ -170,7 +182,7 @@ queue remains:
 4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
 5. Recapture `docs/assets` at the next release: every screenshot predates the settings-window label
    renames and the printed explanations.
-5. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
+6. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
 
 ## Proving commands
 
