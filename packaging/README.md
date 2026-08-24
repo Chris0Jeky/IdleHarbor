@@ -130,6 +130,10 @@ release workflow has published the archive.
    ```
 
 4. Submit or update the WinGet manifests in [`winget`](winget) once the release page is live.
+5. Update the five version references in `docs/index.html` — the JSON-LD `softwareVersion`,
+   `downloadUrl`, and `installUrl`, the download button's label, and the `gh attestation verify`
+   example. The project site is served from `docs/`, so it is published by merging, not by a
+   workflow.
 
 Between steps 2 and 3 the Chocolatey package deliberately still names the previous release.
 `Test-ChocolateyPackage.ps1` allows that and refuses the reverse — a package version ahead of the
