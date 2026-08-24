@@ -4,13 +4,24 @@ Last updated: 2026-08-24
 
 ## Current milestone
 
-`0.2.0` is being released. Its version is set in `CMakeLists.txt`, `include/idleharbor/version.hpp`,
-`resources/IdleHarbor.rc`, and `resources/app.manifest`, and `CHANGELOG.md` is dated; the annotated
-tag has not been pushed yet, so no `v0.2.0` release page or archives exist while this line stands.
-`packaging/chocolatey` still targets `v0.1.0` on purpose: it pins a published archive's SHA-256,
-which the release workflow only produces after the tag. `packaging/README.md` records that order.
+IdleHarbor `0.2.0` is the current published stable release. The immutable annotated tag
+[`v0.2.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0) resolves to merge commit
+`2f0fe875f84023c049e82ea6cc963cf7ca938c71`. Release workflow
+[run 32719629776](https://github.com/Chris0Jeky/IdleHarbor/actions/runs/32719629776) published x64
+and ARM64 portable ZIPs, per-architecture SPDX 2.3 SBOMs, `SHA256SUMS.txt`, and GitHub/Sigstore
+provenance attestations. All four public assets were downloaded and independently verified against
+their release digests; `gh attestation verify` succeeds for both archives and binds to
+`refs/tags/v0.2.0` at that source digest. The released x64 executable is 544,256 bytes, SHA-256
+`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`, reports `FileVersion 0.2.0`, and
+is `NotSigned` by intent.
 
-IdleHarbor `0.1.0` is the published first stable release. It is a native C++20/Win32 Windows
+`0.2.0` is the settings-window release. It adds a printed explanation under every field and a hover
+description on all 29 interactive controls, applies a combo selection immediately and on the first
+click, renames four labels, and regroups the maximum session duration under Safeguards. Its
+`packaging/chocolatey` package and `packaging/winget/0.2.0` manifests are repointed at the published
+archives and verified against them.
+
+IdleHarbor `0.1.0` was the first stable release. It is a native C++20/Win32 Windows
 mouse-jiggler and keep-awake utility with a platform-neutral policy core, validated local settings,
 strict CLI, bounded motion patterns, Windows power requests, genuine-input observation,
 battery/fullscreen/session safeguards, visible notification-area controls, an emergency stop, and
@@ -130,16 +141,25 @@ No automated check can catch that class of error; only reading the text against 
 ## Distribution status
 
 - **GitHub Release:** published and verified at
-  [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
-- **WinGet:** three schema-1.12 manifests were independently reviewed and submitted as
-  [microsoft/winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663). Local
-  `winget validate` passes without warnings. A full local WinGet lifecycle was not run because
-  `LocalManifestFiles` is an administrator setting on this PC; upstream validation and moderation
-  remain authoritative.
-- **Chocolatey:** reproducible x64 package source is tracked in `packaging/chocolatey`.
-  `choco pack` succeeds; the generated package contains the complete GPL text and verification
-  instructions, and its no-op plan selects the correct script. Community publication still needs
-  an owner Chocolatey account/API key and an appropriate isolated install/uninstall test.
+  [`v0.2.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0), with
+  [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) retained.
+- **WinGet:** the `0.1.0` manifests were submitted as
+  [microsoft/winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663); every
+  upstream validation check passed and it is waiting on a community moderator. `0.2.0` manifests are
+  prepared in `packaging/winget/0.2.0` and pass `winget validate` without warnings, but are
+  deliberately unsubmitted: `#421663` is still a `New-Package` request, so the package does not exist
+  upstream and a version update has nothing to target. Both versions are mirrored in
+  `packaging/winget` so a submission can be reproduced from this repository. A full local WinGet
+  lifecycle was not run because `LocalManifestFiles` is an administrator setting on this PC;
+  upstream validation and moderation remain authoritative.
+- **Chocolatey:** reproducible x64-only package source is tracked in `packaging/chocolatey` and
+  targets the published `v0.2.0` archive. `Test-ChocolateyPackage.ps1 -VerifyPublishedChecksum`
+  downloaded that archive and confirmed the pinned digest against it. `choco pack` produces
+  `idleharbor.0.2.0.nupkg`; the generated package contains the complete GPL text and verification
+  instructions, and `chocolateyBeforeModify.ps1` closes a running instance before an upgrade, which
+  `chocolateyUninstall.ps1` is not run for. Community publication still needs an owner Chocolatey
+  account/API key (`HUMAN_TODO.md` q-3) and an isolated install/upgrade/uninstall test
+  ([#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51)).
 - **Scoop Extras:** no request was submitted. Its current required request criteria ask for
   popularity evidence (for example, 100 stars or 50 forks), which this new project cannot truthfully
   claim yet.

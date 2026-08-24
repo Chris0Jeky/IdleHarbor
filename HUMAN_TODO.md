@@ -10,7 +10,8 @@ remains owner-only and must never be committed.
   SBOMs, and GitHub artifact attestations. A later signed release requires a managed signing account
   or an Authenticode certificate whose private key remains outside the repository.
 - [ ] **q-3 — Chocolatey publication credential.** The reviewed package source and locally packed
-  `idleharbor.0.1.0.nupkg` are ready, but a Chocolatey community account/API key is required to push
-  it for moderation. Create or sign in to the owner account at `community.chocolatey.org`, obtain an
-  API key, and supply it only through a private local environment or credential command. Never add
-  the key to this repository, an issue, a pull request, or chat-visible command output.
+  `idleharbor.0.2.0.nupkg` are ready, and the pinned digest is verified against the real published
+  archive, but a Chocolatey community account/API key is required to push it for moderation. Create
+  or sign in to the owner account at `community.chocolatey.org`, obtain an API key, and supply it
+  only through a private local environment or credential command. Never add the key to this
+  repository, an issue, a pull request, or chat-visible command output.

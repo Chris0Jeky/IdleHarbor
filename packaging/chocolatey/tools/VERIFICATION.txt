@@ -2,25 +2,25 @@ VERIFICATION
 
 The package downloads the publisher's immutable x64 release archive:
 
-  https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip
+  https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip
 
 Expected SHA-256:
 
-  b3bc7e5714543cee3877e94f3c74ecfedb30d3599decef316e57715fdf9f6d28
+  18b4a517ef767c005a6d01ba53c13a79ff50e4a956bd7c43f3635b17b80c75f7
 
-The same digest is published in SHA256SUMS.txt on the v0.1.0 release page:
+The same digest is published in SHA256SUMS.txt on the v0.2.0 release page:
 
-  https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0
+  https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0
 
 The archive contains this executable:
 
-  IdleHarbor-0.1.0-windows-x64-portable\IdleHarbor.exe
+  IdleHarbor-0.2.0-windows-x64-portable\IdleHarbor.exe
 
 Its SHA-256 is recorded in the release's SPDX SBOM. GitHub build provenance can
 also be checked after downloading the archive:
 
-  gh attestation verify IdleHarbor-0.1.0-windows-x64-portable.zip --repo Chris0Jeky/IdleHarbor
+  gh attestation verify IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0Jeky/IdleHarbor
 
-IdleHarbor.exe is intentionally not Authenticode-signed in v0.1.0;
+IdleHarbor.exe is intentionally not Authenticode-signed in v0.2.0;
 Get-AuthenticodeSignature reports NotSigned. The release uses immutable hashes,
 SPDX SBOMs, and GitHub/Sigstore provenance attestations.

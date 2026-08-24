@@ -1,0 +1,29 @@
+# Created with WinGet manifest schema 1.12.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: Chris0Jeky.IdleHarbor
+PackageVersion: 0.2.0
+InstallerLocale: en-US
+InstallerType: zip
+NestedInstallerType: portable
+UpgradeBehavior: install
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+ReleaseDate: 2026-08-24
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip
+    InstallerSha256: 18B4A517EF767C005A6D01BA53C13A79FF50E4A956BD7C43F3635B17B80C75F7
+    NestedInstallerFiles:
+      - RelativeFilePath: IdleHarbor-0.2.0-windows-x64-portable\IdleHarbor.exe
+        PortableCommandAlias: idleharbor
+  - Architecture: arm64
+    InstallerUrl: https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-arm64-portable.zip
+    InstallerSha256: 419B9EC0BE40546AA262C3DDDFB34FB648C47775459A7FF66D31C16F66DC3D38
+    NestedInstallerFiles:
+      - RelativeFilePath: IdleHarbor-0.2.0-windows-arm64-portable\IdleHarbor.exe
+        PortableCommandAlias: idleharbor
+ManifestType: installer
+ManifestVersion: 1.12.0

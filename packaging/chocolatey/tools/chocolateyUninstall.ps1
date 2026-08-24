@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$executable = Join-Path $toolsDir 'IdleHarbor-0.1.0-windows-x64-portable\IdleHarbor.exe'
+$executable = Join-Path $toolsDir 'IdleHarbor-0.2.0-windows-x64-portable\IdleHarbor.exe'
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     return
 }
