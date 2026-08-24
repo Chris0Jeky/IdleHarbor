@@ -697,13 +697,21 @@ try {
     Assert-True ($sbomDocument.packages[0].packageVerificationCode.value -eq $expectedVerificationCode) `
         'SBOM package verification code is not the SPDX 2.3 SHA-1 code.'
 
-    & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.0' | Out-Null
+    # Read the version out of the tree, so a release bump does not have to edit this test.
+    $repositoryRoot = Split-Path -Parent $packagingRoot
+    $cmakeText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'CMakeLists.txt')
+    $currentVersion = [regex]::Match($cmakeText, '(?is)project\s*\(\s*IdleHarbor\s+VERSION\s+([0-9.]+)').Groups[1].Value
+    Assert-True ($currentVersion -match '^\d+\.\d+\.\d+$') 'Could not read the project version from CMakeLists.txt.'
+    $currentVersionParts = $currentVersion -split '\.'
+    $mismatchedVersion = "$($currentVersionParts[0]).$($currentVersionParts[1]).$([int]$currentVersionParts[2] + 1)"
+
+    & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag "v$currentVersion" | Out-Null
     $versionMismatchRejected = $false
-    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.1' | Out-Null }
+    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag "v$mismatchedVersion" | Out-Null }
     catch { $versionMismatchRejected = $true }
     Assert-True $versionMismatchRejected 'Release version validator accepted a mismatched tag.'
 
-    foreach ($unsupportedTag in @('v0.1.0-rc.1', 'v0.1.0+build.1')) {
+    foreach ($unsupportedTag in @("v$currentVersion-rc.1", "v$currentVersion+build.1")) {
         $unsupportedTagRejected = $false
         try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag $unsupportedTag | Out-Null }
         catch { $unsupportedTagRejected = $true }
@@ -712,14 +720,15 @@ try {
 
     $versionFixture = Join-Path $tempRoot 'version-fixture'
     New-Item -ItemType Directory -Path (Join-Path $versionFixture 'include\idleharbor'), (Join-Path $versionFixture 'resources') -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'CMakeLists.txt') -Destination $versionFixture
-    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'include\idleharbor\version.hpp') -Destination (Join-Path $versionFixture 'include\idleharbor')
-    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\IdleHarbor.rc') -Destination (Join-Path $versionFixture 'resources')
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'CMakeLists.txt') -Destination $versionFixture
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'include\idleharbor\version.hpp') -Destination (Join-Path $versionFixture 'include\idleharbor')
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'resources\IdleHarbor.rc') -Destination (Join-Path $versionFixture 'resources')
     $fixtureManifest = Join-Path $versionFixture 'resources\app.manifest'
-    (Get-Content -Raw -LiteralPath (Join-Path (Split-Path -Parent $packagingRoot) 'resources\app.manifest')) -replace 'version="0\.1\.0\.0"', 'version="9.9.9.9"' |
+    $currentManifestVersion = [regex]::Escape("$currentVersion.0")
+    (Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'resources\app.manifest')) -replace "version=`"$currentManifestVersion`"", 'version="9.9.9.9"' |
         Set-Content -LiteralPath $fixtureManifest -Encoding UTF8
     $manifestMismatchRejected = $false
-    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag 'v0.1.0' -SourceRoot $versionFixture | Out-Null }
+    try { & (Join-Path $packagingRoot 'Test-ReleaseVersion.ps1') -Tag "v$currentVersion" -SourceRoot $versionFixture | Out-Null }
     catch { $manifestMismatchRejected = $true }
     Assert-True $manifestMismatchRejected 'Release version validator accepted a mismatched app.manifest version.'
 

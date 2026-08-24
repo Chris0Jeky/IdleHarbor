@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory)]
     [string]$OutputPath,
 
-    [string]$Version = '0.1.0',
+    [Parameter(Mandatory)]
+    [string]$Version,
 
     [ValidateSet('x64', 'arm64', 'x86')]
     [string]$Architecture = 'x64'
