@@ -144,6 +144,21 @@ against `src/core/core.cpp` or `src/app/main.cpp` and corrected:
 
 No automated check can catch that class of error; only reading the text against the source does.
 
+## Project site and discoverability
+
+The project site is served by GitHub Pages from `docs/` on `main` at
+<https://chris0jeky.github.io/IdleHarbor/>, and is the repository's declared homepage. `docs/.nojekyll`
+turns off the Jekyll build, so the page is served exactly as committed and the existing `docs/*.md`
+files are untouched. `docs/index.html` is a single self-contained page -- no external stylesheet,
+script, or font -- carrying a canonical link, Open Graph and Twitter card metadata, and JSON-LD
+`SoftwareApplication` and `FAQPage` blocks. `docs/robots.txt` and `docs/sitemap.xml` accompany it.
+
+Its five version references are part of the release checklist, because the site is published by
+merging rather than by a workflow.
+
+The repository description and topics were rewritten for the terms people actually search, and the
+README and user guide link to the site.
+
 ## Distribution status
 
 - **GitHub Release:** published and verified at
@@ -193,7 +208,10 @@ queue remains:
 - [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51): complete Chocolatey architecture and isolated lifecycle validation;
 - [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55): classify focus changes that bypass the message loop;
 - [#56](https://github.com/Chris0Jeky/IdleHarbor/issues/56): a forwarded command can discard a pending combo selection;
-- [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59): factor the shared setup and teardown out of the native test scripts.
+- [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59): factor the shared setup and teardown out of the native test scripts;
+- [#65](https://github.com/Chris0Jeky/IdleHarbor/issues/65): bound how far the Chocolatey package may lag the project version;
+- [#66](https://github.com/Chris0Jeky/IdleHarbor/issues/66): verify the Chocolatey pinned digest against the real archive automatically;
+- [#68](https://github.com/Chris0Jeky/IdleHarbor/issues/68): no automated check guards the tracked WinGet manifests.
 
 ## Human decisions
 
@@ -207,14 +225,22 @@ queue remains:
 
 ## Resume order
 
-1. Monitor WinGet PR #421663 and complete the Microsoft CLA if its status check requests owner action.
-2. Retry issue #6's social-preview upload after GitHub changes or fixes the Settings UI.
-3. Run the Chocolatey install/uninstall test in a suitable environment and publish with the owner's
-   Chocolatey API key.
+1. Monitor WinGet PR #421663. Once it is accepted, open the version-update pull request from
+   `packaging/winget/0.2.0`; it is prepared and validated and waits only on that acceptance.
+2. Retry issue #6's social-preview upload after GitHub changes or fixes the Settings UI. The project
+   site carries its own Open Graph image, so link previews for the site work regardless; the blank
+   preview affects the repository page only.
+3. Run the Chocolatey install/upgrade/uninstall test in a suitable environment
+   ([#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51)) and publish with the owner's
+   Chocolatey API key (`HUMAN_TODO.md` q-3).
 4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
-5. Recapture `docs/assets` at the next release, from that release's executable. The current captures
-   are `v0.2.0`'s.
-6. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
+5. Continue the small tracked runtime/capture follow-ups without expanding the released safety
+   boundary.
+
+Every release repeats the sequence in `packaging/README.md`'s "Cutting a release": bump the four
+source version locations, merge, tag, then repoint the Chocolatey package, the WinGet manifests, and
+the five version references in `docs/index.html`, and recapture `docs/assets` from the released
+executable.
 
 ## Proving commands
 
@@ -229,10 +255,15 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-ReleaseWorkflow.ps1
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseVersion.ps1 -Tag v0.2.0
+.\packaging\Test-ChocolateyPackage.ps1 -VerifyPublishedChecksum
 choco pack .\packaging\chocolatey\idleharbor.nuspec --output-directory .\out\chocolatey
+winget validate --manifest .\packaging\winget\0.2.0
 ```
 
-Run packaging and release-workflow checks sequentially under PowerShell 7 and Windows PowerShell 5.1.
+Run packaging and release-workflow checks sequentially. PowerShell 7 is no longer installed on this
+machine, so they run locally under Windows PowerShell 5.1 only; CI runs them under `pwsh`, which is
+where the PowerShell 7 coverage now comes from.
+
 CI additionally builds ARM64 and Win32. Hosted ARM64 evidence proves cross-build packaging, not
 representative ARM64 runtime behavior. A true cross-monitor mixed-DPI transition remains unverified
 because only one display is attached. `powercfg /requests` also requires an elevated verification
