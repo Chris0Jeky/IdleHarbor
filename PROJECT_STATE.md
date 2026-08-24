@@ -21,14 +21,13 @@ click, renames four labels, and regroups the maximum session duration under Safe
 `packaging/chocolatey` package and `packaging/winget/0.2.0` manifests are repointed at the published
 archives and verified against them.
 
-IdleHarbor `0.1.0` was the first stable release. It is a native C++20/Win32 Windows
-mouse-jiggler and keep-awake utility with a platform-neutral policy core, validated local settings,
-strict CLI, bounded motion patterns, Windows power requests, genuine-input observation,
-battery/fullscreen/session safeguards, visible notification-area controls, an emergency stop, and
-transactional per-user installation. It has no telemetry, network service, managed runtime, hidden
-mode, or implicit persistence.
+IdleHarbor is a native C++20/Win32 Windows mouse-jiggler and keep-awake utility with a
+platform-neutral policy core, validated local settings, strict CLI, bounded motion patterns, Windows
+power requests, genuine-input observation, battery/fullscreen/session safeguards, visible
+notification-area controls, an emergency stop, and transactional per-user installation. It has no
+telemetry, network service, managed runtime, hidden mode, or implicit persistence.
 
-The immutable annotated tag
+`0.1.0` was the first stable release. Its immutable annotated tag
 [`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) resolves to merge commit
 `d936f1e3d147b98403272e27ce1b3ec8f1cee3eb`. Release workflow
 [run 32423221779](https://github.com/Chris0Jeky/IdleHarbor/actions/runs/32423221779) published x64 and
