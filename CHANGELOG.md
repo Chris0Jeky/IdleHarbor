@@ -6,12 +6,12 @@ where practical.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-24
+
 ### Added
 
 - Each settings field now carries a short explanation printed under it, so the window can be read
   straight through without hovering anything.
-- The maximum session duration moved from "Window & notifications" to "Safeguards". It is a session
-  setting that a profile replaces, unlike everything else under the former heading.
 - Every settings control also explains itself in more detail on hover, including the labels, the
   Start, Stop, and Save actions, and the status card. Hovering a label gives the same description as the field beside
   it. During a running session the settings are disabled and Windows does not deliver hover to a
@@ -19,6 +19,8 @@ where practical.
 
 ### Changed
 
+- The maximum session duration moved from "Window & notifications" to "Safeguards". It is a session
+  setting that a profile replaces, unlike everything else under the former heading.
 - Renamed four labels for what they do rather than how: "Power request" is now "Keep awake",
   "Motion multiplier" is now "Motion size", "Pause after genuine input" is now "Pause after real
   input", and the low-battery threshold now names its unit. The out-of-range message for the motion
@@ -36,6 +38,12 @@ where practical.
   of briefly showing an available Save action beside a saved-looking status.
 - Dismissing the profile list with Escape, or re-selecting the profile already in effect, no longer
   reloads that profile's defaults over settings you had edited.
+
+### Distribution
+
+- Published under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives accompanied by
+  SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations, on the same
+  terms as `0.1.0`.
 
 ## [0.1.0] - 2026-08-20
 
@@ -139,5 +147,6 @@ where practical.
 - Published under `GPL-3.0-only` as unsigned x64 and ARM64 portable archives
   accompanied by SHA-256 checksums, per-architecture SPDX SBOMs, and GitHub artifact attestations.
 
-[Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Chris0Jeky/IdleHarbor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0
