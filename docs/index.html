@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IdleHarbor — Free Open-Source Windows Mouse Jiggler &amp; Keep-Awake Utility</title>
-<meta name="description" content="IdleHarbor is a free, open-source, native Windows mouse jiggler and keep-awake utility. Bounded motion modes, Windows power requests, smart pause safeguards, portable use, no telemetry, no runtime. GPL-3.0.">
+<meta name="description" content="A free, open-source Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, and safeguards that pause it for you. Native, portable, no telemetry.">
 <link rel="canonical" href="https://chris0jeky.github.io/IdleHarbor/">
 <meta name="theme-color" content="#0b1220">
 
@@ -83,6 +83,16 @@
         },
         {
           "@type": "Question",
+          "name": "How do I stop IdleHarbor immediately?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Use the visible Stop button, the notification-area menu, or the emergency hotkey Ctrl+Alt+Shift+F12 if you have enabled it. The session also pauses by itself for any safeguard you have turned on." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does IdleHarbor collect any data?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. There is no telemetry and no network service. Settings are stored in a local INI file, beside the executable in portable mode or in the user's local application-data directory otherwise." }
+        },
+        {
+          "@type": "Question",
           "name": "Is IdleHarbor safe to use on a work laptop?",
           "acceptedAnswer": { "@type": "Answer", "text": "Only if the device, the account, and the workplace rules allow it. Read the safety notes and obtain any required approval first. Installing it and configuring automatic startup may be separate policy decisions." }
         }
@@ -153,7 +163,7 @@ header.site nav a:hover { color: var(--text); }
   border-radius: 999px; padding: 5px 12px; background: var(--panel);
 }
 
-section { padding: 44px 0; border-top: 1px solid var(--line); }
+section { padding: 44px 0; border-top: 1px solid var(--line); scroll-margin-top: 76px; }
 section h2 { font-size: clamp(22px, 3vw, 28px); margin: 0 0 10px; letter-spacing: -0.3px; }
 section > .wrap > p { color: var(--muted); max-width: 70ch; }
 
@@ -248,8 +258,10 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
       Two independent mechanisms, either or both of which you can turn on. <strong>Motion</strong>
       sends a small, bounded input pulse for applications that watch for activity. <strong>Keep
       awake</strong> asks Windows itself to keep the system or the display available, which needs no
-      simulated input at all. Neither one is hidden: a visible window and a notification-area icon
-      always show whether a session is running, paused, or stopped, and why.
+      simulated input at all. Neither one is hidden: a notification-area icon always shows whether a
+      session is running, paused, or stopped, and why, with a window you can open from it. Start it
+      minimised and the icon is what you get; if the icon cannot be created, the window is forced
+      visible instead, so the state is never unreachable.
     </p>
     <div class="grid">
       <div class="card">
@@ -262,7 +274,7 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
       </div>
       <div class="card">
         <h3>Safeguards that pause for you</h3>
-        <p>Real typing or mouse movement, a locked workstation, a disconnected session, and low battery are on by default. Running on battery at all, a full-screen app, active hours, and a maximum session length are available and start switched off.</p>
+        <p>Real typing or mouse movement, a locked workstation, a disconnected session, and low battery are on by default and pause the session. Running on battery at all, a full-screen app, and active hours are available and start switched off. A maximum session length ends it outright rather than pausing, and is also off by default.</p>
       </div>
       <div class="card">
         <h3>Named profiles</h3>

@@ -43,7 +43,9 @@ suite by adding a `tests/*_tests.cpp`, an `add_executable`/`add_test` pair in `C
 
 These are not part of CTest and must be run explicitly, sequentially. The packaging ones are
 supported under both Windows PowerShell 5.1 and PowerShell 7; `pwsh` is not installed on this
-machine, so locally they run under 5.1 and CI provides the PowerShell 7 coverage:
+machine, so locally they run under 5.1. CI runs `Test-Packaging.ps1` under `pwsh`, and that script
+invokes the other release checks in-process, so those get the PowerShell 7 coverage; the two native
+desktop tests are in no workflow and get none:
 
 ```powershell
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe

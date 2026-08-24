@@ -145,12 +145,23 @@ No automated check can catch that class of error; only reading the text against 
 
 ## Project site and discoverability
 
-The project site is served by GitHub Pages from `docs/` on `main` at
-<https://chris0jeky.github.io/IdleHarbor/>, and is the repository's declared homepage. `docs/.nojekyll`
-turns off the Jekyll build, so the page is served exactly as committed and the existing `docs/*.md`
-files are untouched. `docs/index.html` is a single self-contained page -- no external stylesheet,
-script, or font -- carrying a canonical link, Open Graph and Twitter card metadata, and JSON-LD
-`SoftwareApplication` and `FAQPage` blocks. `docs/robots.txt` and `docs/sitemap.xml` accompany it.
+GitHub Pages is enabled for `main` `/docs`, and <https://chris0jeky.github.io/IdleHarbor/> is the
+repository's declared homepage. `docs/.nojekyll` turns off the Jekyll build, so the page is served
+exactly as committed and the existing `docs/*.md` files are untouched. `docs/index.html` is a single
+self-contained page -- no external stylesheet, script, or font -- carrying a canonical link, Open
+Graph and Twitter card metadata, and JSON-LD `SoftwareApplication` and `FAQPage` blocks whose eight
+questions match the eight in the visible FAQ.
+
+`docs/sitemap.xml` is present but a project Pages site cannot serve an origin-root `robots.txt`:
+crawlers only fetch `https://chris0jeky.github.io/robots.txt`, which GitHub controls. A committed
+`docs/robots.txt` would be published at `/IdleHarbor/robots.txt` and never requested, so it is not
+there. The sitemap therefore has to be submitted through Search Console to be discovered
+(`HUMAN_TODO.md` q-4).
+
+Neither JSON-LD block is expected to produce a Google rich result: `SoftwareApplication` needs an
+`aggregateRating` or `review`, and `FAQPage` rich results have been limited to government and health
+sites since 2023. They are there so the page describes itself unambiguously to anything that reads
+structured data, not for a search decoration.
 
 Its five version references are part of the release checklist, because the site is published by
 merging rather than by a workflow.
@@ -210,7 +221,8 @@ queue remains:
 - [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59): factor the shared setup and teardown out of the native test scripts;
 - [#65](https://github.com/Chris0Jeky/IdleHarbor/issues/65): bound how far the Chocolatey package may lag the project version;
 - [#66](https://github.com/Chris0Jeky/IdleHarbor/issues/66): verify the Chocolatey pinned digest against the real archive automatically;
-- [#68](https://github.com/Chris0Jeky/IdleHarbor/issues/68): no automated check guards the tracked WinGet manifests.
+- [#68](https://github.com/Chris0Jeky/IdleHarbor/issues/68): no automated check guards the tracked WinGet manifests;
+- [#70](https://github.com/Chris0Jeky/IdleHarbor/issues/70): capture manifest indentation depends on the PowerShell edition.
 
 ## Human decisions
 
@@ -261,8 +273,11 @@ winget validate --manifest .\packaging\winget\0.2.0
 ```
 
 Run packaging and release-workflow checks sequentially. PowerShell 7 is no longer installed on this
-machine, so they run locally under Windows PowerShell 5.1 only; CI runs them under `pwsh`, which is
-where the PowerShell 7 coverage now comes from.
+machine, so locally they run under Windows PowerShell 5.1 only. CI runs `Test-Packaging.ps1` under
+`pwsh`, and that script invokes `Test-ReleaseWorkflow.ps1`, `Test-ReleaseVersion.ps1`,
+`Test-ChocolateyPackage.ps1`, `Test-ReleaseLicense.ps1`, and the three `New-*` scripts in-process,
+so all of them get PowerShell 7 coverage there. The two native desktop tests and the capture tool
+need a real desktop, are in no workflow, and therefore have no PowerShell 7 coverage at all.
 
 CI additionally builds ARM64 and Win32. Hosted ARM64 evidence proves cross-build packaging, not
 representative ARM64 runtime behavior. A true cross-monitor mixed-DPI transition remains unverified
