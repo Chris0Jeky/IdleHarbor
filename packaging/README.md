@@ -117,7 +117,9 @@ release workflow has published the archive.
 
 1. Bump `CMakeLists.txt`, `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc`, and
    `resources/app.manifest`, date the `CHANGELOG.md` section, and update the version references in
-   the documentation. `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` proves the four source files agree.
+   the documentation -- but *not* the five in `docs/index.html`, which are step 5. That page is the
+   live site the moment this merges, and the release it would advertise does not exist until step 2.
+   `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` proves the four source files agree.
 2. Merge that, then push the annotated tag `vX.Y.Z`. `release.yml` builds x64 and ARM64, packages
    the portable archives and SPDX SBOMs, generates `SHA256SUMS.txt`, attests every asset, and
    publishes the GitHub release.

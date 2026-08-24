@@ -222,8 +222,9 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
     <h1>A Windows mouse jiggler that doesn't hide from you</h1>
     <p class="lede">
       IdleHarbor is a free, open-source keep-awake utility for Windows. It can send bounded mouse
-      movement, ask Windows to stay awake, or both &mdash; and it stops on its own when you start
-      typing, lock the PC, unplug the charger, or open something full-screen.
+      movement, ask Windows to stay awake, or both &mdash; and out of the box it pauses itself when
+      you start typing, when you lock the PC, or when the battery drops below 20%. Pausing on
+      battery power at all, or for a full-screen app, is there too and switched off by default.
     </p>
     <div class="cta">
       <a class="btn btn-primary" href="#download">Download v0.2.0</a>
@@ -261,7 +262,7 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
       </div>
       <div class="card">
         <h3>Safeguards that pause for you</h3>
-        <p>Real typing or mouse movement, a locked workstation, a disconnected session, low battery, running on battery, a full-screen app, active hours, and a maximum session length.</p>
+        <p>Real typing or mouse movement, a locked workstation, a disconnected session, and low battery are on by default. Running on battery at all, a full-screen app, active hours, and a maximum session length are available and start switched off.</p>
       </div>
       <div class="card">
         <h3>Named profiles</h3>
@@ -344,8 +345,9 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
       build provenance attestations. Releases are <strong>not</strong> Authenticode-signed, so
       Windows will report no publisher &mdash; check the hash and the attestation instead:
     </p>
-    <pre><code>Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
-gh attestation verify IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0Jeky/IdleHarbor</code></pre>
+    <pre><code># Hash the ZIP before extracting it: SHA256SUMS.txt lists the archives, not the executable.
+Get-FileHash .\IdleHarbor-0.2.0-windows-x64-portable.zip -Algorithm SHA256
+gh attestation verify .\IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0Jeky/IdleHarbor</code></pre>
     <p>
       Package managers: a WinGet submission is waiting on upstream moderation, and a reviewed
       Chocolatey package source is in the repository but not yet published. Until one of those is
@@ -386,7 +388,7 @@ gh attestation verify IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0Jek
 
     <details>
       <summary>Does it need .NET, Electron, or another runtime?</summary>
-      <p>No. IdleHarbor is a native C++20/Win32 program built against Windows system libraries. There is nothing else to install, and the published executable is 544,256&nbsp;bytes.</p>
+      <p>No. IdleHarbor is a native C++20/Win32 program built against Windows system libraries. There is nothing else to install, and the published x64 executable is 544,256&nbsp;bytes. The ARM64 build differs in size; each release's SPDX SBOM records its own executable's identity.</p>
     </details>
 
     <details>

@@ -217,8 +217,9 @@ queue remains:
 `HUMAN_TODO.md` is authoritative:
 
 - q-1: resolved 2026-08-20 as `GPL-3.0-only`; no copyright holder was inferred.
-- q-2: resolved 2026-08-20 as an explicitly unsigned `v0.1.0`, relying on checksums, SPDX SBOMs,
-  and GitHub provenance attestations. Signing can be reconsidered for a later release.
+- q-2: resolved 2026-08-20 as explicitly unsigned releases, relying on checksums, SPDX SBOMs, and
+  GitHub provenance attestations. It covers `v0.1.0` and `v0.2.0`; signing can be reconsidered for a
+  later release.
 - q-3: open for the owner-only Chocolatey account/API key needed to submit the prepared package;
   the credential must remain outside the repository and public logs.
 
