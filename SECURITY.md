@@ -1,7 +1,7 @@
 # Security policy
 
 Security reports are accepted for the latest tagged release and the current `main` branch. Support
-is best-effort; no fixed response-time or maintenance window is promised for `v0.1.0`.
+is best-effort; no fixed response-time or maintenance window is promised for any release.
 
 ## Reporting a vulnerability
 

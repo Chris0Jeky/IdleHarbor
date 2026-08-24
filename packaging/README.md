@@ -3,14 +3,14 @@
 IdleHarbor is distributed as a native Windows executable with no application runtime or network
 dependency. The portable archive is the canonical package; the PowerShell installer is an optional
 per-user convenience layer around that archive. Download only from the canonical
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0).
+[`v0.2.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0).
 
 ## Release artifacts
 
-The `v0.1.0` release includes these exact assets:
+The `v0.2.0` release includes these exact assets:
 
-- [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip);
-- [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip);
+- [`IdleHarbor-0.2.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip);
+- [`IdleHarbor-0.2.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-arm64-portable.zip);
 - `SHA256SUMS.txt` for the final asset directory;
 - per-architecture SPDX 2.3 SBOM JSON;
 - GitHub artifact attestations;
@@ -110,6 +110,31 @@ The uninstaller refuses to remove an unverified directory and preserves unexpect
 installer created the Task Scheduler folder, rollback and uninstall also remove that folder after
 proving it is empty; a pre-existing or non-empty folder is preserved.
 
+## Cutting a release
+
+The order matters, because the package-manager entries pin a SHA-256 that does not exist until the
+release workflow has published the archive.
+
+1. Bump `CMakeLists.txt`, `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc`, and
+   `resources/app.manifest`, date the `CHANGELOG.md` section, and update the version references in
+   the documentation. `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` proves the four source files agree.
+2. Merge that, then push the annotated tag `vX.Y.Z`. `release.yml` builds x64 and ARM64, packages
+   the portable archives and SPDX SBOMs, generates `SHA256SUMS.txt`, attests every asset, and
+   publishes the GitHub release.
+3. Repoint `chocolatey/` at the published x64 archive: the nuspec version and its pinned URLs, the
+   installer URL and `checksum64`, `VERIFICATION.txt`, and the uninstaller's versioned folder. Take
+   the digest from the release's own `SHA256SUMS.txt`, then prove it against the real download:
+
+   ```powershell
+   .\Test-ChocolateyPackage.ps1 -VerifyPublishedChecksum
+   ```
+
+4. Submit or update the WinGet manifests in [`winget`](winget) once the release page is live.
+
+Between steps 2 and 3 the Chocolatey package deliberately still names the previous release.
+`Test-ChocolateyPackage.ps1` allows that and refuses the reverse — a package version ahead of the
+source cannot correspond to an archive anyone can download.
+
 ## Verification and trust
 
 After downloading, verify the checksum manifest and inspect the signature state:
@@ -119,7 +144,7 @@ Get-FileHash .\IdleHarbor.exe -Algorithm SHA256
 Get-AuthenticodeSignature .\IdleHarbor.exe
 ```
 
-The release publishes SHA-256, SBOM, and attestation evidence. `v0.1.0` is
+The release publishes SHA-256, SBOM, and attestation evidence. `v0.2.0` is
 intentionally unsigned, so `Get-AuthenticodeSignature` is expected to report `NotSigned`. The source
 and archives are licensed `GPL-3.0-only`; each portable archive includes the complete licence text.
 

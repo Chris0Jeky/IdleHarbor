@@ -50,10 +50,16 @@ controlled. It does not provide concealment, monitoring bypasses, or claims of u
 
 ## Status
 
-Version `0.1.0` is the first stable release. Its canonical download and verification page is
-[`v0.1.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0). The visible runtime, policy
+Version `0.2.0` is the current stable release. Its canonical download and verification page is
+[`v0.2.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0). The visible runtime, policy
 core, settings store, CLI, portable packages, per-user installer, startup choices, CI, CodeQL,
 SBOMs, checksums, and GitHub provenance attestations are implemented and published.
+
+`0.2.0` is a settings-window release. Every control now explains itself: each field carries a short
+printed explanation beneath it, and every control describes itself in more detail on hover. Picking a
+profile, motion mode, or keep-awake mode updates the field immediately and works on the first click.
+Four labels were renamed for what they do rather than how. See
+[`CHANGELOG.md`](CHANGELOG.md) for the full list.
 
 | Area | Available now | Notes |
 | --- | --- | --- |
@@ -61,8 +67,8 @@ SBOMs, checksums, and GitHub provenance attestations are implemented and publish
 | Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
 | Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
 | Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
-| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.1.0` release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0) |
-| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.1.0` is unsigned |
+| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.2.0` release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0) |
+| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.2.0` is unsigned |
 
 Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
 
@@ -80,9 +86,9 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
 - **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
   the release workflow rather than marketing claims.
 
-The local Visual Studio 2019 x64 Release-QA executable is 521,728 bytes (509.5 KiB) with SHA-256
-`f39b280be248c84b6e625dcf5995673aee3949aea6a68967274554aabc0b62f2`. The reproducible three-run
-resource baseline and its limitations are recorded in
+The local Visual Studio 2019 x64 Release-QA executable for `0.2.0` is 536,064 bytes (523.5 KiB) with
+SHA-256 `fb1d645468bbd2e41e309cf2e4fe7ee5b915225340173ce77da1e2a2bc45e039`. The reproducible
+three-run resource baseline and its limitations are recorded in
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
@@ -194,11 +200,11 @@ in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 ## Download, install, and trust
 
 Download the architecture-labelled portable archives from the canonical
-[`v0.1.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0), not an
+[`v0.2.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0), not an
 unverified mirror. The release contains these exact asset names:
 
-- [`IdleHarbor-0.1.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-x64-portable.zip) for most Windows PCs;
-- [`IdleHarbor-0.1.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.1.0/IdleHarbor-0.1.0-windows-arm64-portable.zip) for Windows on Arm.
+- [`IdleHarbor-0.2.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip) for most Windows PCs;
+- [`IdleHarbor-0.2.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-arm64-portable.zip) for Windows on Arm.
 
 It also publishes:
 
@@ -208,7 +214,7 @@ It also publishes:
 - package manifest with source revision and architecture.
 
 The optional per-user installer, Start Menu launcher, and startup helpers are documented in
-[`packaging/README.md`](packaging/README.md). `v0.1.0` is explicitly unsigned, so Windows may show a
+[`packaging/README.md`](packaging/README.md). `v0.2.0` is explicitly unsigned, so Windows may show a
 publisher warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify
 its artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
 
@@ -279,9 +285,10 @@ and obtain any required approval first. IdleHarbor does not bypass monitoring or
 claims on a user's behalf; installing it and configuring automatic startup may be separate policy
 decisions.
 
-### Is v0.1.0 code-signed?
+### Is IdleHarbor code-signed?
 
-No. `v0.1.0` is intentionally unsigned because no signing identity has been provided. Checksums,
+No. `v0.2.0`, like `v0.1.0`, is intentionally unsigned because no signing identity has been
+provided. Checksums,
 an SPDX SBOM, and GitHub provenance attestations provide release evidence, but they do not remove
 Windows' unsigned-publisher warning. Signing can be added in a later release.
 

@@ -49,7 +49,7 @@ Windows PowerShell 5.1 for the packaging ones):
 .\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseWorkflow.ps1
-.\packaging\Test-ReleaseVersion.ps1 -Tag v0.1.0
+.\packaging\Test-ReleaseVersion.ps1 -Tag v0.2.0
 ```
 
 `tools\Capture-IdleHarborScreenshots.ps1` regenerates `docs/assets` plus `capture-manifest.json`; it
@@ -106,11 +106,14 @@ never as proof of presence or a way around a security control. `docs/SAFETY.md` 
   `snake_case` free functions; app/platform use `PascalCase`. Prefer `[[nodiscard]]` and `noexcept`
   as the existing headers do.
 - `.editorconfig`: CRLF, UTF-8, 4-space indent for C++/RC, 2-space for PS1/YAML/JSON/Markdown/CMake.
-- Version lives in four places that must stay in sync: `CMakeLists.txt` `VERSION`,
-  `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc`, and
-  `packaging/chocolatey/idleharbor.nuspec`. `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` checks this.
+- The source version lives in four places that must stay in sync: `CMakeLists.txt` `VERSION`,
+  `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc` (both string and numeric fields), and
+  `resources/app.manifest`. `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` checks all four.
+  `packaging/chocolatey/idleharbor.nuspec` is deliberately not one of them: it pins a *published*
+  archive and its SHA-256, so it is repointed after the release workflow publishes, and
+  `Test-ChocolateyPackage.ps1` only requires that it never runs ahead of the source version.
 - Small present-tense commits (`Add interval validation tests`). Keep unrelated refactors out.
-- Licence is `GPL-3.0-only`; `v0.1.0` is intentionally unsigned (see `HUMAN_TODO.md` q-2).
+- Licence is `GPL-3.0-only`; releases are intentionally unsigned (see `HUMAN_TODO.md` q-2).
 
 ## CI
 
