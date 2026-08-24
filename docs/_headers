@@ -1,0 +1,20 @@
+# Applied by the Cloudflare Workers mirror only. GitHub Pages ignores this file
+# and serves it as plain text; it is harmless there.
+#
+# The site is one self-contained page: no external scripts, styles, fonts, or
+# images, and no forms. The policy below is therefore as closed as it can be --
+# it allows same-origin images and the single inline <style>, and nothing else.
+/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+# Screenshots and the social card are content-addressed by release, not by URL,
+# so they may be cached far longer than the page that embeds them.
+/assets/*
+  Cache-Control: public, max-age=86400

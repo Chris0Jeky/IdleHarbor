@@ -1,0 +1,15 @@
+# IdleHarbor -- https://github.com/Chris0Jeky/IdleHarbor
+#
+# This file is live only on the Cloudflare Workers mirror, where it sits at the
+# host root. On GitHub Pages it resolves to /IdleHarbor/robots.txt, which no
+# crawler reads, so it has no effect there.
+#
+# The canonical site is https://chris0jeky.github.io/IdleHarbor/ and every page
+# on this mirror declares it with <link rel="canonical">. Crawling is allowed on
+# purpose: a crawler that is blocked here never reads that tag, and would be
+# left treating the mirror as an independent copy instead of folding it into the
+# canonical URL. No Sitemap line is declared, because this host's sitemap lists
+# URLs on another host and cross-host sitemaps are only honoured for hosts
+# verified together in a webmaster console.
+User-agent: *
+Allow: /
