@@ -31,7 +31,7 @@ setting.
 ## Submission status
 
 `0.1.0` was submitted as [winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663).
-Every upstream validation check passed and it is waiting on a community moderator, who are
+Every upstream validation check passed and it is waiting on a community moderator; moderators are
 volunteers.
 
 `0.2.0` is prepared in `0.2.0/` and passes `winget validate`, but is deliberately not submitted yet.
