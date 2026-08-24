@@ -30,8 +30,13 @@ setting.
 
 ## Submission status
 
-`0.1.0` was submitted as [winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663)
-and is waiting on a community moderator. Because that is still a `New-Package` pull request, a later
-version is not submitted alongside it: the package has to exist upstream before a version update can
-target it. Prepare the new manifests here, and open the version-update pull request once the new
-package request has been accepted.
+`0.1.0` was submitted as [winget-pkgs#421663](https://github.com/microsoft/winget-pkgs/pull/421663).
+Every upstream validation check passed and it is waiting on a community moderator, who are
+volunteers.
+
+`0.2.0` is prepared in `0.2.0/` and passes `winget validate`, but is deliberately not submitted yet.
+`#421663` is still a `New-Package` pull request, so the package does not exist upstream and there is
+nothing for a version update to target. Opening a second `New-Package` request for the same
+identifier would put two competing submissions in the moderation queue. Open the version-update pull
+request once `#421663` has been accepted; both versions then coexist upstream and `winget install`
+resolves to the newer one.

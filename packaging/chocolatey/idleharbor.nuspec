@@ -2,23 +2,23 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>idleharbor</id>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <title>IdleHarbor</title>
     <authors>Cristian Tcaci</authors>
     <owners>Cristian Tcaci</owners>
     <projectUrl>https://github.com/Chris0Jeky/IdleHarbor</projectUrl>
     <projectSourceUrl>https://github.com/Chris0Jeky/IdleHarbor</projectSourceUrl>
     <packageSourceUrl>https://github.com/Chris0Jeky/IdleHarbor/tree/main/packaging/chocolatey</packageSourceUrl>
-    <docsUrl>https://github.com/Chris0Jeky/IdleHarbor/blob/v0.1.0/docs/USER_GUIDE.md</docsUrl>
+    <docsUrl>https://github.com/Chris0Jeky/IdleHarbor/blob/v0.2.0/docs/USER_GUIDE.md</docsUrl>
     <bugTrackerUrl>https://github.com/Chris0Jeky/IdleHarbor/issues</bugTrackerUrl>
-    <iconUrl>https://raw.githubusercontent.com/Chris0Jeky/IdleHarbor/v0.1.0/resources/IdleHarbor.ico</iconUrl>
-    <licenseUrl>https://github.com/Chris0Jeky/IdleHarbor/blob/v0.1.0/LICENSE</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/Chris0Jeky/IdleHarbor/v0.2.0/resources/IdleHarbor.ico</iconUrl>
+    <licenseUrl>https://github.com/Chris0Jeky/IdleHarbor/blob/v0.2.0/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>Lightweight, transparent Windows keep-awake utility with intelligent safety pauses.</summary>
     <description>IdleHarbor is a native Windows keep-awake utility with optional mouse movement, power-request modes, activity-aware pausing, lock and disconnect safety, battery protection, active hours, session limits, a notification-area menu, and an emergency stop hotkey.
 
 The Chocolatey package installs the x64 portable application and does not configure automatic startup. IdleHarbor remains visible and user-controlled.</description>
-    <releaseNotes>https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.1.0</releaseNotes>
+    <releaseNotes>https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0</releaseNotes>
     <tags>idleharbor mouse-jiggler keep-awake windows sleep power-management productivity</tags>
   </metadata>
   <files>

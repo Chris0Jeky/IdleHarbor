@@ -17,9 +17,9 @@ Before publication, install and uninstall the generated package in a suitable is
 test environment, then push with the owner's Chocolatey API key:
 
 ```powershell
-choco install idleharbor --source .\out\chocolatey --version 0.1.0 --yes
+choco install idleharbor --source .\out\chocolatey --version 0.2.0 --yes
 choco uninstall idleharbor --yes
-choco push .\out\chocolatey\idleharbor.0.1.0.nupkg --source https://push.chocolatey.org/
+choco push .\out\chocolatey\idleharbor.0.2.0.nupkg --source https://push.chocolatey.org/
 ```
 
 The release URL, SHA-256, licence text, and verification instructions are included in the package.
