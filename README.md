@@ -288,9 +288,8 @@ decisions.
 ### Is IdleHarbor code-signed?
 
 No. `v0.2.0`, like `v0.1.0`, is intentionally unsigned because no signing identity has been
-provided. Checksums,
-an SPDX SBOM, and GitHub provenance attestations provide release evidence, but they do not remove
-Windows' unsigned-publisher warning. Signing can be added in a later release.
+provided. Checksums, an SPDX SBOM, and GitHub provenance attestations provide release evidence, but
+they do not remove Windows' unsigned-publisher warning. Signing can be added in a later release.
 
 ### Which license does IdleHarbor use?
 

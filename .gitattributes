@@ -1,0 +1,5 @@
+# The tracked WinGet manifests exist to reproduce a submission exactly, so they
+# must keep the bytes that were submitted rather than this machine's line
+# endings. Everything else, this directory's own README included, follows the
+# repository's normal CRLF checkout.
+packaging/winget/*/*.yaml -text

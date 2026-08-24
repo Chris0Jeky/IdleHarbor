@@ -88,10 +88,24 @@ $verification = Get-Content -Raw -LiteralPath $verificationPath
 Assert-True ($verification.Contains($expectedUrl)) 'Chocolatey verification file does not name the release asset.'
 Assert-True ($verification.Contains($pinnedSha256)) `
     'Chocolatey verification file does not repeat the installer SHA-256.'
-$foreignDigests = @([regex]::Matches($verification, '[0-9a-f]{64}') |
-    Where-Object { $_.Value -cne $pinnedSha256 } | ForEach-Object { $_.Value })
+# Get-FileHash and SHA256SUMS.txt both emit uppercase, so a digest pasted from
+# either is exactly the stale value worth catching; match case-insensitively.
+$foreignDigests = @([regex]::Matches($verification, '(?i)[0-9a-f]{64}') |
+    Where-Object { $_.Value -ine $pinnedSha256 } | ForEach-Object { $_.Value })
 Assert-True ($foreignDigests.Count -eq 0) `
     "Chocolatey verification file names a SHA-256 that is not the installer checksum: $($foreignDigests -join ', ')"
+
+# The digest is not the only thing that goes stale here. VERIFICATION.txt also
+# names the release page, the archive, and the folder inside it, and a moderator
+# reads all of them.
+$foreignArchives = @([regex]::Matches($verification, 'IdleHarbor-\d+\.\d+\.\d+-windows') |
+    Where-Object { $_.Value -cne "IdleHarbor-$version-windows" } | ForEach-Object { $_.Value })
+Assert-True ($foreignArchives.Count -eq 0) `
+    "Chocolatey verification file names an archive from another release: $($foreignArchives -join ', ')"
+$foreignTags = @([regex]::Matches($verification, 'v\d+\.\d+\.\d+') |
+    Where-Object { $_.Value -cne "v$version" } | ForEach-Object { $_.Value })
+Assert-True ($foreignTags.Count -eq 0) `
+    "Chocolatey verification file names another release tag: $($foreignTags -join ', ')"
 Assert-True ($verification -match 'NotSigned') 'Chocolatey verification file must disclose the unsigned executable.'
 
 if ($VerifyPublishedChecksum) {
