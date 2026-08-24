@@ -14,7 +14,10 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
 
-# Screenshots and the social card are content-addressed by release, not by URL,
-# so they may be cached far longer than the page that embeds them.
+# The images sit at stable URLs and are overwritten when the screenshots are
+# recaptured, so this trades up to a day of staleness in an already-warm browser
+# cache for not refetching half a megabyte on every visit. They change about
+# once a release, and a day-old screenshot misleads nobody. The page itself is
+# deliberately left on the default revalidate-every-time.
 /assets/*
   Cache-Control: public, max-age=86400
