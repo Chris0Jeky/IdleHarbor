@@ -1,0 +1,19 @@
+{
+  // Deploys docs/ as a static mirror of the project site on Cloudflare Workers.
+  // There is no JavaScript entrypoint: "assets" with no "main" serves the
+  // directory directly, and docs/_headers and docs/_redirects are applied by the
+  // edge rather than by code we would have to maintain and review.
+  //
+  // The canonical site stays GitHub Pages. Every page here carries
+  // <link rel="canonical"> pointing at it, so this host consolidates into the
+  // canonical URL instead of competing with it. See packaging/cloudflare/README.md.
+  "name": "idleharbor",
+  "compatibility_date": "2026-08-24",
+  "assets": {
+    "directory": "../../docs",
+    "html_handling": "auto-trailing-slash"
+  },
+  "observability": {
+    "enabled": false
+  }
+}

@@ -16,9 +16,18 @@ verification.
   or sign in to the owner account at `community.chocolatey.org`, obtain an API key, and supply it
   only through a private local environment or credential command. Never add the key to this
   repository, an issue, a pull request, or chat-visible command output.
-- [ ] **q-4 - Search Console sitemap submission.** `docs/sitemap.xml` is published at
+- [ ] **q-4 - Google Search Console sitemap submission.** `docs/sitemap.xml` is published at
   <https://chris0jeky.github.io/IdleHarbor/sitemap.xml>, but a project Pages site cannot serve an
   origin-root `robots.txt` -- crawlers only fetch `https://chris0jeky.github.io/robots.txt`, which
-  GitHub controls -- so nothing points a crawler at it. Verify ownership of the Pages site in Google
-  Search Console and submit the sitemap URL there. This needs the owner's Google account and cannot
-  be done from the repository.
+  GitHub controls -- so nothing on the Pages host points a crawler at it.
+
+  Bing, Yandex, Seznam, and Naver no longer need this: `packaging/Submit-IndexNow.ps1` announces the
+  canonical URL to all four over IndexNow, proving control with the key file committed under `docs/`.
+  Running it is step 6 of the release checklist in `packaging/README.md`, and it needs no account of
+  yours. Google does not implement IndexNow, so it is the only engine this item still covers.
+
+  Verify ownership of <https://chris0jeky.github.io/IdleHarbor/> in Google Search Console (the URL
+  prefix property, not the domain property -- a domain property needs DNS records for `github.io`,
+  which the owner does not control) and submit the sitemap URL there. The HTML-file verification
+  method works: drop the file Google gives you into `docs/` and merge. This needs the owner's Google
+  account and cannot be started from the repository.

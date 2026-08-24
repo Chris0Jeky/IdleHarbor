@@ -6,6 +6,14 @@ where practical.
 
 ## [Unreleased]
 
+### Distribution
+
+- The project site is now mirrored on Cloudflare Workers at
+  <https://idleharbor.commit-atlas.workers.dev>, which adds a `/download` route that always resolves
+  to the current release. <https://chris0jeky.github.io/IdleHarbor/> remains the canonical site and
+  is unchanged; the mirror exists so the site can serve a root `robots.txt` and response headers,
+  which a GitHub Pages subdirectory cannot.
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

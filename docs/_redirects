@@ -1,0 +1,4 @@
+# Cloudflare Workers mirror only; GitHub Pages ignores this file.
+# /download is the one path a visitor is likely to guess; send it to whichever
+# release is current rather than pinning a version that will go stale.
+/download  https://github.com/Chris0Jeky/IdleHarbor/releases/latest  302
