@@ -163,11 +163,32 @@ Neither JSON-LD block is expected to produce a Google rich result: `SoftwareAppl
 sites since 2023. They are there so the page describes itself unambiguously to anything that reads
 structured data, not for a search decoration.
 
-Its five version references are part of the release checklist, because the site is published by
-merging rather than by a workflow.
+The page's five version references are part of the release checklist, because the site is published
+by merging rather than by a workflow.
+
+The published site was rendered and inspected at 1280, 600, 390, and 360 CSS pixels. Nothing
+overflows horizontally at any of them -- `scrollWidth` equals `clientWidth` throughout, and the only
+element wider than the viewport is the shell command inside its own `overflow-x: auto` block. It
+carries no `@media` query at all: the layout is intrinsic, from `flex-wrap`,
+`repeat(auto-fit, minmax(...))`, and `clamp()`, so it reflows at the points those rules imply rather
+than at declared breakpoints. Below roughly 570 pixels the nav drops under the wordmark, the two
+action buttons stack, and both card grids become single-column; above it the nav sits inline and the
+grids widen to two and then three columns. The page itself, the sitemap, and all six referenced
+images return 200 with the expected content types.
+
+Test a narrow viewport with an iframe of the target width, never with `--window-size`. Headless
+Chromium does not give you the width you ask for, in two separate ways: every request comes back
+about 34 CSS pixels short, and there is a floor -- Edge reports 518 and Chrome 526 no matter how much
+smaller you ask for. It then crops the screenshot to the width you requested, so the image is the
+left slice of a wider layout, and every element appears cut at the same edge. That is
+indistinguishable from a genuine horizontal-overflow bug, and it is not one. The shortfall matters
+as much as the floor: `--window-size=600` renders at 566, which is on the other side of this page's
+single-column reflow point.
 
 The repository description and topics were rewritten for the terms people actually search, and the
-README and user guide link to the site.
+README and user guide link to the site. The description quotes the measured x64 executable size, so
+it changes with the binary; it is a GitHub setting rather than a tracked file, so nothing in the
+repository enforces that.
 
 ## Distribution status
 
