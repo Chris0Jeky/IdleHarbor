@@ -13,12 +13,13 @@
 
 <p align="center">
   <img src="docs/assets/idleharbor-window.png"
-       alt="IdleHarbor stopped settings window with its status card and fixed Start, Stop, and Save actions at 200 percent Windows display scaling"
+       alt="IdleHarbor stopped settings window showing the profile, motion, and keep-awake fields with a printed explanation under each, its status card, and fixed Start, Stop, and Save actions at 200 percent Windows display scaling"
        width="594">
 </p>
 
-This is a real capture of the public `v0.1.0` x64 release at 200% Windows display scaling, not a
-mock-up.
+This is a real capture of the public `v0.2.0` x64 release at 200% Windows display scaling, not a
+mock-up. Each field carries its own printed explanation, and every control describes itself in more
+detail on hover.
 
 | Running | Intelligently paused |
 | --- | --- |
