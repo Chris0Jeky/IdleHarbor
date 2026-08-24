@@ -34,12 +34,26 @@ active path and emitted no pointer input.
 | Maximum thread count | 4 (4-4) | 4 (4-4) |
 
 `0.2.0` adds a tooltip control and eight static explanations to the settings window, so it was
-expected to cost slightly more than `0.1.0`. It measures slightly *less* on every memory and handle
-figure -- stopped working set 13.710 MiB against `0.1.0`'s 14.381 MiB, and 158 handles against 163.
-This is not a controlled comparison: `0.1.0` was measured from a local Visual Studio 2019 build and
-`0.2.0` from the released Visual Studio 2022 build, and machine conditions differ between 2026-08-20
-and 2026-08-24. Read it as "the settings-window work did not make IdleHarbor measurably heavier",
-not as a like-for-like improvement.
+expected to cost more than `0.1.0`. The figures move in both directions against that baseline:
+
+| Metric | `0.1.0` | `0.2.0` | Direction |
+| --- | ---: | ---: | --- |
+| Stopped working set | 14.381 MiB | 13.710 MiB | down 0.671 MiB |
+| Active working set | 15.850 MiB | 15.147 MiB | down 0.703 MiB |
+| Stopped private bytes | 1.986 MiB | 2.109 MiB | **up 0.123 MiB** |
+| Active private bytes | 2.115 MiB | 2.170 MiB | **up 0.055 MiB** |
+| Stopped handles | 163 | 158 | down 5 |
+| Active handles | 177 | 172 | down 5 |
+| Maximum threads (active) | 5 | 4 | down 1 |
+
+Private bytes rose, by about 0.12 MiB stopped. Working set and handle count fell. CPU was
+effectively zero in both releases, so it distinguishes nothing.
+
+None of this is a controlled comparison: `0.1.0` was measured from a local Visual Studio 2019 build
+and `0.2.0` from the released Visual Studio 2022 build, four days apart, on a machine whose
+conditions were not held constant. The only conclusion the data supports is that the settings-window
+work did not change IdleHarbor's footprint by an amount this method can distinguish from build and
+machine variation.
 
 The binary imports only Windows system libraries (`SHELL32`, `WTSAPI32`, `ole32`, `USER32`,
 `KERNEL32`, and `GDI32`); it has no .NET, Qt, Electron, or separately installed Visual C++ runtime

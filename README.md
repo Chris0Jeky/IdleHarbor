@@ -88,10 +88,10 @@ Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and provin
   the release workflow rather than marketing claims.
 
 The published `v0.2.0` x64 executable is 544,256 bytes (531.5 KiB) with SHA-256
-`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`. Measured over three 60-second
-windows it holds a 13.7 MiB working set stopped and 15.1 MiB while running a keep-awake session, at
-effectively zero CPU. That baseline, the exact method, and its limitations are recorded in
-[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`. Across three repetitions of a
+60-second stopped window and a 60-second active window, it held a 13.7 MiB working set stopped and
+15.1 MiB while running a keep-awake session, at effectively zero CPU. That baseline, the exact
+method, and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Build and test from source
 

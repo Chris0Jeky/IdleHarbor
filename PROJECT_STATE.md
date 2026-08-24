@@ -209,8 +209,8 @@ queue remains:
 3. Run the Chocolatey install/uninstall test in a suitable environment and publish with the owner's
    Chocolatey API key.
 4. Revisit Scoop Extras only after its popularity/repute criterion can be met honestly.
-5. Recapture `docs/assets` at the next release: every screenshot predates the settings-window label
-   renames and the printed explanations.
+5. Recapture `docs/assets` at the next release, from that release's executable. The current captures
+   are `v0.2.0`'s.
 6. Continue the small tracked runtime/capture follow-ups without expanding the released safety boundary.
 
 ## Proving commands
