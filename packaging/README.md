@@ -136,6 +136,17 @@ release workflow has published the archive.
    `downloadUrl`, and `installUrl`, the download button's label, and the `gh attestation verify`
    example. The project site is served from `docs/`, so it is published by merging, not by a
    workflow.
+6. Redeploy the Cloudflare mirror, which is not published by merging and would otherwise keep
+   serving the previous page, and tell IndexNow the canonical page changed:
+
+   ```powershell
+   npx --yes wrangler@4 deploy --config cloudflare/wrangler.jsonc
+   .\Test-CloudflareSite.ps1 -Live
+   .\Submit-IndexNow.ps1
+   ```
+
+   `Submit-IndexNow.ps1` refuses to submit until the key file is actually reachable on the
+   canonical site, so run it after GitHub Pages has rebuilt rather than immediately after merging.
 
 Between steps 2 and 3 the Chocolatey package deliberately still names the previous release.
 `Test-ChocolateyPackage.ps1` allows that and refuses the reverse — a package version ahead of the

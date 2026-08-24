@@ -152,11 +152,18 @@ self-contained page -- no external stylesheet, script, or font -- carrying a can
 Graph and Twitter card metadata, and JSON-LD `SoftwareApplication` and `FAQPage` blocks whose eight
 questions match the eight in the visible FAQ.
 
-`docs/sitemap.xml` is present but a project Pages site cannot serve an origin-root `robots.txt`:
-crawlers only fetch `https://chris0jeky.github.io/robots.txt`, which GitHub controls. A committed
-`docs/robots.txt` would be published at `/IdleHarbor/robots.txt` and never requested, so it is not
-there. The sitemap therefore has to be submitted through Search Console to be discovered
-(`HUMAN_TODO.md` q-4).
+A project Pages site cannot serve an origin-root `robots.txt`: crawlers only fetch
+`https://chris0jeky.github.io/robots.txt`, which GitHub controls, so a committed `docs/robots.txt`
+is published at `/IdleHarbor/robots.txt` and never requested. That is why the same `docs/` directory
+is also deployed to Cloudflare Workers as a mirror, described below, where it does sit at a host
+root.
+
+`docs/sitemap.xml` still has to be announced rather than discovered. Two of the three routes are now
+done from the repository: `packaging/Submit-IndexNow.ps1` announces the canonical URL to Bing,
+Yandex, Seznam, and Naver over IndexNow, proving control with the key file in `docs/`, which GitHub
+Pages publishes under `/IdleHarbor/`. IndexNow scopes a key to its own directory, and every URL this
+project has lives beneath that one, so hosting the key off the site root costs nothing. Google does
+not implement IndexNow, so a Search Console submission stays owner-only (`HUMAN_TODO.md` q-4).
 
 Neither JSON-LD block is expected to produce a Google rich result: `SoftwareApplication` needs an
 `aggregateRating` or `review`, and `FAQPage` rich results have been limited to government and health
@@ -165,6 +172,32 @@ structured data, not for a search decoration.
 
 The page's five version references are part of the release checklist, because the site is published
 by merging rather than by a workflow.
+
+### Cloudflare Workers mirror
+
+`docs/` is deployed a second time to <https://idleharbor.commit-atlas.workers.dev> from
+`packaging/cloudflare/wrangler.jsonc`. It is static assets only -- no `main` entrypoint, so there is
+no Worker code to maintain -- and `docs/_headers` and `docs/_redirects` are applied by the edge.
+The account has no custom domain and its Workers subdomain is `commit-atlas`, which is another of
+the owner's projects; that is why the mirror URL carries an unrelated name.
+
+**GitHub Pages stays canonical.** The mirror serves `docs/index.html` byte for byte, canonical link
+included, so a crawler reaching the mirror folds it into the Pages URL instead of indexing a second
+copy. `packaging/Test-CloudflareSite.ps1` fails if the canonical, the sitemap, or any absolute URL
+in the page ever names the mirror host, because at that moment the two hosts become duplicates.
+Its `-Live` switch additionally compares the served bytes against the working tree.
+
+What the mirror buys, none of which a Pages subdirectory can do: a real root `robots.txt`, response
+headers (a content security policy the page satisfies with no external resources at all, `nosniff`,
+framing and referrer controls, a longer cache lifetime for `/assets/*`), and a `/download` redirect
+to the current release. `_headers` and `_redirects` are consumed by the edge and return 404 rather
+than being served. All three, plus the IndexNow key, are pinned to LF in `.gitattributes`: this
+repository checks out CRLF, and Cloudflare splits those files on newlines, so a CR would land inside
+the last value on every line.
+
+No workflow holds a Cloudflare credential, so the mirror is redeployed by hand and can lag `main`.
+That is tolerable only because it is not canonical -- a stale mirror never outranks Pages, and its
+canonical tag still names the current site.
 
 The published site was rendered and inspected at 1280, 600, 390, and 360 CSS pixels. Nothing
 overflows horizontally at any of them -- `scrollWidth` equals `clientWidth` throughout, and the only
@@ -212,6 +245,12 @@ repository enforces that.
   `chocolateyUninstall.ps1` is not run for. Community publication still needs an owner Chocolatey
   account/API key (`HUMAN_TODO.md` q-3) and an isolated install/upgrade/uninstall test
   ([#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51)).
+- **Cloudflare Workers:** `docs/` is mirrored at <https://idleharbor.commit-atlas.workers.dev> from
+  `packaging/cloudflare/wrangler.jsonc`, static assets only. GitHub Pages remains canonical and the
+  mirror declares it. Deployed by hand -- no workflow holds a Cloudflare credential -- and guarded by
+  `packaging/Test-CloudflareSite.ps1`.
+- **GitHub Marketplace:** not possible. It lists only GitHub Actions and GitHub Apps, and a
+  standalone Windows desktop application fits neither category. There is no listing to pursue.
 - **Scoop Extras:** no request was submitted. Its current required request criteria ask for
   popularity evidence (for example, 100 stars or 50 forks), which this new project cannot truthfully
   claim yet.
@@ -255,6 +294,9 @@ queue remains:
   later release.
 - q-3: open for the owner-only Chocolatey account/API key needed to submit the prepared package;
   the credential must remain outside the repository and public logs.
+- q-4: open for Google Search Console verification and sitemap submission, which needs the owner's
+  Google account. Its scope narrowed: IndexNow now announces the canonical URL to Bing, Yandex,
+  Seznam, and Naver from the repository, so Google is the only engine it still covers.
 
 ## Resume order
 
@@ -289,6 +331,7 @@ ctest --test-dir build/x64 -C Release --output-on-failure
 .\packaging\Test-Packaging.ps1
 .\packaging\Test-ReleaseVersion.ps1 -Tag v0.2.0
 .\packaging\Test-ChocolateyPackage.ps1 -VerifyPublishedChecksum
+.\packaging\Test-CloudflareSite.ps1 -Live
 choco pack .\packaging\chocolatey\idleharbor.nuspec --output-directory .\out\chocolatey
 winget validate --manifest .\packaging\winget\0.2.0
 ```
@@ -296,7 +339,8 @@ winget validate --manifest .\packaging\winget\0.2.0
 Run packaging and release-workflow checks sequentially. PowerShell 7 is no longer installed on this
 machine, so locally they run under Windows PowerShell 5.1 only. CI runs `Test-Packaging.ps1` under
 `pwsh`, and that script invokes `Test-ReleaseWorkflow.ps1`, `Test-ReleaseVersion.ps1`,
-`Test-ChocolateyPackage.ps1`, `Test-ReleaseLicense.ps1`, and the three `New-*` scripts in-process,
+`Test-ChocolateyPackage.ps1`, `Test-CloudflareSite.ps1`, `Test-ReleaseLicense.ps1`, and the three
+`New-*` scripts in-process,
 so all of them get PowerShell 7 coverage there. The two native desktop tests and the capture tool
 need a real desktop, are in no workflow, and therefore have no PowerShell 7 coverage at all.
 
