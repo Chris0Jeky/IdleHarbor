@@ -1,5 +1,7 @@
 # User guide
 
+Project site: <https://chris0jeky.github.io/IdleHarbor/>
+
 IdleHarbor is a visible, user-controlled Windows utility. Download its architecture-matched archive
 from the canonical [`v0.2.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0)
 and check the published checksum, SPDX SBOM, and GitHub provenance before running it.

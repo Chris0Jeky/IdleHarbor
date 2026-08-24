@@ -7,6 +7,9 @@
 [![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
+**[Project site &rarr;](https://chris0jeky.github.io/IdleHarbor/)** &middot;
+**[Download v0.2.0 &rarr;](https://github.com/Chris0Jeky/IdleHarbor/releases/latest)**
+
 ![IdleHarbor social preview](docs/assets/idleharbor-social.png)
 
 ## Genuine UI

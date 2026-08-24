@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IdleHarbor — Free Open-Source Windows Mouse Jiggler &amp; Keep-Awake Utility</title>
+<meta name="description" content="A free, open-source Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, and safeguards that pause it for you. Native, portable, no telemetry.">
+<link rel="canonical" href="https://chris0jeky.github.io/IdleHarbor/">
+<meta name="theme-color" content="#0b1220">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="IdleHarbor">
+<meta property="og:title" content="IdleHarbor — Free Open-Source Windows Mouse Jiggler &amp; Keep-Awake Utility">
+<meta property="og:description" content="A small, visible, native Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, smart pause safeguards, portable use, no telemetry.">
+<meta property="og:url" content="https://chris0jeky.github.io/IdleHarbor/">
+<meta property="og:image" content="https://chris0jeky.github.io/IdleHarbor/assets/idleharbor-social.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="IdleHarbor wordmark on a dark navy background">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="IdleHarbor — Windows mouse jiggler and keep-awake utility">
+<meta name="twitter:description" content="Native, visible, open-source. Bounded motion modes, Windows power requests, and safeguards that pause the session for you.">
+<meta name="twitter:image" content="https://chris0jeky.github.io/IdleHarbor/assets/idleharbor-social.png">
+
+<link rel="icon" href="assets/idleharbor-mark.svg" type="image/svg+xml">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "IdleHarbor",
+      "url": "https://chris0jeky.github.io/IdleHarbor/",
+      "applicationCategory": "UtilitiesApplication",
+      "applicationSubCategory": "Mouse jiggler and keep-awake utility",
+      "operatingSystem": "Windows 10, Windows 11",
+      "processorRequirements": "x64 or ARM64",
+      "softwareVersion": "0.2.0",
+      "downloadUrl": "https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0",
+      "installUrl": "https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0",
+      "license": "https://spdx.org/licenses/GPL-3.0-only.html",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Cristian Tcaci" },
+      "description": "A native C++20/Win32 Windows mouse jiggler and keep-awake utility with bounded motion modes, Windows power requests, activity and battery safeguards, a notification-area menu, and an emergency stop. No telemetry, no network service, no managed runtime.",
+      "featureList": [
+        "Bounded motion modes: Off, Normal, Zen, Circle, Linear",
+        "Windows power requests for system or display",
+        "Pauses on genuine input, lock, disconnect, battery, and full-screen apps",
+        "Active hours and maximum session duration",
+        "Portable use with no installation required",
+        "Emergency stop hotkey"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is IdleHarbor free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. IdleHarbor is free software under the GNU General Public License version 3 only. The complete source and the release archives are public." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does IdleHarbor need .NET, Electron, or another runtime?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. It is a native C++20/Win32 program built against Windows system libraries, so no separately installed application runtime is required." }
+        },
+        {
+          "@type": "Question",
+          "name": "Will IdleHarbor stop Windows from sleeping?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The System and Display power modes ask Windows to keep that power state available while a session runs. Whether the request is honoured can depend on Windows policy, hardware, lock state, battery settings, or a managed-device policy, so it should not be treated as a universal guarantee." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does IdleHarbor move the mouse pointer?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Only if you choose a visible motion mode. Normal, Circle, and Linear draw a bounded path and return the pointer to where it was. Zen emits virtual input intended not to move the visible pointer. Off emits no motion at all." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is IdleHarbor undetectable?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No, and it does not try to be. Simulated input can be detected, blocked, logged, or ignored. IdleHarbor provides no concealment, no process hiding, and no monitoring bypass, and it must not be used to misrepresent presence or evade a device policy." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I stop IdleHarbor immediately?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Use the visible Stop button, the notification-area menu, or the emergency hotkey Ctrl+Alt+Shift+F12 if you have enabled it. The session also pauses by itself for any safeguard you have turned on." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does IdleHarbor collect any data?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. There is no telemetry and no network service. Settings are stored in a local INI file, beside the executable in portable mode or in the user's local application-data directory otherwise." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is IdleHarbor safe to use on a work laptop?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Only if the device, the account, and the workplace rules allow it. Read the safety notes and obtain any required approval first. Installing it and configuring automatic startup may be separate policy decisions." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #0b1220;
+  --panel: #111c2e;
+  --panel-2: #16233a;
+  --line: #22334d;
+  --text: #eef4fb;
+  --muted: #9fb3c8;
+  --teal: #2dd4bf;
+  --sky: #38bdf8;
+  --warn-bg: #2a1f14;
+  --warn-line: #6b4b23;
+  --warn-text: #f0d5ac;
+  --max: 1080px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--sky); }
+a:hover { color: var(--teal); }
+img { max-width: 100%; height: auto; display: block; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+
+header.site {
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 18, 32, 0.9);
+  position: sticky; top: 0; z-index: 10;
+  backdrop-filter: blur(8px);
+}
+header.site .wrap { display: flex; align-items: center; gap: 16px; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; }
+header.site img { width: 190px; }
+header.site nav { margin-left: auto; display: flex; gap: 18px; flex-wrap: wrap; }
+header.site nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+header.site nav a:hover { color: var(--text); }
+
+.hero { padding: 64px 0 40px; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.5px; }
+.hero .lede { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 62ch; margin: 0 0 28px; }
+.cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.btn {
+  display: inline-block; padding: 13px 22px; border-radius: 10px; text-decoration: none;
+  font-weight: 600; border: 1px solid transparent;
+}
+.btn-primary { background: linear-gradient(135deg, var(--teal), var(--sky)); color: #06121f; }
+.btn-primary:hover { color: #06121f; filter: brightness(1.08); }
+.btn-ghost { border-color: var(--line); color: var(--text); background: var(--panel); }
+.btn-ghost:hover { color: var(--text); border-color: var(--teal); }
+.cta small { color: var(--muted); display: block; width: 100%; margin-top: 4px; }
+
+.badges { display: flex; gap: 10px; flex-wrap: wrap; margin: 26px 0 0; padding: 0; list-style: none; }
+.badges li {
+  font-size: 13px; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; background: var(--panel);
+}
+
+section { padding: 44px 0; border-top: 1px solid var(--line); scroll-margin-top: 76px; }
+section h2 { font-size: clamp(22px, 3vw, 28px); margin: 0 0 10px; letter-spacing: -0.3px; }
+section > .wrap > p { color: var(--muted); max-width: 70ch; }
+
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 26px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.card h3 { margin: 0 0 8px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+figure { margin: 26px 0 0; }
+figure img { border: 1px solid var(--line); border-radius: 12px; }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 10px; }
+.shots { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 15px; }
+.scroll-x { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--text); font-weight: 600; }
+td { color: var(--muted); }
+code {
+  font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 0.92em;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px;
+}
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+pre code { background: none; border: none; padding: 0; }
+
+.notice {
+  margin-top: 26px; background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-radius: 12px; padding: 18px 20px; color: var(--warn-text);
+}
+.notice h3 { margin: 0 0 8px; font-size: 17px; color: var(--warn-text); }
+.notice p { margin: 0 0 10px; font-size: 15px; }
+.notice p:last-child { margin-bottom: 0; }
+.notice a { color: #f6c177; }
+
+details {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  padding: 14px 18px; margin-top: 12px;
+}
+details summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); margin: 10px 0 0; }
+
+footer.site { border-top: 1px solid var(--line); padding: 32px 0 56px; color: var(--muted); font-size: 15px; }
+footer.site a { color: var(--muted); }
+footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 16px; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a href="#top" aria-label="IdleHarbor home"><img src="assets/idleharbor-mark.svg" alt="IdleHarbor" width="190" height="55"></a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#download">Download</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/Chris0Jeky/IdleHarbor">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<div class="hero">
+  <div class="wrap">
+    <h1>A Windows mouse jiggler that doesn't hide from you</h1>
+    <p class="lede">
+      IdleHarbor is a free, open-source keep-awake utility for Windows. It can send bounded mouse
+      movement, ask Windows to stay awake, or both &mdash; and out of the box it pauses itself when
+      you start typing, when you lock the PC, or when the battery drops below 20%. Pausing on
+      battery power at all, or for a full-screen app, is there too and switched off by default.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#download">Download v0.2.0</a>
+      <a class="btn btn-ghost" href="https://github.com/Chris0Jeky/IdleHarbor">View source on GitHub</a>
+      <small>Free and open source under GPL-3.0-only. Windows 10 and 11, x64 and ARM64.</small>
+    </div>
+    <ul class="badges">
+      <li>Native C++20 &amp; Win32</li>
+      <li>No .NET, Electron, or installer required</li>
+      <li>No telemetry, no network service</li>
+      <li>Around 530&nbsp;KB</li>
+      <li>Portable</li>
+    </ul>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it actually does</h2>
+    <p>
+      Two independent mechanisms, either or both of which you can turn on. <strong>Motion</strong>
+      sends a small, bounded input pulse for applications that watch for activity. <strong>Keep
+      awake</strong> asks Windows itself to keep the system or the display available, which needs no
+      simulated input at all. Neither one is hidden: a notification-area icon always shows whether a
+      session is running, paused, or stopped, and why, with a window you can open from it. Start it
+      minimised and the icon is what you get; if the icon cannot be created, the window is forced
+      visible instead, so the state is never unreachable.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <h3>Bounded motion</h3>
+        <p>Off, Normal, Zen, Circle, and Linear. Visible paths stay inside a small area around a safe anchor and return the pointer to exactly where it was.</p>
+      </div>
+      <div class="card">
+        <h3>Windows power requests</h3>
+        <p>Ask Windows to keep the system awake, or the system and display both, for as long as the session runs. The request is cleared on pause, stop, and shutdown.</p>
+      </div>
+      <div class="card">
+        <h3>Safeguards that pause for you</h3>
+        <p>Real typing or mouse movement, a locked workstation, a disconnected session, and low battery are on by default and pause the session. Running on battery at all, a full-screen app, and active hours are available and start switched off. A maximum session length ends it outright rather than pausing, and is also off by default.</p>
+      </div>
+      <div class="card">
+        <h3>Named profiles</h3>
+        <p>Balanced, Long task, Presentation, Compatibility, Visible, Battery saver, and Custom. Each is a starting point you can edit before saving.</p>
+      </div>
+      <div class="card">
+        <h3>Portable or installed</h3>
+        <p>Unzip and run, or use the per-user installer. Automatic startup is always an explicit, separate choice, never enabled for you.</p>
+      </div>
+      <div class="card">
+        <h3>An immediate stop path</h3>
+        <p>A Stop button, a tray menu, and an optional emergency hotkey &mdash; <code>Ctrl+Alt+Shift+F12</code> &mdash; that ends the session from anywhere.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p>
+      Real captures of the published release at 200% Windows display scaling, not mock-ups. Every
+      field carries a short printed explanation, and every control describes itself in more detail
+      when you hover it.
+    </p>
+    <figure>
+      <img src="assets/idleharbor-window.png" alt="The IdleHarbor settings window, stopped, showing the profile, motion, and keep-awake fields with a printed explanation under each, a status card, and fixed Start, Stop, and Save buttons" width="1178" height="778" loading="lazy">
+      <figcaption>The settings window while stopped. The status card and the Start, Stop, and Save actions stay in place while the settings scroll.</figcaption>
+    </figure>
+    <div class="shots">
+      <figure>
+        <img src="assets/idleharbor-running.png" alt="IdleHarbor running a motion-free keep-awake session, with the status card reading Running" width="1178" height="778" loading="lazy">
+        <figcaption>Running a keep-awake session with motion off.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/idleharbor-paused.png" alt="IdleHarbor paused because the current time falls outside the configured active hours" width="1178" height="778" loading="lazy">
+        <figcaption>Paused by a safeguard, with the reason shown.</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <img src="assets/idleharbor-tray-menu.png" alt="The IdleHarbor notification-area menu listing Show, Stop, and Exit" width="219" height="151" loading="lazy">
+      <figcaption>The notification-area menu.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="modes">
+  <div class="wrap">
+    <h2>Motion modes</h2>
+    <p>Motion is independent of the keep-awake request. You can use one, both, or neither &mdash; except turning both off, which IdleHarbor refuses, because nothing would be keeping the machine awake.</p>
+    <div class="scroll-x">
+      <table>
+        <thead><tr><th scope="col">Mode</th><th scope="col">What it emits</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Off</strong></td><td>Nothing. Pair it with a keep-awake request when you do not want any simulated input.</td></tr>
+          <tr><td><strong>Normal</strong></td><td>A small visible diagonal path, scaled by the motion size.</td></tr>
+          <tr><td><strong>Zen</strong></td><td>Virtual mouse input intended not to move the visible pointer.</td></tr>
+          <tr><td><strong>Circle</strong></td><td>A bounded circular path &mdash; the most visible of the modes.</td></tr>
+          <tr><td><strong>Linear</strong></td><td>A horizontal back-and-forth path.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p>
+      The GitHub release page is the only supported download. Take the archive that matches your PC
+      &mdash; <strong>x64</strong> for most Windows PCs, <strong>ARM64</strong> for Windows on Arm
+      &mdash; then verify it against the published <code>SHA256SUMS.txt</code> before running it.
+    </p>
+    <div class="cta" style="margin-top:22px">
+      <a class="btn btn-primary" href="https://github.com/Chris0Jeky/IdleHarbor/releases/latest">Latest release on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/USER_GUIDE.md">Read the user guide</a>
+    </div>
+    <p style="margin-top:22px">
+      Every release publishes SHA-256 checksums, an SPDX 2.3 SBOM for each executable, and GitHub
+      build provenance attestations. Releases are <strong>not</strong> Authenticode-signed, so
+      Windows will report no publisher &mdash; check the hash and the attestation instead:
+    </p>
+    <pre><code># Hash the ZIP before extracting it: SHA256SUMS.txt lists the archives, not the executable.
+Get-FileHash .\IdleHarbor-0.2.0-windows-x64-portable.zip -Algorithm SHA256
+gh attestation verify .\IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0Jeky/IdleHarbor</code></pre>
+    <p>
+      Package managers: a WinGet submission is waiting on upstream moderation, and a reviewed
+      Chocolatey package source is in the repository but not yet published. Until one of those is
+      accepted, use the GitHub release page.
+    </p>
+  </div>
+</section>
+
+<section id="safety">
+  <div class="wrap">
+    <h2>What IdleHarbor will not do</h2>
+    <div class="notice">
+      <h3>Read this before using it on a work machine</h3>
+      <p>
+        IdleHarbor is not an employee-monitoring bypass, and it must not be used to misrepresent
+        presence or evade a device policy. Simulated input can be detected, blocked, logged, or
+        ignored by the applications you are trying to satisfy.
+      </p>
+      <p>
+        It contains no concealment, no process hiding, no misleading identity, no telemetry, no
+        network access, no elevation, and no persistence you did not explicitly configure. If your
+        device is managed, check the rules that apply to it &mdash; and to automatic startup, which
+        may be a separate decision &mdash; before installing anything.
+      </p>
+      <p><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/SAFETY.md">Full safety and acceptable-use notes</a></p>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Frequently asked questions</h2>
+
+    <details>
+      <summary>Is IdleHarbor free?</summary>
+      <p>Yes. It is free software under the GNU General Public License version 3 only (<code>GPL-3.0-only</code>). The complete source and the release archives are public, and the archives include the full licence text.</p>
+    </details>
+
+    <details>
+      <summary>Does it need .NET, Electron, or another runtime?</summary>
+      <p>No. IdleHarbor is a native C++20/Win32 program built against Windows system libraries. There is nothing else to install, and the published x64 executable is 544,256&nbsp;bytes. The ARM64 build differs in size; each release's SPDX SBOM records its own executable's identity.</p>
+    </details>
+
+    <details>
+      <summary>Will it stop Windows from sleeping?</summary>
+      <p>The <strong>System</strong> and <strong>Display</strong> keep-awake modes ask Windows to keep that power state available while a session runs. Whether the request is honoured can depend on Windows policy, hardware, lock state, battery settings, or a managed-device policy, so it is not a universal guarantee.</p>
+    </details>
+
+    <details>
+      <summary>Does it move my mouse pointer?</summary>
+      <p>Only if you choose a visible mode. <strong>Normal</strong>, <strong>Circle</strong>, and <strong>Linear</strong> draw a bounded path and return the pointer to where it was. <strong>Zen</strong> emits virtual input intended not to move the visible pointer. <strong>Off</strong> emits no motion at all.</p>
+    </details>
+
+    <details>
+      <summary>Is it undetectable?</summary>
+      <p>No, and it does not try to be. There is no concealment, no process hiding, and no monitoring bypass. Injected input is compatibility behaviour for legitimate idle prevention, never proof of presence and never a way around a security control.</p>
+    </details>
+
+    <details>
+      <summary>How do I stop it immediately?</summary>
+      <p>Use the <strong>Stop</strong> button, the notification-area menu, or the emergency hotkey <code>Ctrl+Alt+Shift+F12</code> if you have enabled it. The session also pauses or stops by itself for any safeguard you have turned on.</p>
+    </details>
+
+    <details>
+      <summary>Does it collect any data?</summary>
+      <p>No. There is no telemetry and no network service. Settings are stored in a local INI file &mdash; beside the executable in portable mode, or in your local application-data directory otherwise.</p>
+    </details>
+
+    <details>
+      <summary>Is it appropriate for a managed work laptop?</summary>
+      <p>Only if the device, the account, and your workplace rules allow it. Read the safety notes and obtain any approval you need first. Installing it and configuring automatic startup may be separate policy decisions.</p>
+    </details>
+  </div>
+</section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <ul>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor">Source</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/releases">Releases</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/USER_GUIDE.md">User guide</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/SAFETY.md">Safety</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/issues">Issues</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/LICENSE">Licence</a></li>
+    </ul>
+    <p>IdleHarbor is free software licensed GPL-3.0-only. It is not affiliated with or endorsed by Microsoft. Windows is a trademark of Microsoft Corporation.</p>
+  </div>
+</footer>
+
+</body>
+</html>
