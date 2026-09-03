@@ -117,7 +117,7 @@ release workflow has published the archive.
 
 1. Bump `CMakeLists.txt`, `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc`, and
    `resources/app.manifest`, date the `CHANGELOG.md` section, and update the version references in
-   the documentation -- but *not* the five in `docs/index.html`, which are step 5. That page is the
+   the documentation -- but *not* the six in `docs/index.html`, which are step 5. That page is the
    live site the moment this merges, and the release it would advertise does not exist until step 2.
    `Test-ReleaseVersion.ps1 -Tag vX.Y.Z` proves the four source files agree.
 2. Merge that, then push the annotated tag `vX.Y.Z`. `release.yml` builds x64 and ARM64, packages
@@ -132,10 +132,12 @@ release workflow has published the archive.
    ```
 
 4. Submit or update the WinGet manifests in [`winget`](winget) once the release page is live.
-5. Update the five version references in `docs/index.html` — the JSON-LD `softwareVersion`,
-   `downloadUrl`, and `installUrl`, the download button's label, and the `gh attestation verify`
-   example. The project site is served from `docs/`, so it is published by merging, not by a
-   workflow.
+5. Update the six version references in `docs/index.html` — the JSON-LD `softwareVersion`,
+   `downloadUrl`, and `installUrl`, the download button's label, and the archive filename in *both*
+   verification commands, `Get-FileHash` and `gh attestation verify`. Those two sit on adjacent
+   lines and must name the same archive; updating one alone publishes a verification block that
+   mixes the new release with the previous one. The project site is served from `docs/`, so it is
+   published by merging, not by a workflow.
 6. Redeploy the Cloudflare mirror, which is not published by merging and would otherwise keep
    serving the previous page, and tell IndexNow the canonical page changed:
 
