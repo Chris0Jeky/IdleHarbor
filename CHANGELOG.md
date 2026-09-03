@@ -8,6 +8,9 @@ where practical.
 
 ### Distribution
 
+- The project has a site at <https://chris0jeky.github.io/IdleHarbor/>, published from `docs/`. It
+  describes the motion modes, the safeguards, and the download and verification steps, and is linked
+  from the README and the user guide.
 - The project site is now mirrored on Cloudflare Workers at
   <https://idleharbor.commit-atlas.workers.dev>, which adds a `/download` route that always resolves
   to the current release. <https://chris0jeky.github.io/IdleHarbor/> remains the canonical site and
