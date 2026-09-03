@@ -242,7 +242,9 @@ repository enforces that.
   downloaded that archive and confirmed the pinned digest against it. `choco pack` produces
   `idleharbor.0.2.0.nupkg`; the generated package contains the complete GPL text and verification
   instructions, and `chocolateyBeforeModify.ps1` closes a running instance before an upgrade, which
-  `chocolateyUninstall.ps1` is not run for. Community publication still needs an owner Chocolatey
+  `chocolateyUninstall.ps1` is not run for. That hook only ever reaches an instance in its own
+  Windows session, so it refuses with a clear message when IdleHarbor is running in another session
+  and bounds its wait on `--exit` rather than blocking an unattended upgrade indefinitely. Community publication still needs an owner Chocolatey
   account/API key (`HUMAN_TODO.md` q-3) and an isolated install/upgrade/uninstall test
   ([#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51)).
 - **Cloudflare Workers:** `docs/` is mirrored at <https://idleharbor.commit-atlas.workers.dev> from

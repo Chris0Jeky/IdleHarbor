@@ -15,13 +15,40 @@ function Get-PackageOwnedProcess {
         Where-Object { $_.ExecutablePath -eq $executable })
 }
 
-if ((Get-PackageOwnedProcess).Count -eq 0) {
+$running = Get-PackageOwnedProcess
+if ($running.Count -eq 0) {
     return
 }
 
+# That CIM query sees every session on the machine, but --exit only reaches an
+# instance in this one: IdleHarbor guards itself with the session-local mutex
+# Local\IdleHarbor.Singleton.v1 and hands the command to a window on the caller's
+# own desktop. An unattended upgrade running as SYSTEM, or one started from a
+# second signed-in account, would launch a process that finds no instance and
+# stops on a modal "IdleHarbor is not currently running" dialog -- on session 0
+# there is not even a desktop to dismiss it from. Say so now instead of waiting.
+$session = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
+$foreign = @($running | Where-Object { [int]$_.SessionId -ne $session })
+if ($foreign.Count -gt 0) {
+    $sessions = ($foreign | ForEach-Object { [int]$_.SessionId } | Sort-Object -Unique) -join ', '
+    throw ("IdleHarbor from this Chocolatey package is running in Windows session $sessions, not in " +
+        "session $session where this is running, so it cannot be closed from here. Close IdleHarbor " +
+        'in that session and retry.')
+}
+
 # --exit is IdleHarbor's own visible shutdown command: it stops any session,
-# clears the power request, and removes the notification-area icon.
-Start-Process -FilePath $executable -ArgumentList '--exit' -Wait
+# clears the power request, and removes the notification-area icon. Wait for a
+# bounded time rather than indefinitely -- it also reports failures in a modal
+# dialog, and an unattended upgrade has nobody to close one.
+$exitProcess = Start-Process -FilePath $executable -ArgumentList '--exit' -PassThru
+if ($null -eq $exitProcess) {
+    throw 'The IdleHarbor exit command could not be started. Close IdleHarbor and retry.'
+}
+if (-not $exitProcess.WaitForExit(10000)) {
+    try { $exitProcess.Kill() } catch { }
+    throw 'The IdleHarbor exit command did not finish within 10 seconds. Close IdleHarbor and retry.'
+}
+
 $deadline = [DateTime]::UtcNow.AddSeconds(10)
 do {
     if ((Get-PackageOwnedProcess).Count -eq 0) {

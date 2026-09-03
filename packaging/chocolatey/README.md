@@ -13,6 +13,13 @@ closes a running IdleHarbor with its own `--exit` command. `choco upgrade` never
 `chocolateyUninstall.ps1`, so without that hook a running executable would hold a lock on the package
 directory it lives in.
 
+`--exit` only reaches an instance in the caller's own Windows session, because IdleHarbor's
+single-instance guard is a session-local mutex and its command goes to a window on that session's
+desktop. The hook therefore checks the session of every process it finds and fails with a clear
+message when IdleHarbor is running in another one, and it waits a bounded time for `--exit` instead
+of forever, so an unattended upgrade reports an error rather than blocking on a dialog nobody can
+see.
+
 Build from the repository root:
 
 ```powershell
