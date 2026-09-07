@@ -263,6 +263,16 @@ repository enforces that.
 
 ## Follow-up queue
 
+A field report on 2026-09-07 (installed `v0.2.0`, this machine) showed the lock/disconnect
+safeguard refusing every Start with "IdleHarbor could not establish the current lock/disconnect
+state", recoverable only by exiting from the tray and relaunching. Cause: `QuerySessionSnapshot`
+needs `OpenInputDesktop`, which a user process cannot have while the lock screen owns the desktop,
+and `main.cpp` read it once during `Initialize` and cached the failure for the process lifetime -- so
+a relaunch at sign-in was stuck. The reading is now retried at session start and on each
+session-change notification. No unit test covers it: `Application` is not test-reachable and
+`QuerySessionSnapshot` depends on the live desktop, so this was proved by build plus reasoning about
+the Win32 contract, not by a check.
+
 Issues [#43](https://github.com/Chris0Jeky/IdleHarbor/issues/43),
 [#44](https://github.com/Chris0Jeky/IdleHarbor/issues/44), and
 [#45](https://github.com/Chris0Jeky/IdleHarbor/issues/45) closed with PR #47. The bounded post-release

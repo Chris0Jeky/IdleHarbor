@@ -6,6 +6,17 @@ where practical.
 
 ## [Unreleased]
 
+### Fixed
+
+- Starting a session with the lock or disconnect safeguard enabled no longer fails permanently on a
+  copy of IdleHarbor that was launched while the workstation was locked. The lock state is read
+  from the input desktop, which Windows withholds behind the lock screen, and that one startup
+  reading was kept for the life of the process: a relaunch at sign-in left "IdleHarbor could not
+  establish the current lock/disconnect state" on every Start until the process was exited from the
+  tray and started again. The state is now re-established when a session is started and on every
+  lock, unlock, connect, and disconnect notification, and the stopped status card retracts the
+  claim once the state is readable.
+
 ### Distribution
 
 - The project has a site at <https://chris0jeky.github.io/IdleHarbor/>, published from `docs/`. It

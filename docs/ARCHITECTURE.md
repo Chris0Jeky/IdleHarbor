@@ -86,6 +86,12 @@ Start/Stop, and Exit from its tray menu. Close-to-tray is explicit. Shutdown han
 active session; destruction unregisters the hotkey and session notifications, removes the tray icon,
 stops the timer and hooks, and clears the power request.
 
+The lock/disconnect state behind those notifications is read with `QuerySessionSnapshot`, which
+needs the input desktop -- unreadable while the lock screen owns it. That reading is therefore not
+a one-time startup fact: it is retried whenever it is about to matter (registration, a session
+start that requests either safeguard, and each session-change notification) and only ever adopted,
+never re-adopted, so the notifications stay the authority once the state is established.
+
 The top-level window scales canonical control geometry for its current monitor, clamps its preferred
 rectangle to the monitor work area, and keeps a fixed status/safety header and Start/Stop/Save action bar
 outside a clipped settings viewport. When the body is taller than the available client area, that

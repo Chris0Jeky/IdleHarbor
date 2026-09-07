@@ -64,6 +64,28 @@ unavailable in a restricted environment; the status identifies observer availabi
 connect/disconnect handling depends on Windows session notifications. Test these transitions in a
 non-critical session before relying on them.
 
+### "IdleHarbor could not establish the current lock/disconnect state"
+
+The lock state is read from the input desktop, and while the workstation is locked that desktop
+belongs to Windows rather than to the signed-in user, so the read is refused. Up to and including
+`v0.2.0` IdleHarbor asked for that state once, during startup, and kept the answer for the life of
+the process -- so a copy that started while the lock screen still owned the desktop reported the
+state unavailable forever. Start then refuses any session with the lock or disconnect safeguard
+enabled, and no action inside the running window clears it. The usual way to land in it is a
+relaunch at sign-in after a shutdown, restart, or hibernate -- from automatic startup, or from
+Windows restoring apps that were open -- and launching IdleHarbor by hand in the seconds right
+after unlocking can do it too.
+
+On `v0.2.0` the fix is to exit and start again: choose **Exit** from the tray menu, then launch
+IdleHarbor while signed in. Closing the window with the red **X** does not do it -- with
+close-to-tray enabled that only hides the window, and the same process keeps running with the same
+stale answer.
+
+After `v0.2.0` a Start that needs the lock or disconnect safeguard re-reads the state first, and
+every lock, unlock, connect, and disconnect notification is another chance to read it, so pressing
+Start again is normally enough. The read still needs the ordinary desktop back, so it can only
+succeed once the workstation is genuinely unlocked.
+
 ## Settings and INI
 
 Normal settings live under the user's local application-data directory. Portable mode stores

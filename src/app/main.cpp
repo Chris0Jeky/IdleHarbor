@@ -53,6 +53,7 @@ using idleharbor::platform::windows::PowerRequestMode;
 
 constexpr wchar_t kWindowClassName[] = L"IdleHarbor.MainWindow";
 constexpr wchar_t kMutexName[] = L"Local\\IdleHarbor.Singleton.v1";
+constexpr wchar_t kSessionStateUnavailableStatus[] = L"Stopped: current session state unavailable";
 constexpr ULONG_PTR kCopyDataCommand = 0x49444843;  // IDHC
 constexpr int kIconResourceId = 101;
 
@@ -479,14 +480,7 @@ class Application final {
         InitializeTrayIcon();
         session_notifications_available_ =
             WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
-        if (session_notifications_available_) {
-            const auto session = idleharbor::platform::windows::QuerySessionSnapshot();
-            session_state_available_ = session.available;
-            if (session_state_available_) {
-                locked_ = session.locked;
-                disconnected_ = session.disconnected;
-            }
-        }
+        EstablishSessionState();
         ApplyEmergencyHotkeySetting();
 
         RefreshControls();
@@ -501,7 +495,7 @@ class Application final {
             if (!session_notifications_available_) {
                 initial_status = L"Stopped: session-change observer unavailable";
             } else if (!session_state_available_) {
-                initial_status = L"Stopped: current session state unavailable";
+                initial_status = kSessionStateUnavailableStatus;
             }
         }
         SetStatus(initial_status);
@@ -1872,6 +1866,16 @@ class Application final {
         UpdateTrayTooltip();
     }
 
+    // The stopped status card can still be reporting a session state that has since
+    // become readable. Retract exactly that claim, and only while stopped, so a recovery
+    // warning or another stopped reason is never overwritten.
+    void ClearSessionStateUnavailableStatus() {
+        if (session_active_ || status_text_ != kSessionStateUnavailableStatus) {
+            return;
+        }
+        SetStatus(L"Stopped: ready");
+    }
+
     [[nodiscard]] std::wstring DisplayStatusText() const {
         return dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
     }
@@ -2241,6 +2245,28 @@ class Application final {
         SetStatus(L"Stopped: profile defaults loaded; press Save to persist them");
     }
 
+    // Establishes the lock/disconnect state whenever it is not already known. The query
+    // reads the input desktop, which the secure desktop owns while the workstation is
+    // locked, so a process that starts on the lock screen -- automatic startup, or Windows
+    // restoring the window after a sign-in -- cannot read it yet. Asking only once at
+    // startup made that transient failure permanent for the process lifetime, leaving
+    // exiting from the tray and launching again as the sole recovery. Retry at every point
+    // where the state is about to matter, and leave an established state alone so the
+    // session-change notifications stay the authority on it.
+    bool EstablishSessionState() {
+        if (!session_notifications_available_ || session_state_available_) {
+            return false;
+        }
+        const auto session = idleharbor::platform::windows::QuerySessionSnapshot();
+        if (!session.available) {
+            return false;
+        }
+        session_state_available_ = true;
+        locked_ = session.locked;
+        disconnected_ = session.disconnected;
+        return true;
+    }
+
     PolicyInput Snapshot(const bool user_activity) const {
         const auto battery = idleharbor::platform::windows::QueryBatterySnapshot();
         return PolicyInput{
@@ -2272,11 +2298,14 @@ class Application final {
         runtime_settings_ = settings_.session;
         const bool session_safeguards_requested =
             runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected;
+        if (session_safeguards_requested) {
+            EstablishSessionState();
+        }
         if (session_safeguards_requested &&
             (!session_notifications_available_ || !session_state_available_)) {
             const bool observer_unavailable = !session_notifications_available_;
             SetStatus(observer_unavailable ? L"Stopped: session-change observer unavailable"
-                                           : L"Stopped: current session state unavailable");
+                                           : kSessionStateUnavailableStatus);
             MessageBoxW(
                 window_,
                 observer_unavailable
@@ -2688,6 +2717,12 @@ class Application final {
             }
             return 0;
         case WM_WTSSESSION_CHANGE:
+            // The workstation just changed hands, so the desktop the query needs may be
+            // readable now even though it was not at startup. Do this before applying the
+            // notification, which is the fresher fact about its own dimension.
+            if (EstablishSessionState()) {
+                ClearSessionStateUnavailableStatus();
+            }
             if (w_param == WTS_SESSION_LOCK) {
                 locked_ = true;
             } else if (w_param == WTS_SESSION_UNLOCK) {
