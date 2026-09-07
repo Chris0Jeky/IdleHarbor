@@ -81,8 +81,10 @@ IdleHarbor while signed in. Closing the window with the red **X** does not do it
 close-to-tray enabled that only hides the window, and the same process keeps running with the same
 stale answer.
 
-After `v0.2.0` the state is re-established whenever a session is started and on every lock, unlock,
-connect, and disconnect notification, so the condition clears itself.
+After `v0.2.0` a Start that needs the lock or disconnect safeguard re-reads the state first, and
+every lock, unlock, connect, and disconnect notification is another chance to read it, so pressing
+Start again is normally enough. The read still needs the ordinary desktop back, so it can only
+succeed once the workstation is genuinely unlocked.
 
 ## Settings and INI
 
