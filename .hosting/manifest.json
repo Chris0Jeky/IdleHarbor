@@ -1,0 +1,15 @@
+{
+  "schema_version":1,"reviewed_on":"2026-09-10","repository":"Chris0Jeky/IdleHarbor","stable_id":"idleharbor","runtime_class":"local",
+  "public_origin":"https://chris0jeky.github.io/IdleHarbor/","origin_evidence":"repository-reported",
+  "target":"Native Windows app; existing static site and GitHub Releases",
+  "source_paths":["README.md","PROJECT_STATE.md"],
+  "persistent_state":["Local INI settings; no hosted database"],
+  "invariants":["No runtime network, telemetry or hidden behavior","Preserve release URLs, checksums and installer identity","A static site does not imply a browser version"],
+  "gates":["Owned canonical site hostname","Stable download and checksum verification","Name screen before promotion"],
+  "tasks":[
+    {"id":"IH1","goal":"Prepare static site canonical-origin changes","acceptance":"All asset, release and checksum links resolve after a base-path change"},
+    {"id":"IH2","goal":"Keep distribution independent from branding","acceptance":"Existing installer/update identity and local configuration continue to work"},
+    {"id":"IH3","goal":"Publish only verified native capability claims","acceptance":"No cloud feature or browser runtime is advertised"}
+  ],
+  "activation_authorized":false
+}
