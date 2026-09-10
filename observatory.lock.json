@@ -1,0 +1,10 @@
+{
+  "version": "0.1.0",
+  "source": "Chris0Jeky/Pulseboard:observatory",
+  "installs": {
+    "docs/observatory.js": {
+      "project": "idleharbor",
+      "sha256": "32611c5e1523d2543eb680e231277464ae5c9a76cf04c3372b304e34a08021a4"
+    }
+  }
+}
