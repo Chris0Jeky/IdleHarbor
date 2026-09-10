@@ -147,10 +147,11 @@ No automated check can catch that class of error; only reading the text against 
 
 GitHub Pages is enabled for `main` `/docs`, and <https://chris0jeky.github.io/IdleHarbor/> is the
 repository's declared homepage. `docs/.nojekyll` turns off the Jekyll build, so the page is served
-exactly as committed and the existing `docs/*.md` files are untouched. `docs/index.html` is a single
-self-contained page -- no external stylesheet, script, or font -- carrying a canonical link, Open
-Graph and Twitter card metadata, and JSON-LD `SoftwareApplication` and `FAQPage` blocks whose eight
-questions match the eight in the visible FAQ.
+exactly as committed and the existing `docs/*.md` files are untouched. `docs/index.html` carries its
+styles inline and loads one same-origin, vendored `docs/observatory.js` adapter. The adapter has no
+configured endpoint, so it creates no consent UI, storage, timers, or network traffic. The page also
+carries a canonical link, Open Graph and Twitter card metadata, and JSON-LD `SoftwareApplication`
+and `FAQPage` blocks whose eight questions match the eight in the visible FAQ.
 
 A project Pages site cannot serve an origin-root `robots.txt`: crawlers only fetch
 `https://chris0jeky.github.io/robots.txt`, which GitHub controls, so a committed `docs/robots.txt`
@@ -188,7 +189,7 @@ in the page ever names the mirror host, because at that moment the two hosts bec
 Its `-Live` switch additionally compares the served bytes against the working tree.
 
 What the mirror buys, none of which a Pages subdirectory can do: a real root `robots.txt`, response
-headers (a content security policy the page satisfies with no external resources at all, `nosniff`,
+headers (a content security policy limited to same-origin images and the vendored script, `nosniff`,
 framing and referrer controls, a longer cache lifetime for `/assets/*`), and a `/download` redirect
 to the current release. `_headers` and `_redirects` are consumed by the edge and return 404 rather
 than being served. All three, plus the IndexNow key, are pinned to LF in `.gitattributes`: this

@@ -31,11 +31,12 @@ URLs we submit are the canonical ones. See `packaging/README.md`.
 
 ## Shape
 
-Static assets only — there is no JavaScript entrypoint. `wrangler.jsonc` declares
-`assets` with no `main`, so Cloudflare serves `docs/` directly and applies `_headers`
-and `_redirects` at the edge. Those two files are consumed by the edge rather than
-served, so they return 404. Nothing here has to be reviewed as running code, and
-`Test-CloudflareSite.ps1` fails if a `main` entrypoint is ever added.
+Static assets only — there is no Worker JavaScript entrypoint. `wrangler.jsonc`
+declares `assets` with no `main`, so Cloudflare serves `docs/` directly and applies
+`_headers` and `_redirects` at the edge. Those two files are consumed by the edge
+rather than served, so they return 404. The browser-side vendored Observatory
+adapter remains inert until a separately reviewed endpoint is configured;
+`Test-CloudflareSite.ps1` fails if a Worker `main` entrypoint is ever added.
 
 `_headers`, `_redirects`, and the IndexNow key file are pinned to LF in `.gitattributes`.
 This repository checks out CRLF everywhere else, and Cloudflare splits these files on
