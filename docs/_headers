@@ -1,11 +1,11 @@
 # Applied by the Cloudflare Workers mirror only. GitHub Pages ignores this file
 # and serves it as plain text; it is harmless there.
 #
-# The site is one self-contained page: no external scripts, styles, fonts, or
-# images, and no forms. The policy below is therefore as closed as it can be --
-# it allows same-origin images and the single inline <style>, and nothing else.
+# The site uses one same-origin vendored script, same-origin images, and one
+# inline <style>; it has no remote dependencies or forms. The policy below
+# permits exactly those static resources.
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
