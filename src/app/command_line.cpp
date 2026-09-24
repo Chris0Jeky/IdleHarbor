@@ -95,6 +95,13 @@ std::optional<std::wstring_view> TakeValue(
         AddError(result, L"Option '" + std::wstring(arguments[index]) + L"' requires a value.");
         return std::nullopt;
     }
+    const std::wstring_view next = arguments[index + 1];
+    if (next.size() >= 2 && next[0] == L'-' && next[1] == L'-') {
+        AddError(result, L"Option '" + std::wstring(arguments[index]) + L"' requires a value.");
+        // Skip the flag so a failed parse does not arm a command.
+        ++index;
+        return std::nullopt;
+    }
     ++index;
     return arguments[index];
 }

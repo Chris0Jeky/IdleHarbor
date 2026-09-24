@@ -106,6 +106,31 @@ int main() {
     Expect(!Parse({L"--stop-after", L"604801"}).ok(), "stop duration one second above the maximum fails");
     Expect(!Parse({L"--stop-after", L"10081m"}).ok(), "stop duration one minute above the maximum fails");
     Expect(!Parse({L"--config"}).ok(), "missing value fails");
+    const auto missing_config = Parse({L"--config", L"--start"});
+    Expect(!missing_config.ok(), "config value followed by a flag fails");
+    Expect(missing_config.options.command != RequestedCommand::Start, "missing config value does not start");
+    bool config_reports_value = false;
+    for (const auto& error : missing_config.errors) {
+        if (error.find(L"requires a value") != std::wstring::npos) {
+            config_reports_value = true;
+        }
+    }
+    Expect(config_reports_value, "missing config value reports a missing value");
+    const auto missing_profile = Parse({L"--profile", L"--start"});
+    Expect(!missing_profile.ok(), "profile value followed by a flag fails");
+    Expect(missing_profile.options.command != RequestedCommand::Start, "missing profile value does not start");
+    bool profile_reports_value = false;
+    for (const auto& error : missing_profile.errors) {
+        if (error.find(L"requires a value") != std::wstring::npos) {
+            profile_reports_value = true;
+        }
+    }
+    Expect(profile_reports_value, "missing profile value reports a missing value");
+    const auto dashed_config = Parse({L"--config", L"C:\\cfg\\-odd.ini"});
+    Expect(dashed_config.ok(), "single dash inside a config value is accepted");
+    Expect(
+        dashed_config.options.config_path == std::filesystem::path(L"C:\\cfg\\-odd.ini"),
+        "dashed config path is preserved");
     Expect(!Parse({L"--wat"}).ok(), "unknown option fails");
     const auto help = idleharbor::app::CommandLineHelp();
     Expect(!help.empty(), "help text is available");

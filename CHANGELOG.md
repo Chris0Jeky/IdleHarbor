@@ -19,6 +19,8 @@ where practical.
   tray and started again. The state is now re-established when a session is started and on every
   lock, unlock, connect, and disconnect notification, and the stopped status card retracts the
   claim once the state is readable.
+- An option missing its value no longer swallows the next option: `--config --start` now reports
+  that `--config` requires a value instead of using `--start` as the configuration path.
 
 ### Distribution
 
