@@ -64,6 +64,7 @@ struct StackedBodyLayout {
 };
 
 [[nodiscard]] PixelRect ClampWindowRect(PixelRect desired, PixelRect work_area, int margin) noexcept;
+[[nodiscard]] int MinimumTrackHeight(int minimum_client_height, int non_client_height, int available_height) noexcept;
 [[nodiscard]] int MaximumScrollPosition(int content_height, int viewport_height) noexcept;
 [[nodiscard]] int ClampScrollPosition(int position, int content_height, int viewport_height) noexcept;
 [[nodiscard]] int ScrollPositionToReveal(

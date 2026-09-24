@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- The window's minimum height now includes its title bar and borders. The minimum was set from the
+  content height alone, so dragging the window to its smallest size let the frame eat into the
+  content and clipped the fixed Start/Stop/Save footer.
 - Starting a session with the lock or disconnect safeguard enabled no longer fails permanently on a
   copy of IdleHarbor that was launched while the workstation was locked. The lock state is read
   from the input desktop, which Windows withholds behind the lock screen, and that one startup

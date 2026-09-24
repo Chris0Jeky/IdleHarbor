@@ -40,6 +40,13 @@ PixelRect ClampWindowRect(PixelRect desired, const PixelRect work_area, const in
     return {left, top, left + width, top + height};
 }
 
+int MinimumTrackHeight(
+    const int minimum_client_height,
+    const int non_client_height,
+    const int available_height) noexcept {
+    return std::min(minimum_client_height + std::max(non_client_height, 0), std::max(available_height, 1));
+}
+
 int MaximumScrollPosition(const int content_height, const int viewport_height) noexcept {
     return std::max(content_height - std::max(viewport_height, 0), 0);
 }

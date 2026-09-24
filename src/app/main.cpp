@@ -783,7 +783,15 @@ class Application final {
         const int available_width = std::max(work_area.right - work_area.left - 2 * Scale(kBaseWindowMargin), 1);
         const int available_height = std::max(work_area.bottom - work_area.top - 2 * Scale(kBaseWindowMargin), 1);
         info->ptMinTrackSize.x = std::min(Scale(kBaseWindowWidth), available_width);
-        info->ptMinTrackSize.y = std::min(Scale(kBaseMinimumClientHeight), available_height);
+        const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(window_, GWL_STYLE));
+        const DWORD ex_style = static_cast<DWORD>(GetWindowLongPtrW(window_, GWL_EXSTYLE));
+        RECT frame{0, 0, 0, 0};
+        int non_client = 0;
+        if (AdjustWindowRectExForDpi(&frame, style, FALSE, ex_style, dpi_) != FALSE) {
+            non_client = frame.bottom - frame.top;
+        }
+        info->ptMinTrackSize.y =
+            idleharbor::app::MinimumTrackHeight(Scale(kBaseMinimumClientHeight), non_client, available_height);
     }
 
     void ResizeToPreferredWorkArea() {
