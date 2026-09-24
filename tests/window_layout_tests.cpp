@@ -274,6 +274,14 @@ void test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi() {
     }
 }
 
+void test_minimum_track_height_includes_the_non_client_frame() {
+    using idleharbor::app::MinimumTrackHeight;
+    CHECK(MinimumTrackHeight(320, 39, 1000) == 359);
+    CHECK(MinimumTrackHeight(320, 39, 300) == 300);
+    CHECK(MinimumTrackHeight(320, -5, 1000) == 320);
+    CHECK(MinimumTrackHeight(320, 39, 0) == 1);
+}
+
 void test_pointer_focus_does_not_scroll_the_body() {
     using idleharbor::app::FocusRevealTrigger;
     using idleharbor::app::ShouldRevealFocusedControl;
@@ -312,6 +320,7 @@ int main() {
     test_viewport_fill_widths_respect_the_effective_client_width();
     test_stacked_stop_stays_inside_short_clients();
     test_stacked_body_fits_extreme_logical_widths_at_fractional_dpi();
+    test_minimum_track_height_includes_the_non_client_frame();
     test_pointer_focus_does_not_scroll_the_body();
     test_open_popup_freezes_every_reveal_trigger();
     return failures == 0 ? 0 : 1;
