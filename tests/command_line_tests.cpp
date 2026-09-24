@@ -126,6 +126,8 @@ int main() {
         }
     }
     Expect(profile_reports_value, "missing profile value reports a missing value");
+    const auto short_after_config = Parse({L"--config", L"-j"});
+    Expect(!short_after_config.ok(), "a documented short switch is not taken as the config value");
     const auto dashed_config = Parse({L"--config", L"C:\\cfg\\-odd.ini"});
     Expect(dashed_config.ok(), "single dash inside a config value is accepted");
     Expect(
