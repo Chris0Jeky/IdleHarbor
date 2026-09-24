@@ -310,6 +310,31 @@ bool test_max_duration_stops_and_remains_stopped() {
     return true;
 }
 
+bool test_max_duration_takes_precedence_over_pause_conditions() {
+    Settings settings{};
+    settings.max_duration = 30s;
+    PolicyEngine policy(settings);
+    policy.start(0s);
+
+    auto before = policy.evaluate(PolicyInput{29s, false, true});
+    CHECK(before.action == DecisionAction::Pause);
+    CHECK(before.state == EngineState::Paused);
+    CHECK(before.reason == PolicyReason::Locked);
+
+    auto locked_past = policy.evaluate(PolicyInput{30s, false, true});
+    CHECK(locked_past.action == DecisionAction::Stop);
+    CHECK(locked_past.state == EngineState::Stopped);
+    CHECK(locked_past.reason == PolicyReason::MaxDuration);
+
+    PolicyEngine activity_policy(settings);
+    activity_policy.start(0s);
+    auto activity_past = activity_policy.evaluate(PolicyInput{30s, true});
+    CHECK(activity_past.action == DecisionAction::Stop);
+    CHECK(activity_past.state == EngineState::Stopped);
+    CHECK(activity_past.reason == PolicyReason::MaxDuration);
+    return true;
+}
+
 bool test_policy_can_resume_after_transient_safeguard() {
     Settings settings{};
     settings.pause_when_locked = true;
@@ -340,6 +365,7 @@ int main() {
         test_optional_safeguards_are_opt_in(),
         test_unknown_battery_fails_closed_for_requested_safeguards(),
         test_max_duration_stops_and_remains_stopped(),
+        test_max_duration_takes_precedence_over_pause_conditions(),
         test_policy_can_resume_after_transient_safeguard(),
     };
 
