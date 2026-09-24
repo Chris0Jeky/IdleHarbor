@@ -125,6 +125,39 @@ int main() {
     Expect(cross_field.settings.session.power == PowerMode::System, "cross-field recovery restores profile power");
     Expect(cross_field.settings.session.random_minimum == Seconds{1}, "cross-field recovery restores profile timing");
 
+    const auto refusal_path = test_root / L"refused.ini";
+    {
+        std::ofstream known(refusal_path, std::ios::binary);
+        known << "known content";
+    }
+    auto ReadBytes = [](const fs::path& file_path) {
+        std::ifstream input(file_path, std::ios::binary);
+        std::string bytes;
+        char character = 0;
+        while (input.get(character)) {
+            bytes.push_back(character);
+        }
+        return bytes;
+    };
+    const std::string bytes_before = ReadBytes(refusal_path);
+
+    AppSettings invalid;
+    invalid.session.distance = 0;
+    Expect(!idleharbor::core::validate(invalid.session).valid, "distance 0 fails validation");
+    std::string refusal_error;
+    Expect(!idleharbor::app::SaveSettings(refusal_path, invalid, refusal_error), "invalid settings are refused");
+    Expect(
+        refusal_error.find("Refusing to save invalid settings") != std::string::npos,
+        "refusal is reported");
+    Expect(ReadBytes(refusal_path) == bytes_before, "refused save does not modify the target file");
+
+    const auto absent_path = test_root / L"refused-absent.ini";
+    std::string absent_error;
+    Expect(
+        !idleharbor::app::SaveSettings(absent_path, invalid, absent_error),
+        "invalid settings are refused for a new file");
+    Expect(!fs::exists(absent_path), "refused save does not create the target file");
+
     const auto missing = idleharbor::app::LoadSettings(test_root / L"missing.ini");
     Expect(!missing.file_found, "missing file is not reported as loaded");
     Expect(idleharbor::core::validate(missing.settings.session).valid, "missing file returns valid defaults");
