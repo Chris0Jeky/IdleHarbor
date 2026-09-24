@@ -95,6 +95,16 @@ std::optional<std::wstring_view> TakeValue(
         AddError(result, L"Option '" + std::wstring(arguments[index]) + L"' requires a value.");
         return std::nullopt;
     }
+    const std::wstring_view next = arguments[index + 1];
+    // A long option (--x) or a short switch (-x) is the next option, not this one's value.
+    const bool long_option = next.size() >= 2 && next[0] == L'-' && next[1] == L'-';
+    const bool short_switch = next.size() == 2 && next[0] == L'-' && std::iswalpha(next[1]) != 0;
+    if (long_option || short_switch) {
+        AddError(result, L"Option '" + std::wstring(arguments[index]) + L"' requires a value.");
+        // Skip the flag so a failed parse does not arm a command.
+        ++index;
+        return std::nullopt;
+    }
     ++index;
     return arguments[index];
 }
