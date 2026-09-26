@@ -45,3 +45,7 @@ jobs:
       - name: Validate PowerShell packaging scripts
         shell: pwsh
         run: .\packaging\Test-Packaging.ps1
+
+      - name: Check the website's Pulseboard SDK install
+        if: matrix.arch == 'x64'
+        run: node observatory/check.mjs
