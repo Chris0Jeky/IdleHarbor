@@ -125,7 +125,19 @@ x64 and ARM64 archives. The packaging parser and ownership tests can be run inde
    active hours, and maximum duration can pause or stop the session.
 5. Press **Stop**, use the tray menu, or use the emergency hotkey when finished.
 
-IdleHarbor stores local settings only. It has no network service or telemetry path.
+IdleHarbor stores local settings only. The app has no network service or telemetry path and sends
+nothing anywhere.
+
+The project website (<https://chris0jeky.github.io/IdleHarbor/>) is separate from the app: it runs
+the Pulseboard beta SDK. A **Beta** bar offers three categories: **Usage counts** (daily aggregate
+counts of page views and of release or source link clicks), **Diagnostics** (page timings,
+JavaScript error summaries, visible time and scroll depth), and **Journeys and product data** (a
+random per-tab session id with ordered page events, including which of those links was chosen). In
+the EEA, or while the region is unknown, only usage counts run until the visitor presses **OK**;
+elsewhere all three start on and **Choose** turns any of them off. Global Privacy Control or Do Not
+Track turns everything off with no bar and no request. No names, e-mail addresses, IP addresses,
+cookies or page URLs are stored; detailed data is kept 90 days and aggregate counts currently 14
+days. See `observatory/README.md`.
 
 ## Modes and profiles
 

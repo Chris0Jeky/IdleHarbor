@@ -80,12 +80,26 @@ $headersText = Get-Content -LiteralPath $headersPath -Raw
 foreach ($requiredHeader in 'Content-Security-Policy', 'X-Content-Type-Options', 'Referrer-Policy', 'X-Frame-Options') {
     Assert-True ($headersText -match [regex]::Escape($requiredHeader)) "_headers no longer sets $requiredHeader."
 }
-# The page has no remote script, style, font, or image. A CSP that permits a
-# remote origin means that stopped being true without this file being revisited.
-Assert-True ($headersText -notmatch '(?m)^\s*Content-Security-Policy:.*https?://') `
-    '_headers allows a remote origin in the CSP. The site loads nothing external, so a remote origin is either a mistake or a new dependency nobody recorded.'
+# The page has no remote script, style, font, or image. The only remote origin
+# the CSP may name is the Pulseboard collector, and only in connect-src; any
+# other remote origin means that stopped being true without this file being
+# revisited.
+$collectorOrigin = 'https://pulseboard-observatory.commit-atlas.workers.dev'
+$cspLine = @($headerLines | Where-Object { $_ -match '^\s*Content-Security-Policy:' })
+Assert-True ($cspLine.Count -eq 1) '_headers must declare exactly one Content-Security-Policy line.'
+$cspDirectives = @(($cspLine[0] -replace '^\s*Content-Security-Policy:\s*', '') -split ';' |
+    ForEach-Object { $_.Trim() } | Where-Object { $_ })
+foreach ($directive in $cspDirectives) {
+    if ($directive -match '^connect-src\s') {
+        Assert-True ($directive -ceq "connect-src $collectorOrigin") `
+            "_headers connect-src must name only the Pulseboard collector ($collectorOrigin), found '$directive'."
+    } else {
+        Assert-True ($directive -notmatch 'https?://') `
+            "_headers allows a remote origin outside connect-src ('$directive'). The site loads nothing external, so a remote origin is either a mistake or a new dependency nobody recorded."
+    }
+}
 Assert-True ($headersText -match "(?m)^\s*Content-Security-Policy:.*(?:^|;\s*)script-src\s+'self'(?:;|\s*$)") `
-    "_headers must allow the vendored same-origin observatory.js without allowing remote scripts."
+    "_headers must allow the vendored same-origin pulseboard.js and site.js without allowing remote scripts."
 
 # --- _redirects -------------------------------------------------------------
 

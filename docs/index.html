@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IdleHarbor — Free Open-Source Windows Mouse Jiggler &amp; Keep-Awake Utility</title>
-<meta name="description" content="A free, open-source Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, and safeguards that pause it for you. Native, portable, no telemetry.">
+<meta name="description" content="A free, open-source Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, and safeguards that pause it for you. Native and portable; the app has no telemetry.">
 <link rel="canonical" href="https://chris0jeky.github.io/IdleHarbor/">
 <meta name="theme-color" content="#0b1220">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="IdleHarbor">
 <meta property="og:title" content="IdleHarbor — Free Open-Source Windows Mouse Jiggler &amp; Keep-Awake Utility">
-<meta property="og:description" content="A small, visible, native Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, smart pause safeguards, portable use, no telemetry.">
+<meta property="og:description" content="A small, visible, native Windows mouse jiggler and keep-awake utility. Bounded motion, power requests, smart pause safeguards, portable use; the app has no telemetry.">
 <meta property="og:url" content="https://chris0jeky.github.io/IdleHarbor/">
 <meta property="og:image" content="https://chris0jeky.github.io/IdleHarbor/assets/idleharbor-social.png">
 <meta property="og:image:width" content="1280">
@@ -89,7 +89,7 @@
         {
           "@type": "Question",
           "name": "Does IdleHarbor collect any data?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. There is no telemetry and no network service. Settings are stored in a local INI file, beside the executable in portable mode or in the user's local application-data directory otherwise." }
+          "acceptedAnswer": { "@type": "Answer", "text": "The app does not. IdleHarbor itself has no telemetry and no network access, and it sends nothing anywhere. Settings are stored in a local INI file, beside the executable in portable mode or in the user's local application-data directory otherwise. Only this website, not the app, runs Pulseboard beta measurement: aggregate usage counts, plus optional diagnostics and journeys that a Beta bar lets visitors choose; Global Privacy Control or Do Not Track turns all of it off." }
         },
         {
           "@type": "Question",
@@ -211,6 +211,7 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
 </style>
 </head>
 <body>
+<div data-pulseboard-bar style="min-height:2.5rem"></div>
 
 <header class="site">
   <div class="wrap">
@@ -238,13 +239,13 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
     </p>
     <div class="cta">
       <a class="btn btn-primary" href="#download">Download v0.2.0</a>
-      <a class="btn btn-ghost" href="https://github.com/Chris0Jeky/IdleHarbor">View source on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/Chris0Jeky/IdleHarbor" data-download-asset="source">View source on GitHub</a>
       <small>Free and open source under GPL-3.0-only. Windows 10 and 11, x64 and ARM64.</small>
     </div>
     <ul class="badges">
       <li>Native C++20 &amp; Win32</li>
       <li>No .NET, Electron, or installer required</li>
-      <li>No telemetry, no network service</li>
+      <li>The app has no telemetry and no network access</li>
       <li>Around 530&nbsp;KB</li>
       <li>Portable</li>
     </ul>
@@ -349,7 +350,7 @@ footer.site ul { list-style: none; padding: 0; display: flex; gap: 18px; flex-wr
       &mdash; then verify it against the published <code>SHA256SUMS.txt</code> before running it.
     </p>
     <div class="cta" style="margin-top:22px">
-      <a class="btn btn-primary" href="https://github.com/Chris0Jeky/IdleHarbor/releases/latest">Latest release on GitHub</a>
+      <a class="btn btn-primary" href="https://github.com/Chris0Jeky/IdleHarbor/releases/latest" data-download-asset="release-page">Latest release on GitHub</a>
       <a class="btn btn-ghost" href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/USER_GUIDE.md">Read the user guide</a>
     </div>
     <p style="margin-top:22px">
@@ -425,7 +426,8 @@ gh attestation verify .\IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0J
 
     <details>
       <summary>Does it collect any data?</summary>
-      <p>No. There is no telemetry and no network service. Settings are stored in a local INI file &mdash; beside the executable in portable mode, or in your local application-data directory otherwise.</p>
+      <p><strong>The app does not.</strong> IdleHarbor itself has no telemetry and no network access, and it sends nothing anywhere. Settings are stored in a local INI file &mdash; beside the executable in portable mode, or in your local application-data directory otherwise.</p>
+      <p><strong>This website is different.</strong> It runs the Pulseboard beta SDK, which shows a <strong>Beta</strong> bar with three choices: <strong>Usage counts</strong> (anonymous daily aggregate counts of page views and of release or source link clicks), <strong>Diagnostics</strong> (page timings, JavaScript error summaries, visible time and scroll depth), and <strong>Journeys and product data</strong> (a random per-tab session id with the ordered page events, including which of those links was chosen and the release it named). In the EEA, or while your region is unknown, only usage counts run until you press <strong>OK</strong>; elsewhere all three start on and <strong>Choose</strong> turns any of them off. Global Privacy Control or Do Not Track turns everything off with no bar and no request. No names, e-mail addresses, IP addresses, cookies or page URLs are stored. Detailed diagnostics and journeys are kept 90 days; aggregate counts are currently kept 14 days. The small <strong>Beta</strong> button in the corner reopens the choices at any time.</p>
     </details>
 
     <details>
@@ -441,7 +443,7 @@ gh attestation verify .\IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0J
   <div class="wrap">
     <ul>
       <li><a href="https://github.com/Chris0Jeky/IdleHarbor">Source</a></li>
-      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/releases">Releases</a></li>
+      <li><a href="https://github.com/Chris0Jeky/IdleHarbor/releases" data-download-asset="release-list">Releases</a></li>
       <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/USER_GUIDE.md">User guide</a></li>
       <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a></li>
       <li><a href="https://github.com/Chris0Jeky/IdleHarbor/blob/main/docs/SAFETY.md">Safety</a></li>
@@ -452,6 +454,7 @@ gh attestation verify .\IdleHarbor-0.2.0-windows-x64-portable.zip --repo Chris0J
   </div>
 </footer>
 
-<script defer src="observatory.js"></script>
+<script defer src="pulseboard.js"></script>
+<script defer src="site.js"></script>
 </body>
 </html>

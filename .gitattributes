@@ -11,3 +11,6 @@ packaging/winget/*/*.yaml -text
 docs/_headers text eol=lf
 docs/_redirects text eol=lf
 docs/*.txt text eol=lf
+
+# The vendored Pulseboard SDK is hashed as the LF bytes its builder generated.
+docs/pulseboard.js text eol=lf

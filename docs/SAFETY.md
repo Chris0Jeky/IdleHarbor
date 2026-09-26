@@ -39,7 +39,8 @@ whitelist around them.
 
 ## Privacy and privilege
 
-The current application has no network service or telemetry path. It stores validated local
+The current application has no network service or telemetry path. (The project website, not the
+application, runs optional Pulseboard beta measurement; see the README's privacy note.) It stores validated local
 preferences and does not need an elevated process or Windows service. It should not collect input
 content, screenshots, window titles, or browsing history.
 

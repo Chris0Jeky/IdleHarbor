@@ -24,6 +24,11 @@ where practical.
 
 ### Distribution
 
+- The project website (not the application) now runs the Pulseboard beta SDK 3.1.0 with a Beta
+  consent bar: aggregate usage counts, optional diagnostics and journeys, and which release or
+  source link was chosen. Global Privacy Control and Do Not Track turn it off. The
+  application itself is unchanged: it has no telemetry and no network access, and the site and
+  README now say so explicitly.
 - The project has a site at <https://chris0jeky.github.io/IdleHarbor/>, published from `docs/`. It
   describes the motion modes, the safeguards, and the download and verification steps, and is linked
   from the README and the user guide.
