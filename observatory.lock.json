@@ -1,11 +1,11 @@
 {
   "version": "0.1.0",
-  "sdk": "3.0.0",
+  "sdk": "3.1.0",
   "source": "Chris0Jeky/Pulseboard:observatory",
   "installs": {
     "docs/pulseboard.js": {
       "project": "idleharbor",
-      "sha256": "59cc53ae973d324206e9d692a2d2e0d2e58eefb3740deebca9683b6712bccf58"
+      "sha256": "20ccd24e23d29c9af3fec2994abb5a9c7347769a23909bde6fe1c40af1b8e90c"
     }
   }
 }
