@@ -77,7 +77,7 @@ for (const options of [{ origin: 'https://idleharbor.example' }, { webdriver: tr
 
 const html = read('docs/index.html');
 assert.ok(!html.includes('observatory.js'), 'The retired observatory.js adapter is still referenced');
-assert.match(html, /<body>\n<div data-pulseboard-bar style="height:2\.5rem"><\/div>\n/, 'The bar placeholder must be the first child of <body>');
+assert.match(html, /<body>\n<div data-pulseboard-bar style="min-height:2\.5rem"><\/div>\n/, 'The bar placeholder must be the first child of <body>');
 assert.match(html, /<script defer src="pulseboard\.js"><\/script>\n<script defer src="site\.js"><\/script>\n<\/body>/,
   'The page must load pulseboard.js and then site.js, both deferred and same-origin');
 assert.ok(!/<script(?![^>]*type="application\/ld\+json")[^>]*>[^<]/.test(html), 'No inline script: the CSP is script-src \'self\'');

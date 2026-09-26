@@ -5,7 +5,7 @@
   "installs": {
     "docs/pulseboard.js": {
       "project": "idleharbor",
-      "sha256": "c70b3a4746b03ff37a6fab9452a740aacd91c27adb2ae07c9f0c4c371c09c7b4"
+      "sha256": "59cc53ae973d324206e9d692a2d2e0d2e58eefb3740deebca9683b6712bccf58"
     }
   }
 }
