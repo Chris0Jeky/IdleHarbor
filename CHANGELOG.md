@@ -24,7 +24,7 @@ where practical.
 
 ### Distribution
 
-- The project website (not the application) now runs the Pulseboard beta SDK 3.1.0 with a Beta
+- The project website (not the application) now runs the Pulseboard beta SDK 3.2.0 with a Beta
   consent bar: aggregate usage counts, optional diagnostics and journeys, and which release or
   source link was chosen. Global Privacy Control and Do Not Track turn it off. The
   application itself is unchanged: it has no telemetry and no network access, and the site and

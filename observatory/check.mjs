@@ -14,7 +14,7 @@ const ASSETS = ['release-page', 'release-list', 'source'];
 // ---- The locked artifact ------------------------------------------------------------------------------
 
 const lock = JSON.parse(read('observatory.lock.json'));
-assert.equal(lock.sdk, '3.1.0', 'The lock must record SDK 3.1.0');
+assert.equal(lock.sdk, '3.2.0', 'The lock must record SDK 3.2.0');
 const entries = Object.entries(lock.installs ?? {});
 assert.equal(entries.length, 1, 'The lock records exactly one installed artifact');
 const [target, entry] = entries[0];
@@ -23,7 +23,7 @@ assert.equal(entry.project, 'idleharbor');
 const code = read(target);
 assert.equal(createHash('sha256').update(code).digest('hex'), entry.sha256, `${target} does not match the lock`);
 const header = code.split('\n').slice(0, 3).join('\n');
-assert.match(header, /pulseboard-sdk 3\.1\.0 for idleharbor\./, 'The header must name pulseboard-sdk 3.1.0');
+assert.match(header, /pulseboard-sdk 3.2.0 for idleharbor\./, 'The header must name pulseboard-sdk 3.2.0');
 const body = code.split('\n').slice(3).join('\n');
 const bodyHash = /sha256 of the body below: ([0-9a-f]{64})/.exec(header)?.[1];
 assert.equal(createHash('sha256').update(body).digest('hex'), bodyHash, 'The artifact was edited after it was built');
@@ -55,7 +55,7 @@ function fakeWindow({ origin = SITE, readyState = 'loading', webdriver = false }
 { // On the registered origin, loading defines a frozen API and makes no request before the DOM is ready.
   const w = fakeWindow();
   vm.runInContext(code, w);
-  assert.equal(w.Pulseboard?.version, '3.1.0', 'window.Pulseboard must be defined');
+  assert.equal(w.Pulseboard?.version, '3.2.0', 'window.Pulseboard must be defined');
   assert.equal(Object.isFrozen(w.Pulseboard), true);
   assert.deepEqual(w.fetches, [], 'No request may leave before mount');
   assert.equal(w.listeners.DOMContentLoaded?.length, 1, 'Mount waits for DOMContentLoaded');
@@ -138,4 +138,4 @@ const directives = Object.fromEntries(csp.split(';').map(d => d.trim()).filter(B
 assert.equal(directives['connect-src'], `connect-src ${COLLECTOR}`);
 assert.equal(directives['script-src'], "script-src 'self'");
 
-console.log('Pulseboard SDK 3.1.0 artifact, page wiring, download hook and CSP checks passed.');
+console.log('Pulseboard SDK 3.2.0 artifact, page wiring, download hook and CSP checks passed.');
