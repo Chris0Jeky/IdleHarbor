@@ -99,7 +99,9 @@ Motion and power are deliberately independent: a user can select input, power, b
 ## Product boundaries (hard constraints)
 
 Do not add concealment, process hiding, misleading identity, monitoring bypasses, telemetry, network
-access, elevation, or implicit persistence. Preserve a visible user-controlled status and an
+access, elevation, or implicit persistence. The desktop app sends nothing and stays that way; the
+public website (`docs/`) loads the Pulseboard SDK by owner decision (Pulseboard q-13, q-20, q-21),
+and that exception covers the site only. Preserve a visible user-controlled status and an
 immediate stop path. Treat injected input as compatibility behavior for legitimate idle prevention,
 never as proof of presence or a way around a security control. `docs/SAFETY.md` is the reference.
 

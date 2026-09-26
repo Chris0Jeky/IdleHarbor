@@ -21,6 +21,9 @@ and dependency-free outside Windows system libraries.
 - Preserve a visible, user-controlled status and an immediate stop path.
 - Never add concealment, misleading identity, process hiding, monitoring bypasses, telemetry,
   network access, elevation, or persistence without explicit user action.
+  The desktop app sends nothing and stays that way; the public website (`docs/`) loads the
+  Pulseboard SDK by owner decision (Pulseboard q-13, q-20, q-21), and that exception covers the
+  site only.
 - Treat injected input as compatibility behavior for legitimate idle prevention, not proof of
   presence or a security-control bypass.
 - Keep core policy and motion generation testable without moving the real pointer.
