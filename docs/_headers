@@ -1,11 +1,13 @@
 # Applied by the Cloudflare Workers mirror only. GitHub Pages ignores this file
 # and serves it as plain text; it is harmless there.
 #
-# The site uses one same-origin vendored script, same-origin images, and one
-# inline <style>; it has no remote dependencies or forms. The policy below
-# permits exactly those static resources.
+# The site uses two same-origin scripts (the vendored Pulseboard SDK and the
+# download-link hook), same-origin images, and one inline <style>; it has no
+# remote dependencies or forms. connect-src names the Pulseboard collector,
+# the one remote origin the page may contact. The SDK only runs on the
+# registered GitHub Pages origin, so on this mirror it stays idle.
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; connect-src https://pulseboard-observatory.commit-atlas.workers.dev; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
