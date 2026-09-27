@@ -148,7 +148,7 @@ No automated check can catch that class of error; only reading the text against 
 GitHub Pages is enabled for `main` `/docs`, and <https://chris0jeky.github.io/IdleHarbor/> is the
 repository's declared homepage. `docs/.nojekyll` turns off the Jekyll build, so the page is served
 exactly as committed and the existing `docs/*.md` files are untouched. `docs/index.html` carries its
-styles inline and loads two same-origin scripts: the vendored Pulseboard SDK 3.2.0 artifact
+styles inline and loads two same-origin scripts: the vendored Pulseboard SDK 3.3.0 artifact
 `docs/pulseboard.js` (built by Pulseboard, pinned by `observatory.lock.json`, checked by
 `node observatory/check.mjs` in CI) and `docs/site.js`, which reports `download.requested`
 `{asset, version}` when the release page, release list or source link is chosen. The SDK runs only on
