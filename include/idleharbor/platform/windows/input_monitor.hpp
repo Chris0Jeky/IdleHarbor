@@ -26,6 +26,8 @@ class InputMonitor final {
     InputMonitor(InputMonitor&&) = delete;
     InputMonitor& operator=(InputMonitor&&) = delete;
 
+    // Start requires a non-null notification window and a nonzero notification
+    // message. Null/zero arguments install no hooks and return no capabilities.
     [[nodiscard]] InputMonitorCapabilities Start(HWND notification_window, UINT notification_message) noexcept;
     // Reinstall both low-level hooks so silent OS removal is detected within one
     // application timer interval. A failed refresh is a capability loss.
