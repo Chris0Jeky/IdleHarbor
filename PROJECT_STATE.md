@@ -2,6 +2,15 @@
 
 Last updated: 2026-08-24
 
+## CLI parser maintenance (2026-10-05)
+
+The proposed parser fix retains the next command when a value-taking option has no value:
+`--interval --stop` records Stop plus a missing-value error. Both application entry paths still
+reject errored parses before dispatching a command. The focused regression fails against the
+previous parser; the x64 Debug build and all seven CTest suites pass with the fix. The swarm
+verify script `tests/Test-CommandLineValue.Tests.ps1` is absent, so CTest supplies the direct
+proof. Release, x86/ARM64, and native UI execution are not verified by this parser check.
+
 ## Current milestone
 
 IdleHarbor `0.2.0` is the current published stable release. The immutable annotated tag

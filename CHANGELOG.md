@@ -20,7 +20,9 @@ where practical.
   lock, unlock, connect, and disconnect notification, and the stopped status card retracts the
   claim once the state is readable.
 - An option missing its value no longer swallows the next option: `--config --start` now reports
-  that `--config` requires a value instead of using `--start` as the configuration path.
+  that `--config` requires a value instead of using `--start` as the configuration path. The parser
+  retains the following command in its result, including Stop for `--interval --stop`; the
+  application still rejects the errored invocation without executing that command.
 
 ### Distribution
 
