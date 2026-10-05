@@ -108,7 +108,9 @@ int main() {
     Expect(!Parse({L"--config"}).ok(), "missing value fails");
     const auto missing_config = Parse({L"--config", L"--start"});
     Expect(!missing_config.ok(), "config value followed by a flag fails");
-    Expect(missing_config.options.command != RequestedCommand::Start, "missing config value does not start");
+    Expect(
+        missing_config.options.command == RequestedCommand::Start,
+        "missing config value still parses the following command");
     bool config_reports_value = false;
     for (const auto& error : missing_config.errors) {
         if (error.find(L"requires a value") != std::wstring::npos) {
@@ -118,7 +120,9 @@ int main() {
     Expect(config_reports_value, "missing config value reports a missing value");
     const auto missing_profile = Parse({L"--profile", L"--start"});
     Expect(!missing_profile.ok(), "profile value followed by a flag fails");
-    Expect(missing_profile.options.command != RequestedCommand::Start, "missing profile value does not start");
+    Expect(
+        missing_profile.options.command == RequestedCommand::Start,
+        "missing profile value still parses the following command");
     bool profile_reports_value = false;
     for (const auto& error : missing_profile.errors) {
         if (error.find(L"requires a value") != std::wstring::npos) {
@@ -126,6 +130,35 @@ int main() {
         }
     }
     Expect(profile_reports_value, "missing profile value reports a missing value");
+    const auto interval_then_stop = Parse({L"--interval", L"--stop"});
+    Expect(!interval_then_stop.ok(), "interval followed by stop reports an error");
+    Expect(interval_then_stop.options.command == RequestedCommand::Stop, "interval followed by stop keeps Stop");
+    Expect(!interval_then_stop.options.interval.has_value(), "interval followed by stop sets no interval");
+    bool interval_reports_value = false;
+    for (const auto& error : interval_then_stop.errors) {
+        if (error.find(L"requires a value") != std::wstring::npos) {
+            interval_reports_value = true;
+        }
+    }
+    Expect(interval_reports_value, "interval followed by stop reports a missing value");
+    const auto trailing_interval = Parse({L"--interval"});
+    Expect(!trailing_interval.ok(), "trailing interval without a value fails");
+    Expect(trailing_interval.options.command == RequestedCommand::Launch, "trailing interval keeps Launch");
+    bool trailing_interval_reports_value = false;
+    for (const auto& error : trailing_interval.errors) {
+        if (error.find(L"requires a value") != std::wstring::npos) {
+            trailing_interval_reports_value = true;
+        }
+    }
+    Expect(trailing_interval_reports_value, "trailing interval reports a missing value");
+    const auto interval_value_then_stop = Parse({L"--interval", L"5s", L"--stop"});
+    Expect(interval_value_then_stop.ok(), "interval value followed by stop parses");
+    Expect(
+        interval_value_then_stop.options.command == RequestedCommand::Stop,
+        "interval value followed by stop keeps Stop");
+    Expect(
+        interval_value_then_stop.options.interval == 5s,
+        "interval value followed by stop keeps the interval");
     const auto short_after_config = Parse({L"--config", L"-j"});
     Expect(!short_after_config.ok(), "a documented short switch is not taken as the config value");
     const auto dashed_config = Parse({L"--config", L"C:\\cfg\\-odd.ini"});
