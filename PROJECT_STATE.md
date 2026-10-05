@@ -2,6 +2,16 @@
 
 Last updated: 2026-08-24
 
+## CLI stop-duration alignment (2026-10-05)
+
+The proposed `--stop-after` fix accepts up to 30 days (720h), matching the existing core settings
+validator. Tests cover 200h, the maximum in hours/minutes/seconds, rejection above the maximum,
+the error's stated range, and zero to disable the safeguard. These tests fail against the previous
+parser. The x64 Debug configure/build and all seven CTest suites pass with the fix.
+The assigned `tests/Test-StopAfter.Tests.ps1` is absent, and `pwsh` is unavailable on PATH;
+CTest supplies direct proof instead. Release, Win32/ARM64, and native UI/session execution are
+not verified. `HUMAN_TODO.md` q-3 and q-4 remain owner actions unrelated to this parser change.
+
 ## CLI parser maintenance (2026-10-05)
 
 The proposed parser fix retains the next command when a value-taking option has no value:

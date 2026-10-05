@@ -91,7 +91,7 @@ int main() {
     Expect(Parse({L"--distance", L"120"}).ok(), "maximum distance multiplier is accepted");
     Expect(!Parse({L"--distance", L"121"}).ok(), "oversized distance multiplier fails");
     Expect(!Parse({L"--battery-threshold", L"101"}).ok(), "oversized threshold fails");
-    Expect(!Parse({L"--stop-after", L"169h"}).ok(), "oversized stop duration fails");
+    Expect(!Parse({L"--stop-after", L"721h"}).ok(), "oversized stop duration fails");
     Expect(Parse({L"--interval", L"24h"}).ok(), "maximum interval in hours is accepted");
     Expect(Parse({L"--interval", L"24h"}).options.interval == 24h, "maximum interval parses to 24h");
     Expect(Parse({L"--interval", L"1440m"}).ok(), "maximum interval in minutes is accepted");
@@ -99,12 +99,27 @@ int main() {
     Expect(Parse({L"--interval", L"86400s"}).ok(), "maximum interval with seconds suffix is accepted");
     Expect(!Parse({L"--interval", L"86401"}).ok(), "interval one second above the maximum fails");
     Expect(!Parse({L"--interval", L"1441m"}).ok(), "interval one minute above the maximum fails");
-    Expect(Parse({L"--stop-after", L"168h"}).ok(), "maximum stop duration in hours is accepted");
-    Expect(Parse({L"--stop-after", L"168h"}).options.stop_after == 168h, "maximum stop duration parses to 168h");
-    Expect(Parse({L"--stop-after", L"10080m"}).ok(), "maximum stop duration in minutes is accepted");
-    Expect(Parse({L"--stop-after", L"604800"}).ok(), "maximum stop duration in seconds is accepted");
-    Expect(!Parse({L"--stop-after", L"604801"}).ok(), "stop duration one second above the maximum fails");
-    Expect(!Parse({L"--stop-after", L"10081m"}).ok(), "stop duration one minute above the maximum fails");
+    Expect(Parse({L"--stop-after", L"200h"}).ok(), "200h stop duration is accepted");
+    Expect(Parse({L"--stop-after", L"200h"}).options.stop_after == 200h, "200h stop duration parses to 200h");
+    Expect(Parse({L"--stop-after", L"720h"}).ok(), "maximum stop duration in hours is accepted");
+    Expect(Parse({L"--stop-after", L"720h"}).options.stop_after == 720h, "maximum stop duration parses to 720h");
+    Expect(Parse({L"--stop-after", L"43200m"}).ok(), "maximum stop duration in minutes is accepted");
+    Expect(Parse({L"--stop-after", L"2592000"}).ok(), "maximum stop duration in seconds is accepted");
+    Expect(!Parse({L"--stop-after", L"2592001"}).ok(), "stop duration one second above the maximum fails");
+    Expect(!Parse({L"--stop-after", L"43201m"}).ok(), "stop duration one minute above the maximum fails");
+    Expect(Parse({L"--stop-after", L"0"}).ok(), "zero stop duration remains accepted");
+    Expect(Parse({L"--stop-after", L"0"}).options.stop_after == 0s, "zero stop duration parses to 0s");
+    {
+        const auto oversized = Parse({L"--stop-after", L"721h"});
+        Expect(!oversized.ok(), "stop duration above 720h fails");
+        bool reports_range = false;
+        for (const auto& error : oversized.errors) {
+            if (error.find(L"use 0s to 720h") != std::wstring::npos) {
+                reports_range = true;
+            }
+        }
+        Expect(reports_range, "oversized stop duration reports the 0s to 720h range");
+    }
     Expect(!Parse({L"--config"}).ok(), "missing value fails");
     const auto missing_config = Parse({L"--config", L"--start"});
     Expect(!missing_config.ok(), "config value followed by a flag fails");
