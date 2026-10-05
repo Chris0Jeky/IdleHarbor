@@ -8,6 +8,8 @@ where practical.
 
 ### Fixed
 
+- `--stop-after` now accepts durations up to 30 days (720 hours), matching the settings validator.
+  The CLI previously rejected durations above seven days even though the settings allowed them.
 - The window's minimum height now includes its title bar and borders. The minimum was set from the
   content height alone, so dragging the window to its smallest size let the frame eat into the
   content and clipped the fixed Start/Stop/Save footer.

@@ -223,9 +223,9 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
         } else if (option == L"--stop-after") {
             const auto value = TakeValue(result, arguments, index);
             if (value.has_value()) {
-                const auto parsed = ParseDuration(*value, true, std::chrono::hours(24 * 7));
+                const auto parsed = ParseDuration(*value, true, std::chrono::hours(24 * 30));
                 if (!parsed.has_value()) {
-                    AddError(result, L"Invalid stop duration '" + std::wstring(*value) + L"'; use 0s to 168h.");
+                    AddError(result, L"Invalid stop duration '" + std::wstring(*value) + L"'; use 0s to 720h.");
                 } else {
                     result.options.stop_after = parsed;
                 }
@@ -289,7 +289,7 @@ Session options:
   --no-random                 Use the exact interval
   --pause-on-input DURATION   Resume after this much genuine-input quiet time;
                               0 disables the safeguard
-  --stop-after DURATION       Stop automatically after up to 168h; 0 disables
+  --stop-after DURATION       Stop automatically after up to 720h; 0 disables
   --battery-threshold N       Pause at or below N percent; 0 disables
   --pause-on-fullscreen       Pause while a full-screen app is foreground
   --no-pause-on-fullscreen    Disable that safeguard
