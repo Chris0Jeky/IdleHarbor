@@ -31,15 +31,18 @@ if ($binaryCandidates.Count -ne 1) {
     throw "Expected exactly one built IdleHarbor.exe below $buildRoot; found $($binaryCandidates.Count)."
 }
 
-$requiredFiles = @(
-    'packaging\install.ps1',
-    'packaging\uninstall.ps1',
-    'packaging\install.cmd',
-    'README.md',
-    'LICENSE',
-    'THIRD-PARTY-NOTICES.md'
-)
-foreach ($required in $requiredFiles) {
+# One payload table drives both preflight and copying, including the renamed
+# distribution guide. Missing sources must never silently shrink an archive.
+$requiredFiles = [ordered]@{
+    'packaging\install.ps1' = 'install.ps1'
+    'packaging\uninstall.ps1' = 'uninstall.ps1'
+    'packaging\install.cmd' = 'install.cmd'
+    'README.md' = 'README.md'
+    'LICENSE' = 'LICENSE'
+    'THIRD-PARTY-NOTICES.md' = 'THIRD-PARTY-NOTICES.md'
+    'packaging\README.md' = 'DISTRIBUTION.md'
+}
+foreach ($required in $requiredFiles.Keys) {
     $requiredSource = Join-Path $repoRoot $required
     if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
         throw "Expected required release file '$required' below $repoRoot; found none."
@@ -57,22 +60,8 @@ New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 try {
     Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path $stagePackage 'IdleHarbor.exe')
 
-    foreach ($relative in @(
-        'packaging\install.ps1',
-        'packaging\uninstall.ps1',
-        'packaging\install.cmd',
-        'README.md',
-        'LICENSE',
-        'THIRD-PARTY-NOTICES.md'
-    )) {
-        $source = Join-Path $repoRoot $relative
-        if (Test-Path -LiteralPath $source -PathType Leaf) {
-            Copy-Item -LiteralPath $source -Destination (Join-Path $stagePackage (Split-Path -Leaf $source))
-        }
-    }
-    $distributionGuide = Join-Path $repoRoot 'packaging\README.md'
-    if (Test-Path -LiteralPath $distributionGuide -PathType Leaf) {
-        Copy-Item -LiteralPath $distributionGuide -Destination (Join-Path $stagePackage 'DISTRIBUTION.md')
+    foreach ($file in $requiredFiles.GetEnumerator()) {
+        Copy-Item -LiteralPath (Join-Path $repoRoot $file.Key) -Destination (Join-Path $stagePackage $file.Value)
     }
 
     $manifest = [ordered]@{
