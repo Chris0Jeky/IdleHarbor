@@ -8,8 +8,9 @@ $tools = Join-Path $repositoryRoot 'packaging\chocolatey\tools'
 [xml]$nuspec = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'packaging\chocolatey\idleharbor.nuspec')
 $version = [string]$nuspec.package.metadata.version
 $root = Join-Path ([IO.Path]::GetTempPath()) ('IdleHarbor-shutdown-regression-' + [Guid]::NewGuid().ToString('N'))
-$script:target = Join-Path $root "IdleHarbor-$version-windows-x64-portable\IdleHarbor.exe"
-$script:session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+$shutdownState = @{}
+$shutdownState.target = Join-Path $root "IdleHarbor-$version-windows-x64-portable\IdleHarbor.exe"
+$shutdownState.session = [Diagnostics.Process]::GetCurrentProcess().SessionId
 $failures = New-Object 'Collections.Generic.List[string]'
 $caseCount = 0
 
@@ -17,35 +18,36 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
-# Script-local doubles are inherited by the copied production entry points.
+# Script-local doubles share a reference object with the copied entry points.
+# Do not use script: variables: that qualifier rebinds in a called script.
 # No global functions, live processes or installed package files are changed.
 function Get-CimInstance {
     [CmdletBinding()]
     param([string]$ClassName, [string]$Filter)
-    $script:queries++
-    $script:queryModes += [string]$PSBoundParameters['ErrorAction']
+    $shutdownState.queries++
+    $shutdownState.queryModes += [string]$PSBoundParameters['ErrorAction']
     Assert-True ($ClassName -eq 'Win32_Process') 'Unexpected CIM class.'
     Assert-True ($Filter -eq "Name='IdleHarbor.exe'") 'Unexpected CIM filter.'
-    if ($script:scenario -eq 'query-error') { Write-Error 'Process query failed'; return }
-    if ($script:scenario -eq 'none') { return }
-    if ($script:queries -gt 1) { return }
-    $path = $script:target
-    $sessionId = $script:session
-    if ($script:scenario -eq 'unrelated') { $path += '.other' }
-    if ($script:scenario -eq 'foreign') { $sessionId++ }
-    if ($script:scenario -eq 'unknown-path') { $path = $null }
+    if ($shutdownState.scenario -eq 'query-error') { Write-Error 'Process query failed'; return }
+    if ($shutdownState.scenario -eq 'none') { return }
+    if ($shutdownState.queries -gt 1) { return }
+    $path = $shutdownState.target
+    $sessionId = $shutdownState.session
+    if ($shutdownState.scenario -eq 'unrelated') { $path += '.other' }
+    if ($shutdownState.scenario -eq 'foreign') { $sessionId++ }
+    if ($shutdownState.scenario -eq 'unknown-path') { $path = $null }
     [pscustomobject]@{ ExecutablePath = $path; SessionId = $sessionId; ProcessId = 1234 }
 }
 
 function Start-Process {
     [CmdletBinding()]
     param([string]$FilePath, [string[]]$ArgumentList, [switch]$PassThru, [switch]$Wait)
-    $script:launches++
-    $script:unbounded = [bool]$Wait
-    $script:passThru = [bool]$PassThru
-    Assert-True ($FilePath -ceq $script:target) 'Attempted to launch an unrelated executable.'
+    $shutdownState.launches++
+    $shutdownState.unbounded = [bool]$Wait
+    $shutdownState.passThru = [bool]$PassThru
+    Assert-True ($FilePath -ceq $shutdownState.target) 'Attempted to launch an unrelated executable.'
     Assert-True ($ArgumentList.Count -eq 1 -and $ArgumentList[0] -ceq '--exit') 'Unexpected shutdown command.'
-    if ($script:scenario -ne 'no-child') { return $script:child }
+    if ($shutdownState.scenario -ne 'no-child') { return $shutdownState.child }
 }
 
 function Start-Sleep {
@@ -54,7 +56,7 @@ function Start-Sleep {
 }
 
 try {
-    New-Item -ItemType Directory -Path (Split-Path -Parent $script:target) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path -Parent $shutdownState.target) -Force | Out-Null
     $scripts = @('chocolateyBeforeModify.ps1', 'chocolateyUninstall.ps1')
     foreach ($name in $scripts) { Copy-Item -LiteralPath (Join-Path $tools $name) -Destination (Join-Path $root $name) }
     $helper = Join-Path $tools 'Stop-IdleHarborPackage.ps1'
@@ -76,45 +78,45 @@ try {
     foreach ($name in $scripts) {
         foreach ($case in $cases) {
             $caseCount++
-            $script:scenario = $case.Name
-            $script:queries = 0
-            $script:queryModes = @()
-            $script:launches = 0
-            $script:unbounded = $false
-            $script:passThru = $false
-            $script:child = [pscustomobject]@{
+            $shutdownState.scenario = $case.Name
+            $shutdownState.queries = 0
+            $shutdownState.queryModes = @()
+            $shutdownState.launches = 0
+            $shutdownState.unbounded = $false
+            $shutdownState.passThru = $false
+            $shutdownState.child = [pscustomobject]@{
                 WaitResult = ($case.Name -ne 'hung'); ThrowOnWait = ($case.Name -eq 'wait-error')
                 WaitMilliseconds = 0; Kills = 0; Disposed = $false; ExitCode = 0
             }
-            if ($case.Name -eq 'bad-exit') { $script:child.ExitCode = 1 }
-            $script:child | Add-Member ScriptMethod WaitForExit {
+            if ($case.Name -eq 'bad-exit') { $shutdownState.child.ExitCode = 1 }
+            $shutdownState.child | Add-Member ScriptMethod WaitForExit {
                 param([int]$Milliseconds)
                 $this.WaitMilliseconds = $Milliseconds
                 if ($this.ThrowOnWait) { throw 'Wait failed' }
                 return $this.WaitResult
             }
-            $script:child | Add-Member ScriptMethod Kill { $this.Kills++ }
-            $script:child | Add-Member ScriptMethod Dispose { $this.Disposed = $true }
-            Set-Content -LiteralPath $script:target -Value 'Not an executable; Start-Process is doubled.' -Encoding ASCII
-            if ($case.Name -eq 'absent') { Remove-Item -LiteralPath $script:target }
+            $shutdownState.child | Add-Member ScriptMethod Kill { $this.Kills++ }
+            $shutdownState.child | Add-Member ScriptMethod Dispose { $this.Disposed = $true }
+            Set-Content -LiteralPath $shutdownState.target -Value 'Not an executable; Start-Process is doubled.' -Encoding ASCII
+            if ($case.Name -eq 'absent') { Remove-Item -LiteralPath $shutdownState.target }
             $message = ''
             try { & (Join-Path $root $name) | Out-Null }
             catch { $message = $_.Exception.Message }
             try {
                 if ($case.Error.Length -eq 0) { Assert-True ($message.Length -eq 0) "Unexpected exception: $message" }
                 else { Assert-True ($message -match $case.Error) "Expected '$($case.Error)', got '$message'." }
-                Assert-True ($script:launches -eq $case.Launches) 'Wrong number of exit-command launches.'
-                Assert-True (-not $script:unbounded) 'Start-Process -Wait is unbounded.'
-                Assert-True (@($script:queryModes | Where-Object { $_ -ne 'Stop' }).Count -eq 0) 'Process discovery must fail closed.'
-                if ($case.Name -eq 'absent') { Assert-True ($script:queries -eq 0) 'Missing executable must not query processes.' }
+                Assert-True ($shutdownState.launches -eq $case.Launches) 'Wrong number of exit-command launches.'
+                Assert-True (-not $shutdownState.unbounded) 'Start-Process -Wait is unbounded.'
+                Assert-True (@($shutdownState.queryModes | Where-Object { $_ -ne 'Stop' }).Count -eq 0) 'Process discovery must fail closed.'
+                if ($case.Name -eq 'absent') { Assert-True ($shutdownState.queries -eq 0) 'Missing executable must not query processes.' }
                 if ($case.Launches -gt 0 -and $case.Name -ne 'no-child') {
-                    Assert-True $script:passThru 'Exit command must return a process handle.'
-                    Assert-True ($script:child.WaitMilliseconds -eq 10000) 'Exit-command wait must be bounded to 10 seconds.'
-                    Assert-True $script:child.Disposed 'Exit-command process handle was not disposed.'
+                    Assert-True $shutdownState.passThru 'Exit command must return a process handle.'
+                    Assert-True ($shutdownState.child.WaitMilliseconds -eq 10000) 'Exit-command wait must be bounded to 10 seconds.'
+                    Assert-True $shutdownState.child.Disposed 'Exit-command process handle was not disposed.'
                 }
                 $expectedKills = 0
                 if ($case.Name -eq 'hung') { $expectedKills = 1 }
-                Assert-True ($script:child.Kills -eq $expectedKills) 'Only a timed-out exit-command child may be killed.'
+                Assert-True ($shutdownState.child.Kills -eq $expectedKills) 'Only a timed-out exit-command child may be killed.'
                 Write-Host "PASS: $name / $($case.Name)"
             }
             catch {
