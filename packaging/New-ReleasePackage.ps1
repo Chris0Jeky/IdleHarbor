@@ -31,6 +31,21 @@ if ($binaryCandidates.Count -ne 1) {
     throw "Expected exactly one built IdleHarbor.exe below $buildRoot; found $($binaryCandidates.Count)."
 }
 
+$requiredFiles = @(
+    'packaging\install.ps1',
+    'packaging\uninstall.ps1',
+    'packaging\install.cmd',
+    'README.md',
+    'LICENSE',
+    'THIRD-PARTY-NOTICES.md'
+)
+foreach ($required in $requiredFiles) {
+    $requiredSource = Join-Path $repoRoot $required
+    if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
+        throw "Expected required release file '$required' below $repoRoot; found none."
+    }
+}
+
 $binary = $binaryCandidates[0]
 $packageName = "IdleHarbor-$Version-windows-$Architecture-portable"
 $stageRoot = Join-Path ([IO.Path]::GetTempPath()) "$packageName-$([Guid]::NewGuid().ToString('N'))"
