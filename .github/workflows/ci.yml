@@ -61,10 +61,22 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run registered script regressions
-        shell: ${{ matrix.shell }}
+      - name: Run regressions in Windows PowerShell
+        if: matrix.shell == 'powershell'
+        shell: powershell
         run: .\tests\Test-RegressionScripts.ps1
 
-      - name: Validate packaging in this PowerShell edition
-        shell: ${{ matrix.shell }}
+      - name: Run regressions in PowerShell 7
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: .\tests\Test-RegressionScripts.ps1
+
+      - name: Validate packaging in Windows PowerShell
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: .\packaging\Test-Packaging.ps1
+
+      - name: Validate packaging in PowerShell 7
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
         run: .\packaging\Test-Packaging.ps1
