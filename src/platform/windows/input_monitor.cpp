@@ -18,6 +18,10 @@ InputMonitorCapabilities InputMonitor::Start(
         return {};
     }
 
+    if (notification_window == nullptr || notification_message == 0) {
+        Stop();
+        return {};
+    }
     notification_window_ = notification_window;
     notification_message_ = notification_message;
     notification_pending_.store(false, std::memory_order_relaxed);
