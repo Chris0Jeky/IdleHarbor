@@ -49,3 +49,34 @@ jobs:
       - name: Check the website's Pulseboard SDK install
         if: matrix.arch == 'x64'
         run: node observatory/check.mjs
+
+  script-regressions:
+    name: Script regressions (${{ matrix.shell }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run regressions in Windows PowerShell
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: .\tests\Test-RegressionScripts.ps1
+
+      - name: Run regressions in PowerShell 7
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: .\tests\Test-RegressionScripts.ps1
+
+      - name: Validate packaging in Windows PowerShell
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: .\packaging\Test-Packaging.ps1
+
+      - name: Validate packaging in PowerShell 7
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: .\packaging\Test-Packaging.ps1
