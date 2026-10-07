@@ -427,12 +427,15 @@ if ($taskFolderOwned) {
     }
 }
 
+# Simulate only already validated leaf removals when calculating preview residue.
+$previewedRemovals = @()
 foreach ($file in @($marker.managedFiles)) {
     $candidate = Join-Path $safeRoot ([string]$file)
     if (-not (Test-SamePath (Split-Path -Parent $candidate) $safeRoot)) {
         throw "Ownership marker contains a path outside the installation directory: $file"
     }
     if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+        if ($WhatIfPreference) { $previewedRemovals += Get-FullPath $candidate }
         if (Confirm-Change $candidate 'Remove installed file') {
             Remove-Item -LiteralPath $candidate -Force
         }
@@ -440,6 +443,7 @@ foreach ($file in @($marker.managedFiles)) {
 }
 
 if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    if ($WhatIfPreference) { $previewedRemovals += Get-FullPath $markerPath }
     if (Confirm-Change $markerPath 'Remove ownership marker') {
         Remove-Item -LiteralPath $markerPath -Force
     }
@@ -447,6 +451,9 @@ if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
 
 if (Test-Path -LiteralPath $safeRoot -PathType Container) {
     $remaining = @(Get-ChildItem -LiteralPath $safeRoot -Force)
+    if ($WhatIfPreference) {
+        $remaining = @($remaining | Where-Object { $previewedRemovals -notcontains $_.FullName })
+    }
     if ($remaining.Count -eq 0) {
         if (Confirm-Change $safeRoot 'Remove empty installation directory') {
             Remove-Item -LiteralPath $safeRoot -Force
@@ -479,5 +486,11 @@ if ($PurgeData) {
     }
 }
 
-Write-Output "Uninstalled $ProductName from $safeRoot"
-if (-not $PurgeData) { Write-Output 'User settings were preserved. Use -PurgeData only when removal is intentional.' }
+if ($WhatIfPreference) {
+    Write-Output "Previewed uninstall of $ProductName from $safeRoot"
+    if (-not $PurgeData) { Write-Output 'User settings would be preserved. Use -PurgeData only when removal is intentional.' }
+}
+else {
+    Write-Output "Uninstalled $ProductName from $safeRoot"
+    if (-not $PurgeData) { Write-Output 'User settings were preserved. Use -PurgeData only when removal is intentional.' }
+}

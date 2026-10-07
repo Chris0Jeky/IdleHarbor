@@ -106,6 +106,7 @@ struct ValidationResult {
 
 class IntervalSampler {
 public:
+    // Throws std::invalid_argument for nonpositive or reversed bounds.
     IntervalSampler(std::uint64_t seed, Seconds minimum, Seconds maximum, bool randomized);
 
     [[nodiscard]] Seconds next();

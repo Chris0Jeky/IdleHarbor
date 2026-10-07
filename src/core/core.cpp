@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <stdexcept>
 #include <utility>
 
 namespace idleharbor::core {
@@ -271,7 +272,11 @@ IntervalSampler::IntervalSampler(
     Seconds minimum,
     Seconds maximum,
     bool randomized)
-    : minimum_(minimum), maximum_(maximum), randomized_(randomized), generator_(seed) {}
+    : minimum_(minimum), maximum_(maximum), randomized_(randomized), generator_(seed) {
+    if (minimum <= Seconds{0} || minimum > maximum) {
+        throw std::invalid_argument("interval bounds must be positive and ordered");
+    }
+}
 
 Seconds IntervalSampler::next() {
     if (!randomized_ || minimum_ >= maximum_) {
