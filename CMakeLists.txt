@@ -103,6 +103,13 @@ if(IDLEHARBOR_BUILD_TESTS)
   idleharbor_configure_msvc(idleharbor_power_request_tests)
   add_test(NAME power_request COMMAND idleharbor_power_request_tests)
 
+  add_executable(idleharbor_input_monitor_tests tests/input_monitor_lifecycle_tests.cpp src/platform/windows/input_monitor.cpp)
+  target_include_directories(idleharbor_input_monitor_tests BEFORE PRIVATE tests/fakes/input_monitor include)
+  target_compile_definitions(idleharbor_input_monitor_tests PRIVATE IDLEHARBOR_INPUT_MONITOR_TEST_DOUBLE)
+  target_compile_features(idleharbor_input_monitor_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_input_monitor_tests)
+  add_test(NAME input_monitor_lifecycle COMMAND idleharbor_input_monitor_tests)
+
   add_executable(idleharbor_command_line_tests tests/command_line_tests.cpp)
   target_link_libraries(idleharbor_command_line_tests PRIVATE idleharbor_app_support)
   target_compile_features(idleharbor_command_line_tests PRIVATE cxx_std_20)
