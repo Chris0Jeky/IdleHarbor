@@ -54,6 +54,35 @@ $projectVersion = $projectVersionMatch.Groups[1].Value
 Assert-True ([version]$version -le [version]$projectVersion) `
     "Chocolatey package version $version is ahead of the project version $projectVersion; it can only target a release that exists."
 
+if ($version -cne $projectVersion) {
+    $changelogPath = Join-Path $repositoryRoot 'CHANGELOG.md'
+    Assert-True (Test-Path -LiteralPath $changelogPath -PathType Leaf) 'CHANGELOG.md is required to justify a lagging Chocolatey package.'
+    $history = Get-Content -Raw -LiteralPath $changelogPath
+    $releases = @([regex]::Matches($history, '(?m)^## \[(?<version>\d+\.\d+\.\d+)\] - (?<date>\d{4}-\d{2}-\d{2})\r?$'))
+    Assert-True ($releases.Count -gt 0) 'CHANGELOG.md contains no dated release history for the lagging package.'
+    $lastVersion = $null
+    foreach ($release in $releases) {
+        $releaseVersion = [version]$release.Groups['version'].Value
+        try {
+            $null = [DateTime]::ParseExact($release.Groups['date'].Value, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+        }
+        catch { throw "CHANGELOG.md contains an invalid release date: $($release.Groups['date'].Value)." }
+        Assert-True ($releaseVersion -le [version]$projectVersion) 'CHANGELOG.md contains a release ahead of the project version.'
+        if ($null -ne $lastVersion) {
+            Assert-True ($releaseVersion -lt $lastVersion) 'CHANGELOG.md release versions must be strictly descending without duplicates.'
+        }
+        $lastVersion = $releaseVersion
+    }
+    # Before a release is dated, the newest dated version is its predecessor.
+    # After dating it, exactly the next section is allowed during repointing.
+    $previousIndex = 0
+    if ($releases[0].Groups['version'].Value -ceq $projectVersion) { $previousIndex = 1 }
+    Assert-True ($previousIndex -lt $releases.Count) 'CHANGELOG.md provides no previous release for this package.'
+    $previousVersion = $releases[$previousIndex].Groups['version'].Value
+    Assert-True ($version -ceq $previousVersion) `
+        "Chocolatey package $version must target project $projectVersion or its immediate previous release $previousVersion."
+}
+
 Assert-True ([string]$metadata.id -ceq 'idleharbor') 'Chocolatey package id must remain idleharbor.'
 Assert-True ([string]$metadata.licenseUrl -ceq "https://github.com/Chris0Jeky/IdleHarbor/blob/v$version/LICENSE") `
     'Chocolatey licence URL is not pinned to the package version.'
