@@ -38,7 +38,8 @@ to the intended capture scale, and run:
 
 The tool creates stopped, scrolled, running, policy-paused, and notification-area captures under
 `docs/assets`, plus `capture-manifest.json` with the exact source revision, executable identity,
-Authenticode state, dimensions, and image hashes. Inspect every PNG before committing it; the
+Authenticode state, dimensions, and image hashes. The manifest uses a fixed 2-space JSON layout, so
+Windows PowerShell 5.1 and PowerShell 7 write identical text. Inspect every PNG before committing it; the
 manifest is evidence of identity, not a substitute for visual review. The tool brings IdleHarbor to
 the foreground for each capture. During the tray-menu capture, it briefly moves the physical cursor
 to the notification icon, sends Escape to close the menu, and restores the original cursor position;

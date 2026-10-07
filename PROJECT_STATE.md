@@ -40,6 +40,8 @@ The continuation delivers:
   by six fixture operations and source/installed-byte preservation checks.
 - #112: retryable failed power cleanup, rejected invalid interval bounds and
   executable coverage for every safety-pause status reason.
+- #113: deterministic capture-manifest JSON with pure formatter cases and
+  read-only hash/dimension verification of all five committed PNGs.
 - #111: packaging fixture isolation in an edition-matched child PowerShell process,
   preserving caller-owned commands and variables on success and child failure.
 
@@ -55,6 +57,7 @@ record. See [the continuation handoff](docs/MAINTENANCE-CONTINUED-2026-10-07.md)
 | Native sources | Ten CTest executables on Windows x64/x86; x64/x86/ARM64 builds | ARM64 is cross-build only; power failure uses a private API double, not an induced live OS failure |
 | Script regressions | Both PowerShell editions: 11 version, 8 archive, 22 Chocolatey shutdown, 24 per-user shutdown, 9 license and 14 release-lag cases; preview/isolation suites; InputMonitor source contract | No live input hooks or complete Chocolatey lifecycle proof |
 | Packaging fixtures | Public Test-Packaging entry point starts the internal fixture suite in a same-edition child process | Process isolation protects caller namespaces, not a filesystem or Windows-API sandbox |
+| Capture metadata | Fixed-format and ten edge checks in both PowerShell editions; five existing PNG hashes/dimensions | No fresh capture, pointer movement or native visual inspection |
 | Website | 17 Node cases, six release-reference agreement checks, SDK 3.3.1 contract | Offline repository checks, not current deployment or live-site inspection |
 | WinGet | 28 Node cases on Windows/Linux, four tracked architecture-specific archive pins | Focused plain-scalar manifest contract, not a general YAML parser or full WinGet schema validator |
 | Published archives | Automated real ZIP downloads and SHA-256 comparisons for Chocolatey and WinGet | Bytes are not extracted/executed; no package-manager installation or moderation proof |
@@ -83,8 +86,9 @@ failure presentation. #112 repairs the low-level power object's state and bool
 result, not every UI caller of void Clear. #42/#46 still need accessible/visible
 tray and status consistency; #55/#56 need focus/combo interaction proof.
 
-#37 concerns ownership across known-folder relocation. #49/#50/#59/#70 concern
-capture quoting, corner privacy, harness cleanup and deterministic capture data.
+#37 concerns ownership across known-folder relocation. #49/#50/#59 concern
+capture quoting, corner privacy and harness cleanup. #70's serialization issue is
+addressed by #113, without claiming the other native capture gates are complete.
 Preserve their native/desktop evidence requirements rather than substituting a
 source check or a passing headless build.
 

@@ -44,6 +44,8 @@ where practical.
 
 ### Distribution
 
+- Capture manifests use deterministic two-space LF JSON across both PowerShell editions;
+  read-only checks verify the hashes and dimensions of the five committed PNGs.
 - The packaging fixture suite runs in an edition-matched child PowerShell process so its test
   doubles cannot overwrite the caller's scheduler command, module binding or fixture variable.
 - Publication requires the complete normalized GPLv3 text, not only recognizable license markers;
