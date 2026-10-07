@@ -590,6 +590,14 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
+    # A genuinely unexpected file must still be reported in a preview, and only that file.
+    $foreignPreviewWarnings = $null
+    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot -WhatIf -WarningVariable foreignPreviewWarnings | Out-Null
+    $foreignPreviewText = ((@($foreignPreviewWarnings) | ForEach-Object { "$_" }) -join "`n")
+    Assert-True ($foreignPreviewText -like '*unexpected*user-note.txt*') `
+        "Uninstall -WhatIf did not report the genuinely unexpected file. Warnings: $foreignPreviewText"
+    Assert-True (-not ($foreignPreviewText -like '*IdleHarbor.exe*')) `
+        "Uninstall -WhatIf reported a WhatIf-retained managed file as unexpected. Warnings: $foreignPreviewText"
     Remove-Item -LiteralPath $unexpectedFile -Force
     $installStampBeforePreview = Get-InstallTreeStamp $installRoot
     $previewUninstallWarnings = $null
