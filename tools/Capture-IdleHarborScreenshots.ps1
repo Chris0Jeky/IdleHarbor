@@ -539,6 +539,54 @@ function Save-TrayMenuCapture([IntPtr]$Window, [string]$Path) {
     }
 }
 
+function Format-CaptureManifestJson {
+    [CmdletBinding()]
+    param([AllowNull()][object]$Value, [int]$Level = 0)
+
+    if ($null -eq $Value) { return 'null' }
+    if ($Value -is [bool]) { if ($Value) { return 'true' } else { return 'false' } }
+    if ($Value -is [string] -or $Value -is [char]) {
+        $builder = New-Object System.Text.StringBuilder
+        [void]$builder.Append('"')
+        foreach ($character in ([string]$Value).ToCharArray()) {
+            $code = [int]$character
+            if ($code -eq 0x22) { [void]$builder.Append('\"') }
+            elseif ($code -eq 0x5C) { [void]$builder.Append('\\') }
+            elseif ($code -lt 0x20) { [void]$builder.Append(('\u{0:x4}' -f $code)) }
+            else { [void]$builder.Append($character) }
+        }
+        [void]$builder.Append('"')
+        return $builder.ToString()
+    }
+    # PSCustomObject also reports IFormattable, so it must be excluded here and handled below.
+    if ($Value -is [System.IFormattable] -and $Value -isnot [System.Collections.IEnumerable] -and $Value -isnot [pscustomobject]) {
+        return $Value.ToString($null, [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+
+    $inner = '  ' * ($Level + 1)
+    $outer = '  ' * $Level
+    if ($Value -is [System.Collections.IDictionary] -or $Value -is [pscustomobject]) {
+        if ($Value -is [System.Collections.IDictionary]) {
+            $pairs = @(foreach ($key in $Value.Keys) { [pscustomobject]@{ Name = [string]$key; Item = $Value[$key] } })
+        }
+        else {
+            $pairs = @(foreach ($property in $Value.PSObject.Properties) { [pscustomobject]@{ Name = $property.Name; Item = $property.Value } })
+        }
+        if ($pairs.Count -eq 0) { return '{}' }
+        $lines = @(foreach ($pair in $pairs) {
+            $inner + (Format-CaptureManifestJson $pair.Name) + ': ' + (Format-CaptureManifestJson $pair.Item ($Level + 1))
+        })
+        return "{`n" + ($lines -join ",`n") + "`n" + $outer + '}'
+    }
+    if ($Value -is [System.Collections.IEnumerable]) {
+        $items = @($Value)
+        if ($items.Count -eq 0) { return '[]' }
+        $lines = @(foreach ($item in $items) { $inner + (Format-CaptureManifestJson $item ($Level + 1)) })
+        return "[`n" + ($lines -join ",`n") + "`n" + $outer + ']'
+    }
+    throw "Unsupported manifest value type: $($Value.GetType().FullName)"
+}
+
 function Get-ImageEvidence([string]$FileName, [string]$State) {
     $path = Join-Path $outputRoot $FileName
     $image = [Drawing.Image]::FromFile($path)
@@ -634,7 +682,7 @@ try {
     $encoding = New-Object Text.UTF8Encoding($false)
     [IO.File]::WriteAllText(
         $manifestPath,
-        (($manifest | ConvertTo-Json -Depth 6) + [Environment]::NewLine),
+        ((Format-CaptureManifestJson $manifest) + [Environment]::NewLine),
         $encoding)
 
     # Promote only a complete capture set. Preserve every previous destination
