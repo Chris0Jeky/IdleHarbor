@@ -20,3 +20,12 @@ target_link_libraries(idleharbor_session_toolkit_tests PRIVATE idleharbor_core i
 idleharbor_configure_msvc(idleharbor_session_toolkit_tests)
 add_test(NAME session_toolkit COMMAND idleharbor_session_toolkit_tests)
 set_tests_properties(session_toolkit PROPERTIES TIMEOUT 30)
+
+add_executable(idleharbor_session_menu_race_tests "${PROJECT_SOURCE_DIR}/tests/session_menu_race_tests.cpp")
+target_include_directories(idleharbor_session_menu_race_tests PRIVATE "${session_fixture_directory}" include "${PROJECT_SOURCE_DIR}/src/app")
+target_compile_features(idleharbor_session_menu_race_tests PRIVATE cxx_std_20)
+target_compile_definitions(idleharbor_session_menu_race_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(idleharbor_session_menu_race_tests PRIVATE idleharbor_core idleharbor_app_support idleharbor_windows Comctl32 Shell32 Wtsapi32)
+idleharbor_configure_msvc(idleharbor_session_menu_race_tests)
+add_test(NAME session_menu_race COMMAND idleharbor_session_menu_race_tests)
+set_tests_properties(session_menu_race PROPERTIES TIMEOUT 30)
