@@ -94,6 +94,12 @@ if(IDLEHARBOR_BUILD_TESTS)
   idleharbor_configure_msvc(idleharbor_command_line_tests)
   add_test(NAME command_line COMMAND idleharbor_command_line_tests)
 
+  add_executable(idleharbor_command_line_value_tests tests/command_line_value_tests.cpp)
+  target_link_libraries(idleharbor_command_line_value_tests PRIVATE idleharbor_app_support)
+  target_compile_features(idleharbor_command_line_value_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_command_line_value_tests)
+  add_test(NAME command_line_values COMMAND idleharbor_command_line_value_tests)
+
   add_executable(idleharbor_settings_store_tests tests/settings_store_tests.cpp)
   target_link_libraries(idleharbor_settings_store_tests PRIVATE idleharbor_app_support)
   target_compile_features(idleharbor_settings_store_tests PRIVATE cxx_std_20)
