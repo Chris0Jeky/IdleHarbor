@@ -122,15 +122,41 @@ function Stop-OwnedApplicationIfRunning([string]$Executable) {
     if ($running.Count -eq 0) { return }
     if (-not (Confirm-Change $Executable 'Ask the running IdleHarbor instance to exit for uninstall')) { return }
 
-    Start-Process -FilePath $Executable -ArgumentList '--exit' -WindowStyle Hidden -Wait
-    $deadline = [DateTime]::UtcNow.AddSeconds(5)
-    do {
-        Start-Sleep -Milliseconds 100
-        $running = @(Get-OwnedProcesses $Executable)
-    } while ($running.Count -ne 0 -and [DateTime]::UtcNow -lt $deadline)
-    if ($running.Count -ne 0) {
-        throw 'The running IdleHarbor instance did not exit; no installed files were removed.'
+    $currentProcess = [Diagnostics.Process]::GetCurrentProcess()
+    try { $session = $currentProcess.SessionId }
+    finally { $currentProcess.Dispose() }
+    foreach ($process in $running) {
+        if ($null -eq $process.SessionId -or [int]$process.SessionId -ne $session) {
+            throw 'The running IdleHarbor instance is in another or unknown Windows session. Close it there and retry.'
+        }
     }
+
+    # A raced exit or a different desktop can strand --exit on a modal dialog.
+    # Bound only this new command child; never force-kill a discovered app.
+    $exitProcess = Start-Process -FilePath $Executable -ArgumentList '--exit' -WindowStyle Hidden -PassThru -ErrorAction Stop
+    if ($null -eq $exitProcess) {
+        throw 'The IdleHarbor exit command could not be started. Close IdleHarbor and retry.'
+    }
+    try {
+        if (-not $exitProcess.WaitForExit(10000)) {
+            try { $exitProcess.Kill() } catch { }
+            throw 'The IdleHarbor exit command did not finish within 10 seconds. Close IdleHarbor and retry.'
+        }
+        if ($exitProcess.ExitCode -ne 0) {
+            throw "The IdleHarbor exit command returned exit code $($exitProcess.ExitCode). Close IdleHarbor and retry."
+        }
+    }
+    finally { $exitProcess.Dispose() }
+
+    $elapsed = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $running = @(Get-OwnedProcesses $Executable)
+        if ($running.Count -eq 0) { return }
+        $remaining = 5000 - $elapsed.ElapsedMilliseconds
+        if ($remaining -le 0) { break }
+        Start-Sleep -Milliseconds ([int][Math]::Min(100, $remaining))
+    } while ($elapsed.ElapsedMilliseconds -lt 5000)
+    throw 'The running IdleHarbor instance did not exit; no installed files were removed.'
 }
 
 function Get-StartupLinkPath() {
