@@ -1,0 +1,46 @@
+name: WinGet contracts
+
+on:
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - 'tests/winget_contract_tests.mjs'
+      - '.github/workflows/winget-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/**'
+      - 'tests/winget_contract_tests.mjs'
+      - '.github/workflows/winget-contract.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '31 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: node --test tests/winget_contract_tests.mjs
+      - run: node packaging/check-winget.mjs
+
+  published:
+    name: Verify all pinned WinGet archives
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: node packaging/check-winget.mjs --verify-published-checksum
