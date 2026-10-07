@@ -31,9 +31,22 @@ node packaging/check-winget.mjs --verify-published-checksum
 
 ## Automated gates
 
-CI builds x64/x86/ARM64, executes ten CTests on x64/x86, and runs the registered
-script/packaging checks in both PowerShell editions. ARM64 execution is skipped,
-not inferred from its successful cross-build. CodeQL analyzes the C++ build.
+CI builds x64/x86/ARM64, executes all registered CTests on x64/x86, and runs the
+registered script/packaging checks in both PowerShell editions. ARM64 execution is
+skipped, not inferred from its successful cross-build. CodeQL analyzes the C++ build.
+
+The input_monitor_lifecycle target tests production hook ownership against a
+private API double. The application_status target invokes actual Application
+methods with hidden native controls and intercepted tray/dialog/show-window calls.
+For a detailed status-test result, run:
+
+```powershell
+ctest --test-dir build/x64 -C Release -R "^application_status$" --verbose
+```
+
+Neither target installs live input hooks or performs desktop acceptance checks.
+See [hook cleanup](../docs/INPUT-HOOK-CLEANUP.md) and
+[status surfaces](../docs/STATUS-SURFACES.md) for their explicit proof boundaries.
 
 Published checksum runs on relevant PR/main changes, manual dispatch and a daily
 04:17 UTC schedule. WinGet contracts runs its offline Windows/Linux cases and
