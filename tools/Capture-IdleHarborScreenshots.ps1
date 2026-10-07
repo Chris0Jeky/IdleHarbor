@@ -682,7 +682,7 @@ try {
     $encoding = New-Object Text.UTF8Encoding($false)
     [IO.File]::WriteAllText(
         $manifestPath,
-        ((Format-CaptureManifestJson $manifest) + [Environment]::NewLine),
+        ((Format-CaptureManifestJson $manifest) + "`n"),
         $encoding)
 
     # Promote only a complete capture set. Preserve every previous destination
