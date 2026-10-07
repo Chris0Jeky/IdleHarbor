@@ -8,6 +8,8 @@ where practical.
 
 ### Fixed
 
+- Input-hook cleanup retains failed handles, disables notifications immediately, and bounds
+  refresh/destructor recovery to four pending handles without allowing duplicate observers.
 - Configuration filenames beginning with a single dash are accepted without swallowing recognized
   options; 109 parser boundary cases protect missing-value handling and following commands.
 - Per-user install and uninstall bound the new exit-command child wait, reject identified foreign
