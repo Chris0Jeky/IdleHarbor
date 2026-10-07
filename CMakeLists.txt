@@ -151,4 +151,6 @@ if(IDLEHARBOR_BUILD_TESTS)
   target_compile_features(idleharbor_foundation_tests PRIVATE cxx_std_20)
   idleharbor_configure_msvc(idleharbor_foundation_tests)
   add_test(NAME foundation COMMAND idleharbor_foundation_tests)
+
+  include(tests/application_status.cmake)
 endif()

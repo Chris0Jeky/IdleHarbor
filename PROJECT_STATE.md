@@ -46,6 +46,10 @@ The continuation delivers:
   preserving caller-owned commands and variables on success and child failure.
 - #115: retain failed input-hook handles across Stop, partial refresh and destruction;
   thirteen lifecycle scenarios cover bounded cleanup and callback quiescence.
+- #116: compose tray availability separately from the session reason; keep native
+  status, tooltips and --status consistent through dirty-state failure and recovery.
+  Sixteen hidden-native-control scenarios and direct numeric/enum helper checks
+  form a 345-assertion regression target.
 
 The concurrent #110 overlaps #109. Its extra timestamp-stability coverage is
 retained in the preview suite without reapplying conflicting production changes.
@@ -56,7 +60,8 @@ record. See [the continuation handoff](docs/MAINTENANCE-CONTINUED-2026-10-07.md)
 
 | Surface | Executed checks | Boundary |
 | --- | --- | --- |
-| Native sources | Eleven registered CTest executables; Windows x64/x86 execution and x64/x86/ARM64 build gates | ARM64 is cross-build only; power and input-hook failures use private API doubles, not induced live OS failures |
+| Native sources | Twelve registered CTest executables; Windows x64/x86 execution and x64/x86/ARM64 build gates | ARM64 is cross-build only; power and input-hook failures use private API doubles, not induced live OS failures |
+| Application status | Actual Application methods, real hidden control text, sixteen status scenarios and numeric/enum helpers | Tray/dialog/show-window calls are intercepted; no Explorer interaction, screen-reader session, visible window or screenshot proof |
 | Script regressions | Both PowerShell editions: 11 version, 8 archive, 22 Chocolatey shutdown, 24 per-user shutdown, 9 license and 14 release-lag cases; preview/isolation suites; InputMonitor source contract | No live input hooks or complete Chocolatey lifecycle proof |
 | Packaging fixtures | Public Test-Packaging entry point starts the internal fixture suite in a same-edition child process | Process isolation protects caller namespaces, not a filesystem or Windows-API sandbox |
 | Capture metadata | Fixed-format and ten edge checks in both PowerShell editions; five existing PNG hashes/dimensions | No fresh capture, pointer movement or native visual inspection |
@@ -85,11 +90,12 @@ that universally fail-closed discovery.
 
 #115 addresses #86's input-hook handle loss with bounded retention and installing-
 thread lifecycle tests. See [cleanup contracts](docs/INPUT-HOOK-CLEANUP.md); pending
-handles are retained recovery state, not successful cleanup. #86 retains main.cpp
-helper coverage and visible cleanup-failure presentation. #112 repairs the low-level
-power object's state and bool result, not every UI caller of void Clear. #42/#46
-still need accessible/visible tray and status consistency; #55/#56 need focus/combo
-interaction proof.
+handles are retained recovery state, not successful cleanup. #116 adds direct
+main.cpp numeric/enum helper coverage and addresses #42/#46 status consistency.
+See [status contracts](docs/STATUS-SURFACES.md) for the native-control/API-double
+boundary. #86 retains visible cleanup-failure presentation: #112 repairs the
+low-level power object's state and bool result, not every UI caller of void Clear.
+#55/#56 still need focus/combo interaction proof.
 
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. #70's serialization issue is

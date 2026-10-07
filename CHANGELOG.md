@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Tray failure no longer replaces paused or stopped reasons with generic status. Recovery retracts
+  only the transient icon warning, and native status text, the tooltip and `--status` retain the
+  same unsaved-settings prefix and underlying reason.
 - Input-hook cleanup retains failed handles, disables notifications immediately, and bounds
   refresh/destructor recovery to four pending handles without allowing duplicate observers.
 - Configuration filenames beginning with a single dash are accepted without swallowing recognized
