@@ -88,6 +88,21 @@ if(IDLEHARBOR_BUILD_TESTS)
   idleharbor_configure_msvc(idleharbor_core_tests)
   add_test(NAME core COMMAND idleharbor_core_tests)
 
+  add_executable(idleharbor_core_contract_tests tests/core_contract_tests.cpp)
+  target_link_libraries(idleharbor_core_contract_tests PRIVATE idleharbor_core)
+  target_compile_features(idleharbor_core_contract_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_core_contract_tests)
+  add_test(NAME core_contracts COMMAND idleharbor_core_contract_tests)
+
+  # Recompile only this source against a test-local API double. The production
+  # library and application retain the real Windows headers and linkage.
+  add_executable(idleharbor_power_request_tests tests/power_request_tests.cpp src/platform/windows/power_request.cpp)
+  target_include_directories(idleharbor_power_request_tests BEFORE PRIVATE tests/fakes/power_request include)
+  target_compile_definitions(idleharbor_power_request_tests PRIVATE IDLEHARBOR_POWER_REQUEST_TEST_DOUBLE)
+  target_compile_features(idleharbor_power_request_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_power_request_tests)
+  add_test(NAME power_request COMMAND idleharbor_power_request_tests)
+
   add_executable(idleharbor_command_line_tests tests/command_line_tests.cpp)
   target_link_libraries(idleharbor_command_line_tests PRIVATE idleharbor_app_support)
   target_compile_features(idleharbor_command_line_tests PRIVATE cxx_std_20)

@@ -21,6 +21,8 @@ class PowerRequest final {
     PowerRequest& operator=(PowerRequest&&) = delete;
 
     [[nodiscard]] bool Apply(PowerRequestMode mode) noexcept;
+    // Failed OS cleanup leaves mode()/active() intact for a later retry.
+    // Apply(None) exposes the same cleanup result through its bool return.
     void Clear() noexcept;
 
     [[nodiscard]] PowerRequestMode mode() const noexcept { return mode_; }

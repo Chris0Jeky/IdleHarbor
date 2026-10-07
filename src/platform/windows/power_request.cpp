@@ -9,7 +9,7 @@ PowerRequest::~PowerRequest() {
 bool PowerRequest::Apply(const PowerRequestMode mode) noexcept {
     if (mode == PowerRequestMode::None) {
         Clear();
-        return true;
+        return mode_ == PowerRequestMode::None;
     }
 
     EXECUTION_STATE flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED;
@@ -25,8 +25,7 @@ bool PowerRequest::Apply(const PowerRequestMode mode) noexcept {
 }
 
 void PowerRequest::Clear() noexcept {
-    if (mode_ != PowerRequestMode::None) {
-        SetThreadExecutionState(ES_CONTINUOUS);
+    if (mode_ != PowerRequestMode::None && SetThreadExecutionState(ES_CONTINUOUS) != 0) {
         mode_ = PowerRequestMode::None;
     }
 }
