@@ -8,6 +8,13 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-ScheduledTaskCommandModuleName($Command) {
+    if ($null -eq $Command) { return '' }
+    $moduleName = [string]$Command.ModuleName
+    if ([string]::IsNullOrWhiteSpace($moduleName)) { $moduleName = [string]$Command.Source }
+    return $moduleName
+}
+
 function Get-FileDigestHex([string]$Path, [string]$Algorithm) {
     $hashAlgorithm = [Security.Cryptography.HashAlgorithm]::Create($Algorithm)
     $stream = [IO.File]::OpenRead($Path)
@@ -335,9 +342,14 @@ $retainedTransactionPaths = @()
 $packagingTestMutex = $null
 $packagingTestMutexOwned = $false
 $global:IdleHarborPackagingTestScheduledTask = $null
+$scheduledTaskModuleLoadedBefore = $false
+$scheduledTaskCommandBefore = $null
+$scheduledTaskCommandFromModule = $false
 
 # Keep the lifecycle suite isolated from a real per-user IdleHarbor task. The installer scripts run
 # in child scopes and resolve this deterministic test double before the ScheduledTasks cmdlet.
+# Sample the loaded module before Get-Command: that lookup auto-loads ScheduledTasks on Windows
+# PowerShell 5.1 and would hide whether the module was already present.
 function Install-ScheduledTaskTestDouble {
     function global:Get-ScheduledTask {
         [CmdletBinding()]
@@ -348,6 +360,9 @@ function Install-ScheduledTaskTestDouble {
         return $global:IdleHarborPackagingTestScheduledTask
     }
 }
+$scheduledTaskModuleLoadedBefore = $null -ne (Get-Module -Name ScheduledTasks)
+$scheduledTaskCommandBefore = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
+$scheduledTaskCommandFromModule = (Get-ScheduledTaskCommandModuleName $scheduledTaskCommandBefore) -eq 'ScheduledTasks'
 Install-ScheduledTaskTestDouble
 
 Assert-StartupOwnershipPredicates (Join-Path $packagingRoot 'install.ps1') $tempRoot
@@ -785,6 +800,29 @@ finally {
             if ($null -ne $packagingTestMutex) { $packagingTestMutex.Dispose() }
             Remove-Item -LiteralPath Function:\Get-ScheduledTask -ErrorAction SilentlyContinue
             Remove-Variable -Name IdleHarborPackagingTestScheduledTask -Scope Global -ErrorAction SilentlyContinue
+            try {
+                # Only a command that already came from ScheduledTasks is restored. Importing
+                # when that command did not exist would leave a command the session did not have.
+                # Skip Import-Module when the module command is already the one in command lookup,
+                # so a healthy export is not replaced. Failures here must not mask the test error.
+                if ($scheduledTaskCommandFromModule) {
+                    $restoredCommand = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
+                    $restoredModule = Get-ScheduledTaskCommandModuleName $restoredCommand
+                    $moduleStillLoaded = $null -ne (Get-Module -Name ScheduledTasks)
+                    if ($restoredModule -ne 'ScheduledTasks' -or ($scheduledTaskModuleLoadedBefore -and -not $moduleStillLoaded)) {
+                        Import-Module ScheduledTasks -Force
+                    }
+                }
+            }
+            catch {
+                Write-Warning "Could not restore Get-ScheduledTask from the ScheduledTasks module: $($_.Exception.Message)"
+            }
         }
     }
+}
+
+if ($null -ne $scheduledTaskCommandBefore -and $scheduledTaskCommandFromModule) {
+    $restoredScheduledTaskCommand = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
+    Assert-True ((Get-ScheduledTaskCommandModuleName $restoredScheduledTaskCommand) -eq 'ScheduledTasks') `
+        'Packaging checks left Get-ScheduledTask unresolved from the ScheduledTasks module.'
 }

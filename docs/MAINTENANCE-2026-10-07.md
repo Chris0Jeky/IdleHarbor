@@ -71,7 +71,7 @@ reviewing an issue is not a claim that its fix or its platform-specific proof wa
 | #40 | Add normalized full-text GPLv3 completeness proof, not just recognizable license markers. |
 | #42 | Add deterministic tray-failure/dirty-state tests with truthful visible status. |
 | #46 | Preserve tray recovery and status-refresh semantics; validate native failure/recovery paths. |
-| #48 | Preserve a pre-existing scheduler command/module when packaging test doubles are removed. |
+| #48 | Packaging suite restores a pre-existing ScheduledTasks Get-ScheduledTask after the test double is removed. |
 | #49 | Harden capture path quoting, repeated interop loading and hotkey setup on a real desktop. |
 | #50 | Normalize rounded screenshot-corner backgrounds without altering the captured application. |
 | #51 | Advanced by #101's fail-closed script behavior; real Chocolatey lifecycle, architecture, session and cleanup remain unverified. |
@@ -93,7 +93,7 @@ reviewing an issue is not a claim that its fix or its platform-specific proof wa
 1. Fix #77's per-user `Stop-OwnedApplicationIfRunning` wait with regression-first tests while
    preserving exact executable ownership, WhatIf and transactional update behavior. Do not
    force-kill a discovered application instance.
-2. Tackle #38/#48/#40 as small independent packaging-contract changes, then #65/#68/#66 as
+2. Tackle #38/#40 as small independent packaging-contract changes, then #65/#68/#66 as
    distribution validation. Real downloads and upstream publication are different acceptance gates.
 3. Run #51 in an isolated Windows environment before claiming Chocolatey lifecycle readiness;
    keep owner credentials outside the repository and logs. Continue native focus/status/capture
