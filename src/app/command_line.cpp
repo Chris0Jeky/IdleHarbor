@@ -96,10 +96,11 @@ std::optional<std::wstring_view> TakeValue(
         return std::nullopt;
     }
     const std::wstring_view next = arguments[index + 1];
-    // A token that looks like an option is the next option, not this one's value.
-    // Leave the index unadvanced so the next iteration parses it normally
-    // (e.g. `--interval --stop` still records Stop while reporting the missing value).
-    if (!next.empty() && next[0] == L'-') {
+    // Reserve long-option syntax and the supported short flags, not every
+    // dash-prefixed filename. Leave options unconsumed so their effects and
+    // diagnostics are retained (e.g. --interval --stop still records Stop).
+    if (next.starts_with(L"--") ||
+        IsOneOf(next, {L"-h", L"-?", L"-j", L"-g", L"-m", L"-r", L"-o", L"-s", L"-d"})) {
         AddError(result, L"Option '" + std::wstring(arguments[index]) + L"' requires a value.");
         return std::nullopt;
     }
