@@ -1,0 +1,43 @@
+name: Published checksum
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/published-checksum.yml'
+      - 'packaging/**'
+      - 'CMakeLists.txt'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/published-checksum.yml'
+      - 'packaging/**'
+      - 'CMakeLists.txt'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: published-checksum-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify pinned Chocolatey archive
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare the published archive with its pinned SHA-256
+        shell: pwsh
+        run: .\packaging\Test-ChocolateyPackage.ps1 -VerifyPublishedChecksum
