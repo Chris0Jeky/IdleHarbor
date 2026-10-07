@@ -8,6 +8,12 @@ where practical.
 
 ### Fixed
 
+- InputMonitor rejects a missing notification window or zero message before installing observers,
+  and releases the attempted ownership claim on rejection.
+- Chocolatey upgrade and uninstall share session-aware shutdown, reject uncertain process
+  ownership or failed discovery, and bound the spawned `--exit` command instead of waiting
+  indefinitely. Process handles are released on success and failure; running application instances
+  are not force-terminated.
 - `--stop-after` now accepts durations up to 30 days (720 hours), matching the settings validator.
   The CLI previously rejected durations above seven days even though the settings allowed them.
 - The window's minimum height now includes its title bar and borders. The minimum was set from the
@@ -28,6 +34,13 @@ where practical.
 
 ### Distribution
 
+- Release packaging requires every documented payload, including the distribution guide, before
+  touching an existing archive. The same source/destination table drives validation and copying.
+- CI executes the input-monitor contract, release-version, archive and Chocolatey shutdown
+  regressions in both Windows PowerShell 5.1 and PowerShell 7 without an installed Pester module.
+- The website's six release references are checked together, independently of the in-development
+  CMake version. Hosting plans identify their canonical-routing and release-verification source
+  files without activating a deployment or changing the canonical site.
 - The project website (not the application) now runs the Pulseboard beta SDK 3.3.0 with a Beta
   consent bar: aggregate usage counts, optional diagnostics and journeys, and which release or
   source link was chosen. Global Privacy Control and Do Not Track turn it off. The

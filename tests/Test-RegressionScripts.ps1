@@ -9,7 +9,8 @@ $ErrorActionPreference = 'Stop'
 foreach ($suite in @(
     'Test-InputMonitor.Tests.ps1',
     'Test-ReleaseVersion.Tests.ps1',
-    'Test-NewReleasePackage.Tests.ps1'
+    'Test-NewReleasePackage.Tests.ps1',
+    'Test-ChocolateyShutdown.ps1'
 )) {
     $path = Join-Path $PSScriptRoot $suite
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing registered regression suite: $suite" }

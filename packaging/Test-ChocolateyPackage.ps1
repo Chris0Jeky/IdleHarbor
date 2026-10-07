@@ -22,14 +22,15 @@ $nuspecPath = Join-Path $packageRoot 'idleharbor.nuspec'
 $installPath = Join-Path $toolsRoot 'chocolateyInstall.ps1'
 $uninstallPath = Join-Path $toolsRoot 'chocolateyUninstall.ps1'
 $beforeModifyPath = Join-Path $toolsRoot 'chocolateyBeforeModify.ps1'
+$stopHelperPath = Join-Path $toolsRoot 'Stop-IdleHarborPackage.ps1'
 $verificationPath = Join-Path $toolsRoot 'VERIFICATION.txt'
 $packageLicensePath = Join-Path $toolsRoot 'LICENSE.txt'
 
-foreach ($required in $nuspecPath, $installPath, $uninstallPath, $beforeModifyPath, $verificationPath, $packageLicensePath) {
+foreach ($required in $nuspecPath, $installPath, $uninstallPath, $beforeModifyPath, $stopHelperPath, $verificationPath, $packageLicensePath) {
     Assert-True (Test-Path -LiteralPath $required -PathType Leaf) "Missing Chocolatey package file: $required"
 }
 
-foreach ($script in $installPath, $uninstallPath, $beforeModifyPath) {
+foreach ($script in $installPath, $uninstallPath, $beforeModifyPath, $stopHelperPath) {
     $tokens = $null
     $errors = $null
     [Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors) | Out-Null
@@ -80,8 +81,8 @@ Assert-True ($install -notmatch '(?i)Register-ScheduledTask|CurrentVersion\\Run|
 $uninstall = Get-Content -Raw -LiteralPath $uninstallPath
 Assert-True ($uninstall -match "IdleHarbor-$([regex]::Escape($version))-windows-x64-portable") `
     'Chocolatey uninstaller does not target the versioned package executable.'
-Assert-True ($uninstall -match "ArgumentList\s+'--exit'") `
-    'Chocolatey uninstaller lacks the graceful IdleHarbor exit command.'
+Assert-True ($uninstall.Contains('Stop-IdleHarborPackage -Executable $executable')) `
+    'Chocolatey uninstaller does not invoke the shared graceful shutdown helper.'
 
 # choco upgrade does not run chocolateyUninstall.ps1. It runs the installed
 # package's chocolateyBeforeModify.ps1, so the graceful shutdown has to exist
@@ -89,8 +90,10 @@ Assert-True ($uninstall -match "ArgumentList\s+'--exit'") `
 $beforeModify = Get-Content -Raw -LiteralPath $beforeModifyPath
 Assert-True ($beforeModify -match "IdleHarbor-$([regex]::Escape($version))-windows-x64-portable") `
     'Chocolatey before-modify script does not target the versioned package executable.'
-Assert-True ($beforeModify -match "ArgumentList\s+'--exit'") `
-    'Chocolatey before-modify script lacks the graceful IdleHarbor exit command.'
+Assert-True ($beforeModify.Contains('Stop-IdleHarborPackage -Executable $executable')) `
+    'Chocolatey before-modify script does not invoke the shared graceful shutdown helper.'
+$stopHelper = Get-Content -Raw -LiteralPath $stopHelperPath
+Assert-True ($stopHelper -match "ArgumentList\s+'--exit'") 'Shared shutdown helper lacks the graceful IdleHarbor exit command.'
 
 # VERIFICATION.txt is what a Chocolatey moderator reads, so it has to repeat the
 # installer's own URL and digest rather than a stale copy of an older release.
