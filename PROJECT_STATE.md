@@ -4,95 +4,91 @@ Last updated: 2026-10-07
 
 ## Product and release boundary
 
-IdleHarbor is a native C++20/Win32 Windows keep-awake utility with a platform-neutral policy
-core, local settings, explicit Start/Stop/Exit controls and safety pauses. Keep the application
-visible and user-controlled. Do not add application networking, telemetry, hidden behavior,
-implicit startup, elevation or security-policy bypasses.
+IdleHarbor remains a native C++20/Win32 Windows keep-awake utility with local
+settings, explicit Start/Stop/Exit controls and safety pauses. Preserve visible
+user control and immediate stop. Do not add application networking, telemetry,
+elevation, hidden behavior or implicit persistence. The website-only, owner-selected
+Pulseboard integration remains separate from the application.
 
-The package and website still target `v0.2.0`. This maintenance batch does not create a release,
-change a published checksum, install anything on the development PC, submit a marketplace
-package or deploy the site. GPL-3.0-only and intentionally unsigned distribution are unchanged.
-The website's separate, owner-selected Pulseboard integration is retained; the checked-in SDK
-contract passes `node observatory/check.mjs` and identifies SDK 3.3.1.
+The checked-in application, Chocolatey package and website still name v0.2.0.
+This maintenance work does not publish a new release, change archive pins, update
+an installed-user application or submit a marketplace package. GPL-3.0-only and
+unsigned distribution are unchanged. Hosting activation remains false.
 
-Earlier release, installed-PC, screenshot, distribution and native-desktop observations are
-preserved byte-for-byte in [the historical state record](docs/history/PROJECT_STATE-before-2026-10-07.md).
-They are dated evidence, not a fresh assertion about the current machine, upstream moderation,
-public-site availability or an owner account. Recheck the relevant service before relying on an
-old external status. `HUMAN_TODO.md` remains the authority for owner decisions.
+Historical release hashes, screenshots and installed-PC observations are retained
+in [the historical state record](docs/history/PROJECT_STATE-before-2026-10-07.md).
+They are not current-machine, desktop, account or public-site verification.
+`HUMAN_TODO.md` remains the authority for owner-only decisions.
 
-## Maintenance delivery
+## Delivered maintenance
 
-The uploaded ZIP was reconciled to main `56419c2e702a9642cf2a01f49c4efba75c57a485`, including
-its full Git tree, before edits. Publishing and exact-head CI used the connected GitHub tools.
+The first batch (#93-#102) qualified existing PRs, completed release payload
+preflight, registered both PowerShell editions, shared bounded Chocolatey shutdown,
+and added website release/hosting contracts. Its dated evidence remains in
+[the first handoff](docs/MAINTENANCE-2026-10-07.md).
 
-- Merged #93: updated pinned CodeQL actions.
-- Merged #94, #95 and #96: required release payload preflight, invalid InputMonitor notification
-  target rejection, and release-version regression additions.
-- Merged #100: completed all four remaining review findings from those PRs. One seven-file
-  table now drives release preflight and copying, including `DISTRIBUTION.md`. Missing input
-  preserves an existing archive. Standalone regression scripts are registered in CI in both
-  Windows PowerShell 5.1 and PowerShell 7; no Pester installation is required.
-- Merged #101: shared bounded, session-aware Chocolatey shutdown. Unknown process ownership
-  or failed discovery is rejected; only a newly spawned, timed-out `--exit` child may be killed.
-  Discovered application instances are never force-terminated. Issue #78 is resolved; #77 and
-  #51 retain the broader installer and real-lifecycle follow-ups.
-- #102 adds a dependency-free website release-consensus guard and corrects the inert hosting
-  manifest's source paths. The six site references must agree with each other, not with CMake,
-  so the release/repoint window remains valid. Hosting activation stays false and the canonical
-  origin and all release destinations remain unchanged.
+The continuation delivers:
 
-See [the maintenance handoff](docs/MAINTENANCE-2026-10-07.md) for exact-head red/green evidence,
-all 22 issues reviewed, unverified boundaries and the next work slices. PR #102 carries the
-final integrated validation record for this batch.
+- #103: valid single-dash configuration filenames and 109 parser-boundary cases.
+- #104: bounded per-user install/uninstall shutdown and 24 isolated cases.
+- #105: complete normalized GPLv3 integrity, with nine tracked/untracked fixtures.
+- #106: read-only automation that downloads and hashes the actual Chocolatey archive.
+- #107: at most one dated-release lag for Chocolatey, with 14 regression cases.
+- #108: WinGet metadata contracts, 28 offline cases, and actual-byte verification
+  of all four tracked x64/ARM64 archives for v0.1.0/v0.2.0.
+- #109: explicit preview summaries and genuine-unowned-file warnings, protected
+  by six fixture operations and source/installed-byte preservation checks.
+- #112: retryable failed power cleanup, rejected invalid interval bounds and
+  executable coverage for every safety-pause status reason.
+- #111: packaging fixture isolation in an edition-matched child PowerShell process,
+  preserving caller-owned commands and variables on success and child failure.
 
-## Executable validation
+The concurrent #110 overlaps #109. Its extra timestamp-stability coverage is
+retained in the preview suite without reapplying conflicting production changes.
+The consolidation PR carries the final integrated validation and supersession
+record. See [the continuation handoff](docs/MAINTENANCE-CONTINUED-2026-10-07.md).
 
-| Surface | Checked path | Evidence boundary |
+## Executable checks and their limits
+
+| Surface | Executed checks | Boundary |
 | --- | --- | --- |
-| Native core and application | Windows CI builds x64, x86 and ARM64; x64/x86 run seven CTest executables | ARM64 is cross-build only; no representative ARM64 execution |
-| Script regressions | `tests/Test-RegressionScripts.ps1` in PowerShell 5.1 and 7 | 11 version cases, 8 archive cases, 22 mocked Chocolatey shutdown cases, plus an InputMonitor source-contract check |
-| Packaging | `packaging/Test-Packaging.ps1` in both PowerShell editions | Existing local/fixture checks, not real Chocolatey or WinGet orchestration |
-| Website release and hosting | `node --test tests/site_release_tests.mjs` and `node tools/check-site-release.mjs` | 17 offline cases; no deployment or live-site verification |
-| Website SDK | `node observatory/check.mjs` | Checked-in artifact, wiring, reporting hooks and CSP contract |
+| Native sources | Ten CTest executables on Windows x64/x86; x64/x86/ARM64 builds | ARM64 is cross-build only; power failure uses a private API double, not an induced live OS failure |
+| Script regressions | Both PowerShell editions: 11 version, 8 archive, 22 Chocolatey shutdown, 24 per-user shutdown, 9 license and 14 release-lag cases; preview/isolation suites; InputMonitor source contract | No live input hooks or complete Chocolatey lifecycle proof |
+| Packaging fixtures | Public Test-Packaging entry point starts the internal fixture suite in a same-edition child process | Process isolation protects caller namespaces, not a filesystem or Windows-API sandbox |
+| Website | 17 Node cases, six release-reference agreement checks, SDK 3.3.1 contract | Offline repository checks, not current deployment or live-site inspection |
+| WinGet | 28 Node cases on Windows/Linux, four tracked architecture-specific archive pins | Focused plain-scalar manifest contract, not a general YAML parser or full WinGet schema validator |
+| Published archives | Automated real ZIP downloads and SHA-256 comparisons for Chocolatey and WinGet | Bytes are not extracted/executed; no package-manager installation or moderation proof |
 
-The maintenance container was Linux without PowerShell, the Windows SDK or an interactive
-Windows desktop. Three portable C++ suites (core, CLI and window layout), the 17 Node tests,
-the site release guard and the SDK check ran locally. Hosted Windows CI supplies the Windows
-build and PowerShell results. The InputMonitor test checks source structure, not live hooks.
-Shutdown tests use local command doubles and do not start or terminate a real application.
+Use [the validation guide](packaging/VALIDATION.md) for exact commands and workflow
+names. Registered regressions fail on terminating assertions; they do not depend
+on Pester discovery. The public packaging entry point is unchanged, but callers
+must not invoke its internal fixture implementation directly when isolation matters.
 
-From a Windows checkout with Visual Studio 2022 Build Tools:
+Local work used a reconciled ZIP in Linux worktrees. GCC/Clang exercised portable
+and test-double C++ suites; Node exercised offline metadata/hash tests. Hosted
+Windows CI supplied MSVC, both PowerShell editions and real release-download proof.
+GitHub commits, exact-head CI and live issue state outrank these summaries.
 
-```powershell
-cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
-cmake --build build/x64 --config Release --parallel
-ctest --test-dir build/x64 -C Release --output-on-failure
-.\tests\Test-RegressionScripts.ps1
-.\packaging\Test-Packaging.ps1
-node --test tests/site_release_tests.mjs
-node tools/check-site-release.mjs
-node observatory/check.mjs
-```
+## Remaining work and owner gates
 
-Run packaging checks sequentially in each edition. Native viewport/help-tip scripts and the
-capture tool require a real interactive desktop and were not run in this batch. Current-head
-proof must not be replaced with a log from an earlier commit.
+#77's reported unbounded shutdown copies are fixed by #101/#104. Its broader
+orchestration question remains with #51: prove actual Chocolatey install/upgrade/
+uninstall behavior, hook failure handling, session/desktop boundaries, architecture
+rejection and shim cleanup in an isolated Windows environment. Per-user process
+lookup still suppresses inaccessible paths and enumeration errors; do not call
+that universally fail-closed discovery.
 
-## Next work and owner gates
+#86 retains input-hook cleanup retry, main.cpp helper coverage and visible cleanup
+failure presentation. #112 repairs the low-level power object's state and bool
+result, not every UI caller of void Clear. #42/#46 still need accessible/visible
+tray and status consistency; #55/#56 need focus/combo interaction proof.
 
-First address the related unbounded per-user installer wait in #77 while preserving exact-path
-ownership and `-WhatIf`. The packaging suite restores a pre-existing ScheduledTasks
-Get-ScheduledTask after removing its test double (#48). Then handle preview wording (#38),
-license completeness (#40), bounded Chocolatey version lag (#65), and WinGet manifest guards
-(#68) through failing regression tests. #66 concerns published-archive verification rather
-than offline metadata agreement.
+#37 concerns ownership across known-folder relocation. #49/#50/#59/#70 concern
+capture quoting, corner privacy, harness cleanup and deterministic capture data.
+Preserve their native/desktop evidence requirements rather than substituting a
+source check or a passing headless build.
 
-Use an isolated Windows environment for #51's real Chocolatey lifecycle, session, architecture
-and cleanup evidence. Do not infer that Chocolatey aborts every mutation merely because a mocked
-entry point throws. Native focus/status/capture follow-ups retain their desktop proof requirements.
-
-Owner actions remain outside this maintenance batch: Chocolatey account/API-key publication
-(q-3), Google Search Console verification/submission (q-4), and social-preview upload (#6).
-Do not put credentials into the repository, PR comments or logs. No hosting activation is
-authorized by `.hosting/manifest.json`; it is a planning record, not a deployment instruction.
+Owner-only work remains unchanged: Chocolatey account/API-key publication,
+Google Search Console operations and the social-preview Settings upload (#6).
+No credentials belong in the repository or logs. No new hosting activation,
+marketplace publication or native screenshot recapture is authorized by this record.

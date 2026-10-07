@@ -32,8 +32,8 @@ function Snapshot([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return '<absent>' }
     return (@(Get-ChildItem -LiteralPath $Path -Recurse -Force | Sort-Object FullName | ForEach-Object {
         $relative = $_.FullName.Substring($Path.Length)
-        if ($_.PSIsContainer) { "directory:$relative" }
-        else { "${relative}:$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)" }
+        if ($_.PSIsContainer) { "directory:${relative}:$($_.LastWriteTimeUtc.Ticks)" }
+        else { "${relative}:$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash):$($_.LastWriteTimeUtc.Ticks)" }
     }) -join "`n")
 }
 function Text([object[]]$Records) { return ($Records | ForEach-Object { $_.ToString() }) -join "`n" }

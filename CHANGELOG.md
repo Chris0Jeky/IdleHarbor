@@ -8,6 +8,16 @@ where practical.
 
 ### Fixed
 
+- Configuration filenames beginning with a single dash are accepted without swallowing recognized
+  options; 109 parser boundary cases protect missing-value handling and following commands.
+- Per-user install and uninstall bound the new exit-command child wait, reject identified foreign
+  or unknown sessions, dispose handles and preserve preview no-launch behavior.
+- Installer previews explicitly report preview-only summaries and distinguish genuinely unowned
+  residue from managed files retained by WhatIf. Hash and timestamp checks protect no-op behavior.
+- Failed power-request cleanup retains the last applied state for retry; Apply(None) reports the
+  cleanup result instead of claiming unconditional success.
+- Interval sampling rejects nonpositive or reversed bounds while preserving valid deterministic,
+  fixed and random behavior. All safety-pause status reasons have executable coverage.
 - InputMonitor rejects a missing notification window or zero message before installing observers,
   and releases the attempted ownership claim on rejection.
 - Chocolatey upgrade and uninstall share session-aware shutdown, reject uncertain process
@@ -34,6 +44,14 @@ where practical.
 
 ### Distribution
 
+- The packaging fixture suite runs in an edition-matched child PowerShell process so its test
+  doubles cannot overwrite the caller's scheduler command, module binding or fixture variable.
+- Publication requires the complete normalized GPLv3 text, not only recognizable license markers;
+  valid LF, CRLF and UTF-8 BOM representations are tested without changing the license itself.
+- Chocolatey metadata may lag only to the immediate previous dated release, preserving the
+  legitimate release/repoint window while rejecting stale or ambiguous histories.
+- Read-only automated checks download and hash the pinned Chocolatey archive and all tracked
+  WinGet archives. Offline WinGet contracts guard identity, version, architecture and nested paths.
 - Release packaging requires every documented payload, including the distribution guide, before
   touching an existing archive. The same source/destination table drives validation and copying.
 - CI executes the input-monitor contract, release-version, archive and Chocolatey shutdown
