@@ -152,5 +152,11 @@ if(IDLEHARBOR_BUILD_TESTS)
   idleharbor_configure_msvc(idleharbor_foundation_tests)
   add_test(NAME foundation COMMAND idleharbor_foundation_tests)
 
+  add_executable(idleharbor_session_controls_tests tests/session_controls_tests.cpp)
+  target_link_libraries(idleharbor_session_controls_tests PRIVATE idleharbor_core)
+  target_compile_features(idleharbor_session_controls_tests PRIVATE cxx_std_20)
+  idleharbor_configure_msvc(idleharbor_session_controls_tests)
+  add_test(NAME session_controls COMMAND idleharbor_session_controls_tests)
+
   include(tests/application_status.cmake)
 endif()
