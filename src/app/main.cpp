@@ -509,14 +509,27 @@ class Application final {
     }
 
     void HandleCommand(const CommandLineOptions& options) {
+        if (options.command == RequestedCommand::StartFor && session_active_) {
+            MessageBoxW(window_, L"A session is already active. Extend it or stop it before starting a new timer.",
+                        L"IdleHarbor session", MB_OK | MB_ICONINFORMATION);
+            return;
+        }
+        // Commit the user's pending selection before applying explicit command
+        // overrides. The second call covers an early synchronous CBN_CLOSEUP.
+        CloseOpenComboBoxLists();
+        ApplyQueuedComboBoxSelection();
         const bool restart_for_overrides = session_active_ && HasRuntimeOverrides(options);
         const bool automatic_start_blocked =
             !settings_load_warnings_.empty() &&
-            (options.command == RequestedCommand::Start ||
+            (options.command == RequestedCommand::Start || options.command == RequestedCommand::StartFor ||
              (options.command == RequestedCommand::Toggle && !session_active_));
-        ApplyCommandLineOptions(options);
-        dirty_ = SettingsNeedSave();
-        RefreshControls();
+        // Informational/session-control commands must not erase invalid or
+        // unfinished settings edits simply to refresh an unchanged preference.
+        if (HasRuntimeOverrides(options) || options.minimized || options.close_to_tray.has_value()) {
+            ApplyCommandLineOptions(options);
+            dirty_ = SettingsNeedSave();
+            RefreshControls();
+        }
         if (automatic_start_blocked) {
             ShowWindow(window_, SW_SHOW);
             SetForegroundWindow(window_);
@@ -540,6 +553,15 @@ class Application final {
                 StopSession();
             }
             StartSession();
+            break;
+        case RequestedCommand::StartFor:
+            StartTimedSession(options.command_duration.value_or(Seconds{0}));
+            break;
+        case RequestedCommand::Pause:
+        case RequestedCommand::Resume:
+        case RequestedCommand::Snooze:
+        case RequestedCommand::Extend:
+            ControlSession(options.command, options.command_duration.value_or(Seconds{0}));
             break;
         case RequestedCommand::Stop:
             StopSession();
@@ -1890,6 +1912,13 @@ class Application final {
 
     [[nodiscard]] std::wstring DisplayStatusText(const bool include_tray_warning = true) const {
         std::wstring text = dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
+        if (session_active_ && policy_ != nullptr) {
+            const auto remaining = policy_->remaining_duration(NowSeconds());
+            text += remaining ? L"; " + FormatCountdown(*remaining) + L" remaining" : L"; no time limit";
+        }
+        if (power_cleanup_pending_) {
+            text += L"; power request release failed; press Stop to retry";
+        }
         if (include_tray_warning && tray_unavailable_) {
             text += L"; notification icon unavailable; window kept visible";
         }
@@ -2026,10 +2055,10 @@ class Application final {
             }
         } else {
             if (start_ != nullptr) {
-                EnableWindow(start_, TRUE);
+                EnableWindow(start_, power_cleanup_pending_ ? FALSE : TRUE);
             }
             if (stop_ != nullptr) {
-                EnableWindow(stop_, FALSE);
+                EnableWindow(stop_, power_cleanup_pending_ ? TRUE : FALSE);
             }
         }
         for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
@@ -2293,8 +2322,18 @@ class Application final {
         };
     }
 
-    void StartSession() {
+    void StartSession(const std::optional<Seconds> duration = std::nullopt) {
         if (session_active_) {
+            return;
+        }
+        if (power_cleanup_pending_) {
+            MessageBoxW(window_, L"The previous power request could not be released. Press Stop to retry cleanup first.",
+                        L"IdleHarbor session", MB_OK | MB_ICONWARNING);
+            return;
+        }
+        if (duration && (*duration <= Seconds{0} || *duration > Settings::kMaximumDuration)) {
+            MessageBoxW(window_, L"A timed session must be between 1 second and 30 days.",
+                        L"IdleHarbor session", MB_OK | MB_ICONWARNING);
             return;
         }
         std::wstring error;
@@ -2308,6 +2347,9 @@ class Application final {
 
         ApplyEmergencyHotkeySetting();
         runtime_settings_ = settings_.session;
+        if (duration) {
+            runtime_settings_.max_duration = *duration;
+        }
         const bool session_safeguards_requested =
             runtime_settings_.pause_when_locked || runtime_settings_.pause_when_disconnected;
         if (session_safeguards_requested) {
@@ -2381,7 +2423,7 @@ class Application final {
         const bool transitioned_to_stopped = session_active_;
         KillTimer(window_, kTimerId);
         input_monitor_.Stop();
-        power_request_.Clear();
+        ReleasePowerRequest();
         sampler_.reset();
         policy_.reset();
         session_active_ = false;
@@ -2466,7 +2508,10 @@ class Application final {
             return;
         }
         if (decision.action == DecisionAction::Pause) {
-            power_request_.Clear();
+            if (!ReleasePowerRequest()) {
+                FailSession(L"could not release the power request");
+                return;
+            }
             const auto text = idleharbor::core::status_text(decision);
             const std::wstring status(text.begin(), text.end());
             SetStatus(status);
@@ -2540,32 +2585,8 @@ class Application final {
         MessageBoxW(window_, message.c_str(), L"IdleHarbor settings recovered", MB_OK | MB_ICONWARNING);
     }
 
-    void ShowTrayMenu() {
-        HMENU menu = CreatePopupMenu();
-        if (menu == nullptr) {
-            return;
-        }
-        AppendMenuW(menu, MF_STRING, kStatus, L"Show");
-        AppendMenuW(menu, MF_STRING, session_active_ ? kStop : kStart, session_active_ ? L"Stop" : L"Start");
-        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        constexpr UINT kExitMenu = 199;
-        AppendMenuW(menu, MF_STRING, kExitMenu, L"Exit");
-        SetForegroundWindow(window_);
-        POINT cursor{};
-        GetCursorPos(&cursor);
-        const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY, cursor.x, cursor.y, 0, window_, nullptr);
-        DestroyMenu(menu);
-        if (command == kStatus) {
-            ShowWindow(window_, SW_SHOW);
-            SetForegroundWindow(window_);
-        } else if (command == kStart) {
-            StartSession();
-        } else if (command == kStop) {
-            StopSession();
-        } else if (command == kExitMenu) {
-            RequestExit();
-        }
-    }
+    // Session conveniences share the existing policy, native menu and stop path.
+#include "session_actions.inc"
 
     void RequestExit() {
         exiting_ = true;
@@ -2853,6 +2874,7 @@ class Application final {
     UINT dpi_ = USER_DEFAULT_SCREEN_DPI;
     bool tray_added_ = false;
     bool tray_unavailable_ = false;
+    bool power_cleanup_pending_ = false;
     bool hotkey_registered_ = false;
     bool session_notifications_available_ = false;
     bool session_state_available_ = false;
@@ -2981,7 +3003,9 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
     }
 
     if (parsed.options.command == RequestedCommand::Stop || parsed.options.command == RequestedCommand::Status ||
-        parsed.options.command == RequestedCommand::Exit) {
+        parsed.options.command == RequestedCommand::Exit || parsed.options.command == RequestedCommand::Pause ||
+        parsed.options.command == RequestedCommand::Resume || parsed.options.command == RequestedCommand::Snooze ||
+        parsed.options.command == RequestedCommand::Extend) {
         MessageBoxW(nullptr, L"IdleHarbor is not currently running.", L"IdleHarbor", MB_OK | MB_ICONINFORMATION);
         CloseHandle(mutex);
         return 0;
