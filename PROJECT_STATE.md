@@ -82,7 +82,8 @@ proof must not be replaced with a log from an earlier commit.
 ## Next work and owner gates
 
 First address the related unbounded per-user installer wait in #77 while preserving exact-path
-ownership and `-WhatIf`. Then handle preview wording (#38), packaging test isolation (#48),
+ownership and `-WhatIf`. The packaging suite restores a pre-existing ScheduledTasks
+Get-ScheduledTask after removing its test double (#48). Then handle preview wording (#38),
 license completeness (#40), bounded Chocolatey version lag (#65), and WinGet manifest guards
 (#68) through failing regression tests. #66 concerns published-archive verification rather
 than offline metadata agreement.
