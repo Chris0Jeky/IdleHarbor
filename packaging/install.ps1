@@ -938,7 +938,12 @@ finally {
     }
 }
 
-Write-Output "Installed $ProductName to $safeRoot"
+if ($WhatIfPreference) {
+    Write-Output "Previewed install of $ProductName to $safeRoot (no changes were made)."
+}
+else {
+    Write-Output "Installed $ProductName to $safeRoot"
+}
 Write-Output "Startup mode: $Startup"
 if (-not $NoLaunch -and -not $WhatIfPreference -and (Test-Path -LiteralPath $destinationExecutable -PathType Leaf)) {
     Start-Process -FilePath $destinationExecutable -ArgumentList '--start', '--minimized' -WorkingDirectory $safeRoot

@@ -427,6 +427,8 @@ if ($taskFolderOwned) {
     }
 }
 
+# Names retained only because -WhatIf declined a removal this script would have performed.
+$whatIfRetainedNames = @()
 foreach ($file in @($marker.managedFiles)) {
     $candidate = Join-Path $safeRoot ([string]$file)
     if (-not (Test-SamePath (Split-Path -Parent $candidate) $safeRoot)) {
@@ -436,6 +438,9 @@ foreach ($file in @($marker.managedFiles)) {
         if (Confirm-Change $candidate 'Remove installed file') {
             Remove-Item -LiteralPath $candidate -Force
         }
+        elseif ($WhatIfPreference) {
+            $whatIfRetainedNames += (Split-Path -Leaf $candidate)
+        }
     }
 }
 
@@ -443,10 +448,17 @@ if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
     if (Confirm-Change $markerPath 'Remove ownership marker') {
         Remove-Item -LiteralPath $markerPath -Force
     }
+    elseif ($WhatIfPreference) {
+        $whatIfRetainedNames += (Split-Path -Leaf $markerPath)
+    }
 }
 
 if (Test-Path -LiteralPath $safeRoot -PathType Container) {
     $remaining = @(Get-ChildItem -LiteralPath $safeRoot -Force)
+    if ($WhatIfPreference) {
+        $retainedNames = @($whatIfRetainedNames)
+        $remaining = @($remaining | Where-Object { $retainedNames -notcontains $_.Name })
+    }
     if ($remaining.Count -eq 0) {
         if (Confirm-Change $safeRoot 'Remove empty installation directory') {
             Remove-Item -LiteralPath $safeRoot -Force
@@ -479,5 +491,10 @@ if ($PurgeData) {
     }
 }
 
-Write-Output "Uninstalled $ProductName from $safeRoot"
+if ($WhatIfPreference) {
+    Write-Output "Previewed uninstall of $ProductName from $safeRoot (no changes were made)."
+}
+else {
+    Write-Output "Uninstalled $ProductName from $safeRoot"
+}
 if (-not $PurgeData) { Write-Output 'User settings were preserved. Use -PurgeData only when removal is intentional.' }

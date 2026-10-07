@@ -25,6 +25,21 @@ function Get-TransactionDirectories {
         ForEach-Object { $_.FullName })
 }
 
+function Get-JoinedOutput($Output) {
+    return ((@($Output) | ForEach-Object { "$_" }) -join "`n")
+}
+
+function Get-InstallTreeStamp([string]$Root) {
+    $prefix = $Root.TrimEnd('\')
+    return @((Get-ChildItem -LiteralPath $prefix -Force -Recurse | Sort-Object -Property FullName | ForEach-Object {
+        $digest = ''
+        if (-not $_.PSIsContainer) {
+            $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        }
+        '{0}|{1}|{2}|{3}' -f $_.FullName.Substring($prefix.Length), $_.PSIsContainer, $digest, $_.LastWriteTimeUtc.Ticks
+    }))
+}
+
 function Assert-NoNewTransactionDirectories([string[]]$Before, [string]$Message) {
     $after = @(Get-TransactionDirectories)
     $new = @($after | Where-Object { $Before -notcontains $_ })
@@ -370,7 +385,13 @@ try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x00, 0x01, 0x02, 0x03))
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch -WhatIf | Out-Null
+    $installWhatIfOutput = & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch -WhatIf
+    $installWhatIfText = Get-JoinedOutput $installWhatIfOutput
+    $expectedInstallPreview = "Previewed install of IdleHarbor to $([IO.Path]::GetFullPath($installRoot)) (no changes were made)."
+    Assert-True ($installWhatIfText.Contains($expectedInstallPreview)) `
+        "Installer -WhatIf did not report a preview. Output: $installWhatIfText"
+    Assert-True (-not $installWhatIfText.Contains('Installed IdleHarbor')) `
+        'Installer -WhatIf claimed completion.'
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer -WhatIf created files.'
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
@@ -459,7 +480,9 @@ try {
         'Rollback left managed residue in a pre-existing empty install root.'
 
     $successfulCommitTransactions = @(Get-TransactionDirectories)
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch | Out-Null
+    $realInstallOutput = & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch
+    Assert-True ((Get-JoinedOutput $realInstallOutput).Contains('Installed IdleHarbor to')) `
+        'Real install summary did not report completion.'
     Assert-NoNewTransactionDirectories $successfulCommitTransactions `
         'Successful commit left transaction backup material behind.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
@@ -568,7 +591,25 @@ try {
     & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
     Remove-Item -LiteralPath $unexpectedFile -Force
-    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
+    $installStampBeforePreview = Get-InstallTreeStamp $installRoot
+    $previewUninstallWarnings = $null
+    $previewUninstallOutput = & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot -WhatIf -WarningVariable previewUninstallWarnings
+    $previewUninstallText = Get-JoinedOutput $previewUninstallOutput
+    $expectedUninstallPreview = "Previewed uninstall of IdleHarbor from $([IO.Path]::GetFullPath($installRoot)) (no changes were made)."
+    Assert-True ($previewUninstallText.Contains($expectedUninstallPreview)) `
+        "Uninstaller -WhatIf did not report a preview. Output: $previewUninstallText"
+    Assert-True (-not $previewUninstallText.Contains('Uninstalled IdleHarbor')) `
+        'Uninstaller -WhatIf claimed completion.'
+    $unexpectedPreviewWarnings = @($previewUninstallWarnings | Where-Object { "$_" -like '*unexpected*' })
+    Assert-True ($unexpectedPreviewWarnings.Count -eq 0) `
+        "Uninstall -WhatIf warned about unexpected files: $($unexpectedPreviewWarnings -join '; ')"
+    Assert-True (Test-Path -LiteralPath $installRoot -PathType Container) `
+        'Uninstall -WhatIf removed the install root.'
+    Assert-True ((Get-InstallTreeStamp $installRoot) -join "`n" -ceq ($installStampBeforePreview -join "`n")) `
+        'Uninstall -WhatIf changed installed files.'
+    $realUninstallOutput = & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot
+    Assert-True ((Get-JoinedOutput $realUninstallOutput).Contains('Uninstalled IdleHarbor from')) `
+        'Real uninstall summary did not report completion.'
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
 
     $hardlinkRoot = Join-Path $tempRoot 'hardlink-boundary\IdleHarbor'

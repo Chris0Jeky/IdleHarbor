@@ -8,6 +8,7 @@ where practical.
 
 ### Fixed
 
+- Installer and uninstaller `-WhatIf` summaries say the run was a preview. A preview uninstall no longer treats the ownership marker and managed files it would have removed as unexpected leftovers.
 - InputMonitor rejects a missing notification window or zero message before installing observers,
   and releases the attempted ownership claim on rejection.
 - Chocolatey upgrade and uninstall share session-aware shutdown, reject uncertain process

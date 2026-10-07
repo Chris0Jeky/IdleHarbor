@@ -82,7 +82,8 @@ proof must not be replaced with a log from an earlier commit.
 ## Next work and owner gates
 
 First address the related unbounded per-user installer wait in #77 while preserving exact-path
-ownership and `-WhatIf`. Then handle preview wording (#38), packaging test isolation (#48),
+ownership and `-WhatIf`. Preview wording (#38) reports a preview summary and does not treat
+WhatIf-retained managed files as unexpected leftovers. Then handle packaging test isolation (#48),
 license completeness (#40), bounded Chocolatey version lag (#65), and WinGet manifest guards
 (#68) through failing regression tests. #66 concerns published-archive verification rather
 than offline metadata agreement.
