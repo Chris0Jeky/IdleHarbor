@@ -487,8 +487,6 @@ class Application final {
         std::wstring initial_status = L"Stopped: ready";
         if (!settings_load_warnings_.empty()) {
             initial_status = L"Stopped: settings recovered; review and save before automatic start";
-        } else if (!tray_added_) {
-            initial_status = L"Stopped: notification icon unavailable; window kept visible";
         } else if (settings_.emergency_hotkey && !hotkey_registered_) {
             initial_status = L"Stopped: emergency hotkey unavailable";
         } else if (settings_.session.pause_when_locked || settings_.session.pause_when_disconnected) {
@@ -554,7 +552,7 @@ class Application final {
             }
             break;
         case RequestedCommand::Status:
-            MessageBoxW(window_, status_text_.c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(window_, DisplayStatusText().c_str(), L"IdleHarbor status", MB_OK | MB_ICONINFORMATION);
             break;
         case RequestedCommand::Show:
             ShowWindow(window_, SW_SHOW);
@@ -1795,23 +1793,23 @@ class Application final {
         icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         icon.uCallbackMessage = kTrayMessage;
         icon.hIcon = tray_icon_;
-        wcsncpy_s(icon.szTip, (L"IdleHarbor - " + DisplayStatusText()).c_str(), _TRUNCATE);
+        // The added icon represents recovery, so do not seed it with the old
+        // unavailable overlay. Dirty state and the underlying reason remain.
+        wcsncpy_s(icon.szTip, (L"IdleHarbor - " + DisplayStatusText(false)).c_str(), _TRUNCATE);
         tray_added_ = Shell_NotifyIconW(NIM_ADD, &icon) != FALSE;
+        tray_unavailable_ = !tray_added_;
         if (tray_added_) {
             icon.uVersion = NOTIFYICON_VERSION_4;
             Shell_NotifyIconW(NIM_SETVERSION, &icon);
         }
+        SyncStatusControl();
     }
 
     void MarkTrayUnavailable() {
+        tray_added_ = false;
+        tray_unavailable_ = true;
         ShowWindow(window_, SW_SHOW);
-        status_text_ = session_active_ ? L"Running: notification icon unavailable; window kept visible"
-                                       : L"Stopped: notification icon unavailable; window kept visible";
-        if (status_ != nullptr) {
-            SetControlText(status_, DisplayStatusText());
-            InvalidateRect(status_, nullptr, TRUE);
-            UpdateWindow(status_);
-        }
+        SyncStatusControl();
     }
 
     void RecoverTrayIcon() {
@@ -1864,13 +1862,19 @@ class Application final {
         }
     }
 
-    void SetStatus(const std::wstring& status) {
-        status_text_ = status;
+    // Keep native accessible text and the owner-drawn status sourced from the
+    // same composition. This deliberately does not call tray recovery again.
+    void SyncStatusControl() {
         if (status_ != nullptr) {
             SetControlText(status_, DisplayStatusText());
             InvalidateRect(status_, nullptr, TRUE);
             UpdateWindow(status_);
         }
+    }
+
+    void SetStatus(const std::wstring& status) {
+        status_text_ = status;
+        SyncStatusControl();
         UpdateTrayTooltip();
     }
 
@@ -1884,8 +1888,12 @@ class Application final {
         SetStatus(L"Stopped: ready");
     }
 
-    [[nodiscard]] std::wstring DisplayStatusText() const {
-        return dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
+    [[nodiscard]] std::wstring DisplayStatusText(const bool include_tray_warning = true) const {
+        std::wstring text = dirty_ ? L"Unsaved changes — " + status_text_ : status_text_;
+        if (include_tray_warning && tray_unavailable_) {
+            text += L"; notification icon unavailable; window kept visible";
+        }
+        return text;
     }
 
     [[nodiscard]] bool SettingsNeedSave() const noexcept {
@@ -1897,11 +1905,7 @@ class Application final {
         // published before the button is relabelled and before UpdateButtons
         // enables it. Anything observing the window mid-transaction then sees a
         // stale card only while Save still reads as unavailable.
-        if (status_ != nullptr) {
-            SetControlText(status_, DisplayStatusText());
-            InvalidateRect(status_, nullptr, TRUE);
-            UpdateWindow(status_);
-        }
+        SyncStatusControl();
         if (save_ != nullptr) {
             SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
         }
@@ -2637,15 +2641,7 @@ class Application final {
     LRESULT HandleMessage(const UINT message, const WPARAM w_param, const LPARAM l_param) noexcept {
         if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
             tray_added_ = false;
-            InitializeTrayIcon();
-            if (tray_added_) {
-                UpdateTrayTooltip();
-            } else {
-                ShowWindow(window_, SW_SHOW);
-                SetStatus(
-                    session_active_ ? L"Running: notification icon unavailable; window kept visible"
-                                    : L"Stopped: notification icon unavailable; window kept visible");
-            }
+            RecoverTrayIcon();
             return 0;
         }
         switch (message) {
@@ -2856,6 +2852,7 @@ class Application final {
     UINT taskbar_created_message_ = 0;
     UINT dpi_ = USER_DEFAULT_SCREEN_DPI;
     bool tray_added_ = false;
+    bool tray_unavailable_ = false;
     bool hotkey_registered_ = false;
     bool session_notifications_available_ = false;
     bool session_state_available_ = false;
