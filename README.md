@@ -179,6 +179,8 @@ information dialogs; `--status` opens a visible status dialog rather than writin
 ```text
 Commands: --start (-j, --jiggle), --stop, --toggle, --status,
           --show (--settings, -g), --exit
+Session:  --start-for DURATION, --pause, --resume,
+          --snooze DURATION, --extend DURATION
 
 Profiles: --profile balanced|long-task|presentation|compatibility|visible|battery-saver|custom
 Motion:   --motion off|zen|diagonal|linear|circle
@@ -196,6 +198,16 @@ the owning instance is launched; an already-running instance remains bound to it
 path. Profile and settings overrides affect the current owner instance without silently changing the
 INI file; use the visible **Save** action if those values should persist. The complete help text in
 the shipped executable is authoritative.
+
+The tray's **Start for** menu starts a 15, 30, 60 or 120-minute session without changing the saved
+duration. While active, use **Pause**, **Resume**, **Snooze for** (5, 15 or 30 minutes), or add 15
+minutes or one hour. Status and the tray tooltip show the remaining session budget. Pause and
+snooze keep the overall clock running; Resume and snooze expiry recheck every safeguard.
+`--start-for 30m`, `--snooze 5m` and `--extend 1h` provide the same controls. Snooze is bounded to
+24 hours and the total timed session to 30 days. Extend cannot revive an expired session or add
+a limit to an unlimited session. Pause/Resume/Snooze/Extend reject settings and storage options.
+If releasing a Windows power request fails, automatic activity stops and **Stop** remains
+available to retry; starting a new session is blocked until cleanup succeeds.
 
 ## Advanced INI settings
 

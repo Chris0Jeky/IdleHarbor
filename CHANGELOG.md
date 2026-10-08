@@ -6,10 +6,22 @@ where practical.
 
 ## [Unreleased]
 
+### Added
+
+- Session-only tray timers (15/30/60/120 minutes), manual Pause/Resume, bounded snooze,
+  deadline extension and live remaining-time status/tooltip. Strict CLI equivalents use the
+  existing duration syntax; elapsed limits and automatic safeguards remain authoritative.
+
 ### Fixed
 
 - Documentation capture explicitly quotes spaced configuration paths, reuses its native helper
   on repeated invocation and disables the emergency hotkey in capture-only settings.
+- Starting a guarded session retries transient Windows session-notification registration failures
+  instead of requiring an application restart after automatic startup. Registration and the current
+  lock/disconnect state must both succeed before Start is allowed.
+- Failed power release is visible in application status and leaves Stop enabled for retry;
+  a new session is blocked until cleanup succeeds. Old tray-menu session actions are discarded
+  after expiry or replacement, including same-tick replacement.
 - Tray failure no longer replaces paused or stopped reasons with generic status. Recovery retracts
   only the transient icon warning, and native status text, the tooltip and `--status` retain the
   same unsaved-settings prefix and underlying reason.

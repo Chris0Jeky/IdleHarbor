@@ -15,7 +15,14 @@ void add_error(ValidationResult& result, std::string error) {
 }
 
 Seconds nonnegative_difference(Seconds later, Seconds earlier) noexcept {
-    return later >= earlier ? later - earlier : Seconds{0};
+    if (later < earlier) {
+        return Seconds{0};
+    }
+    // Saturate instead of overflowing when a caller supplies extreme epochs.
+    if (earlier < Seconds{0} && later > Seconds::max() + earlier) {
+        return Seconds::max();
+    }
+    return later - earlier;
 }
 
 PolicyDecision pause_decision(PolicyReason reason, Seconds cooldown = Seconds{0}) noexcept {
@@ -66,7 +73,7 @@ ValidationResult validate(const Settings& settings) {
         (settings.active_hours.start_minute >= 24 * 60 || settings.active_hours.end_minute >= 24 * 60)) {
         add_error(result, "active-hours endpoints must be within the day");
     }
-    if (settings.max_duration < Seconds{0} || settings.max_duration > Seconds{30 * 24 * 60 * 60}) {
+    if (settings.max_duration < Seconds{0} || settings.max_duration > Settings::kMaximumDuration) {
         add_error(result, "maximum duration must be between 0 and 30 days");
     }
 
@@ -205,6 +212,8 @@ std::string_view policy_reason_name(PolicyReason reason) noexcept {
         return "outside active hours";
     case PolicyReason::MaxDuration:
         return "maximum duration reached";
+    case PolicyReason::ManualPause:
+        return "manual pause";
     }
     return "unknown";
 }
@@ -213,6 +222,8 @@ int reason_priority(PolicyReason reason) noexcept {
     switch (reason) {
     case PolicyReason::MaxDuration:
         return 100;
+    case PolicyReason::ManualPause:
+        return 95;
     case PolicyReason::Locked:
         return 90;
     case PolicyReason::Disconnected:
@@ -296,11 +307,76 @@ void PolicyEngine::start(Seconds now) noexcept {
     started_at_ = now;
     last_activity_at_ = Seconds{0};
     has_activity_ = false;
+    manually_paused_ = false;
+    paused_at_ = Seconds{0};
+    pause_duration_ = Seconds{0};
 }
 
 void PolicyEngine::stop() noexcept {
     state_ = EngineState::Stopped;
     reason_ = PolicyReason::Manual;
+    manually_paused_ = false;
+}
+
+bool PolicyEngine::expire_if_due(Seconds now) noexcept {
+    if (state_ != EngineState::Stopped && settings_.max_duration > Seconds{0} &&
+        nonnegative_difference(now, started_at_) >= settings_.max_duration) {
+        state_ = EngineState::Stopped;
+        reason_ = PolicyReason::MaxDuration;
+        manually_paused_ = false;
+        return true;
+    }
+    return false;
+}
+
+bool PolicyEngine::pause(Seconds now, Seconds duration) noexcept {
+    if (state_ == EngineState::Stopped || duration < Seconds{0} || duration > Settings::kMaximumInterval ||
+        expire_if_due(now)) {
+        return false;
+    }
+    manually_paused_ = true;
+    paused_at_ = now;
+    pause_duration_ = duration;
+    state_ = EngineState::Paused;
+    reason_ = PolicyReason::ManualPause;
+    return true;
+}
+
+bool PolicyEngine::resume() noexcept {
+    if (!manually_paused()) {
+        return false;
+    }
+    manually_paused_ = false;
+    // Deliberately leave state paused until evaluate rechecks all safeguards.
+    return true;
+}
+
+bool PolicyEngine::extend_duration(Seconds now, Seconds extra) noexcept {
+    if (state_ == EngineState::Stopped || extra <= Seconds{0} || settings_.max_duration <= Seconds{0} ||
+        expire_if_due(now)) {
+        return false;
+    }
+    if (settings_.max_duration > Settings::kMaximumDuration ||
+        extra > Settings::kMaximumDuration - settings_.max_duration) {
+        return false;
+    }
+    settings_.max_duration += extra;
+    return true;
+}
+
+std::optional<Seconds> PolicyEngine::remaining_duration(Seconds now) const noexcept {
+    if (settings_.max_duration <= Seconds{0}) {
+        return std::nullopt;
+    }
+    if (state_ == EngineState::Stopped) {
+        return Seconds{0};
+    }
+    const auto elapsed = nonnegative_difference(now, started_at_);
+    return settings_.max_duration - std::min(elapsed, settings_.max_duration);
+}
+
+bool PolicyEngine::manually_paused() const noexcept {
+    return state_ != EngineState::Stopped && manually_paused_;
 }
 
 PolicyDecision PolicyEngine::stopped_decision() const noexcept {
@@ -317,11 +393,17 @@ PolicyDecision PolicyEngine::evaluate(const PolicyInput& input) noexcept {
         has_activity_ = true;
     }
 
-    if (settings_.max_duration > Seconds{0} &&
-        nonnegative_difference(input.now, started_at_) >= settings_.max_duration) {
-        state_ = EngineState::Stopped;
-        reason_ = PolicyReason::MaxDuration;
+    if (expire_if_due(input.now)) {
         return stopped_decision();
+    }
+    if (manually_paused_) {
+        const auto elapsed = nonnegative_difference(input.now, paused_at_);
+        if (pause_duration_ == Seconds{0} || elapsed < pause_duration_) {
+            state_ = EngineState::Paused;
+            reason_ = PolicyReason::ManualPause;
+            return pause_decision(reason_, pause_duration_ == Seconds{0} ? Seconds{0} : pause_duration_ - elapsed);
+        }
+        manually_paused_ = false;
     }
 
     if (settings_.pause_when_locked && input.locked) {
@@ -391,7 +473,8 @@ std::string status_text(const PolicyDecision& decision) {
 
     std::string result = "Paused: ";
     result += policy_reason_name(decision.reason);
-    if (decision.reason == PolicyReason::UserActivity && decision.cooldown_remaining > Seconds{0}) {
+    if ((decision.reason == PolicyReason::UserActivity || decision.reason == PolicyReason::ManualPause) &&
+        decision.cooldown_remaining > Seconds{0}) {
         result += " (" + std::to_string(decision.cooldown_remaining.count()) + "s remaining)";
     }
     return result;

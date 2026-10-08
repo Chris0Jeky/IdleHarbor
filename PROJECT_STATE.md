@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Product and release boundary
 
@@ -11,8 +11,14 @@ elevation, hidden behavior or implicit persistence. The website-only, owner-sele
 Pulseboard integration remains separate from the application.
 
 The checked-in application, Chocolatey package and website still name v0.2.0.
-This maintenance work does not publish a new release, change archive pins, update
-an installed-user application or submit a marketplace package. GPL-3.0-only and
+No new release, archive-pin change or marketplace submission is published by this
+maintenance. On 2026-10-08 the owner's desktop installation was upgraded from the
+August release binary to the locally verified x64 source build at 01ee3e6 (the same
+application source as merged #118/#120). Its installed SHA-256 matches the checked
+build, saved settings are unchanged, and the existing limited logon task retains
+`--start --minimized`. Real native status plus a forwarded Stop/Start cycle succeed
+in the same installed process. This is a development build still labeled v0.2.0,
+not a newly published release. GPL-3.0-only and
 unsigned distribution are unchanged. Hosting activation remains false.
 
 Historical release hashes, screenshots and installed-PC observations are retained
@@ -56,6 +62,22 @@ retained in the preview suite without reapplying conflicting production changes.
 The consolidation PR carries the final integrated validation and supersession
 record. See [the continuation handoff](docs/MAINTENANCE-CONTINUED-2026-10-07.md).
 
+## Session toolkit (#117 / #118)
+
+The unreleased source adds tray quick timers, manual Pause/Resume, bounded snooze, extension and
+remaining-time status/tooltip with strict CLI equivalents. Session controls do not save preferences;
+expiry continues during holds and Resume rechecks safeguards. Failed power release stops automatic
+activity, keeps Stop available for retry and blocks a new session until cleanup succeeds. Tray actions
+capture a session generation so nested-loop expiry/replacement cannot modify a replacement session.
+
+On 2026-10-08, the complete MSVC 19.29 x64 Release build and all sixteen CTest targets passed locally,
+including 65 core session assertions, 113 CLI checks, 101 actual-Application/hidden-control checks and
+73 menu-session interleaving checks. Native tests use real hidden controls and menus with test-local
+power/input/tray/dialog boundaries; they do not move the pointer or acquire real power requests.
+Explorer interaction, cross-process forwarding timing, visible UI/screenshots and ARM64 execution
+remain unverified. Hosted exact-head CI and independent review remain merge gates for PR #118.
+Existing release archives, website screenshots and installed-user binaries remain v0.2.0.
+
 ## Executable checks and their limits
 
 | Surface | Executed checks | Boundary |
@@ -81,7 +103,20 @@ GitHub commits, exact-head CI and live issue state outrank these summaries.
 
 ## Remaining work and owner gates
 
-#77's reported unbounded shutdown copies are fixed by #101/#104. Its broader
+The 2026-10-08 startup recovery repair retries a failed Windows session-notification
+registration when Start re-establishes the session state. Automatic startup can
+precede the Windows services required for registration; a single failure no longer
+requires restarting the process. Hidden native controls and API doubles exercise
+unreadable-state recovery, failed-registration recovery, notification precedence,
+unrelated warning preservation and Stop after recovery. The previous Start-time
+snapshot retry is protected by a mutation that failed two assertions; the new
+registration retry has four pre-fix failures. Physical sleep/wake and reboot remain
+separate desktop acceptance checks. The locally installed August v0.2.0 executable
+predated these repairs and has now been replaced as described above. The integrated
+MSVC 19.29 x64 Release build passes all sixteen CTests; both PowerShell editions
+pass the registered regression and packaging fixture suites.
+
+#77 is closed: its reported unbounded shutdown copies are fixed by #101/#104. The broader
 orchestration question remains with #51: prove actual Chocolatey install/upgrade/
 uninstall behavior, hook failure handling, session/desktop boundaries, architecture
 rejection and shim cleanup in an isolated Windows environment. Per-user process
@@ -93,9 +128,11 @@ thread lifecycle tests. See [cleanup contracts](docs/INPUT-HOOK-CLEANUP.md); pen
 handles are retained recovery state, not successful cleanup. #116 adds direct
 main.cpp numeric/enum helper coverage and addresses #42/#46 status consistency.
 See [status contracts](docs/STATUS-SURFACES.md) for the native-control/API-double
-boundary. #86 retains visible cleanup-failure presentation: #112 repairs the
-low-level power object's state and bool result, not every UI caller of void Clear.
-#55/#56 still need focus/combo interaction proof.
+boundary. #118 supplies visible, retryable cleanup-failure presentation, allowing
+#86's original tracker claims to close. #56 is also closed: #118 commits pending
+combo selections before forwarded overrides and protects ordinary/early synchronous
+closeup ordering with hidden-native regression tests. #55's focus-origin edge case
+remains open and needs sent-focus/modal-loop interaction proof.
 
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. #70's serialization issue is
