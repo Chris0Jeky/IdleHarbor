@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Starting a guarded session retries transient Windows session-notification registration failures
+  instead of requiring an application restart after automatic startup. Registration and the current
+  lock/disconnect state must both succeed before Start is allowed.
 - Tray failure no longer replaces paused or stopped reasons with generic status. Recovery retracts
   only the transient icon warning, and native status text, the tooltip and `--status` retain the
   same unsaved-settings prefix and underlying reason.

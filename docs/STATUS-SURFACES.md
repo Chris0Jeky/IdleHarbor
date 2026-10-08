@@ -23,6 +23,16 @@ directly and contains no test instrumentation. The test translation unit interce
 Shell_NotifyIconW, MessageBoxW and ShowWindow, but creates hidden native STATIC
 controls and reads their real GetWindowText output.
 
+Session recovery coverage also intercepts WTSRegisterSessionNotification and
+QuerySessionSnapshot. Actual Application methods retry unreadable startup state
+on Start and unlock/connect notifications, retry failed observer registration,
+preserve unrelated status warnings and follow fresh lock/disconnect events.
+A hidden native control fixture verifies failed Start followed by successful Start
+in the same process, with input hooks disabled, a future pulse deadline and no
+power request. Removing the Start-time snapshot retry fails two assertions;
+the registration-retry regression failed four assertions before its repair.
+These doubles do not reproduce a physical suspend/resume or reboot.
+
 Sixteen dirty/clean scenarios cover stopped, running and paused states, initial
 status, icon loss, failed and successful TaskbarCreated/tooltip/direct recovery,
 status-command agreement and immediate Stop. Forty-one additional assertions call

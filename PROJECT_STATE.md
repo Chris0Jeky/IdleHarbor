@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Product and release boundary
 
@@ -80,6 +80,17 @@ Windows CI supplied MSVC, both PowerShell editions and real release-download pro
 GitHub commits, exact-head CI and live issue state outrank these summaries.
 
 ## Remaining work and owner gates
+
+The 2026-10-08 startup recovery repair retries a failed Windows session-notification
+registration when Start re-establishes the session state. Automatic startup can
+precede the Windows services required for registration; a single failure no longer
+requires restarting the process. Hidden native controls and API doubles exercise
+unreadable-state recovery, failed-registration recovery, notification precedence,
+unrelated warning preservation and Stop after recovery. The previous Start-time
+snapshot retry is protected by a mutation that failed two assertions; the new
+registration retry has four pre-fix failures. Physical sleep/wake and reboot remain
+separate desktop acceptance checks. The locally installed August v0.2.0 executable
+predates these repairs; installation is being updated as part of this session.
 
 #77's reported unbounded shutdown copies are fixed by #101/#104. Its broader
 orchestration question remains with #51: prove actual Chocolatey install/upgrade/
