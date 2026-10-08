@@ -14,6 +14,8 @@ where practical.
 
 ### Fixed
 
+- Documentation capture explicitly quotes spaced configuration paths, reuses its native helper
+  on repeated invocation and disables the emergency hotkey in capture-only settings.
 - Starting a guarded session retries transient Windows session-notification registration failures
   instead of requiring an application restart after automatic startup. Registration and the current
   lock/disconnect state must both succeed before Start is allowed.

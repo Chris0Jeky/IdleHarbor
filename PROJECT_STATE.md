@@ -11,8 +11,14 @@ elevation, hidden behavior or implicit persistence. The website-only, owner-sele
 Pulseboard integration remains separate from the application.
 
 The checked-in application, Chocolatey package and website still name v0.2.0.
-This maintenance work does not publish a new release, change archive pins, update
-an installed-user application or submit a marketplace package. GPL-3.0-only and
+No new release, archive-pin change or marketplace submission is published by this
+maintenance. On 2026-10-08 the owner's desktop installation was upgraded from the
+August release binary to the locally verified x64 source build at 01ee3e6 (the same
+application source as merged #118/#120). Its installed SHA-256 matches the checked
+build, saved settings are unchanged, and the existing limited logon task retains
+`--start --minimized`. Real native status plus a forwarded Stop/Start cycle succeed
+in the same installed process. This is a development build still labeled v0.2.0,
+not a newly published release. GPL-3.0-only and
 unsigned distribution are unchanged. Hosting activation remains false.
 
 Historical release hashes, screenshots and installed-PC observations are retained
@@ -106,9 +112,11 @@ unrelated warning preservation and Stop after recovery. The previous Start-time
 snapshot retry is protected by a mutation that failed two assertions; the new
 registration retry has four pre-fix failures. Physical sleep/wake and reboot remain
 separate desktop acceptance checks. The locally installed August v0.2.0 executable
-predates these repairs; installation is being updated as part of this session.
+predated these repairs and has now been replaced as described above. The integrated
+MSVC 19.29 x64 Release build passes all sixteen CTests; both PowerShell editions
+pass the registered regression and packaging fixture suites.
 
-#77's reported unbounded shutdown copies are fixed by #101/#104. Its broader
+#77 is closed: its reported unbounded shutdown copies are fixed by #101/#104. The broader
 orchestration question remains with #51: prove actual Chocolatey install/upgrade/
 uninstall behavior, hook failure handling, session/desktop boundaries, architecture
 rejection and shim cleanup in an isolated Windows environment. Per-user process
@@ -120,13 +128,20 @@ thread lifecycle tests. See [cleanup contracts](docs/INPUT-HOOK-CLEANUP.md); pen
 handles are retained recovery state, not successful cleanup. #116 adds direct
 main.cpp numeric/enum helper coverage and addresses #42/#46 status consistency.
 See [status contracts](docs/STATUS-SURFACES.md) for the native-control/API-double
-boundary. #86 retains visible cleanup-failure presentation: #112 repairs the
-low-level power object's state and bool result, not every UI caller of void Clear.
-#55/#56 still need focus/combo interaction proof.
+boundary. #118 supplies visible, retryable cleanup-failure presentation, allowing
+#86's original tracker claims to close. #56 is also closed: #118 commits pending
+combo selections before forwarded overrides and protects ordinary/early synchronous
+closeup ordering with hidden-native regression tests. #55's focus-origin edge case
+remains open and needs sent-focus/modal-loop interaction proof.
 
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. #70's serialization issue is
 addressed by #113, without claiming the other native capture gates are complete.
+The #49 portability slice quotes owner configuration paths, reuses the loaded capture helper
+and disables the capture-only emergency hotkey. Thirty executable checks pass in each of Windows
+PowerShell 5.1 and PowerShell 7, including an actual native argv probe and repeated initialization.
+See [capture validation](docs/CAPTURE-MANIFEST-VALIDATION.md). A real spaced-path capture and two
+`-Force` captures in one Windows PowerShell 5.1 process remain pending; screenshots are unchanged.
 Preserve their native/desktop evidence requirements rather than substituting a
 source check or a passing headless build.
 

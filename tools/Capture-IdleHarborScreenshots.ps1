@@ -63,8 +63,12 @@ if ($runningOwners.Count -ne 0) {
     throw "Close the existing IdleHarbor owner before capture. Found $ownerSummary"
 }
 
-Add-Type -AssemblyName System.Drawing
-Add-Type @'
+function Initialize-CaptureNative {
+    Add-Type -AssemblyName System.Drawing
+    if ('IdleHarbor.Capture.Native' -as [type]) {
+        return
+    }
+    Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -255,6 +259,17 @@ namespace IdleHarbor.Capture
     }
 }
 '@
+}
+
+Initialize-CaptureNative
+
+# Start-Process joins ArgumentList entries without adding native quoting. Quote
+# each argument using Windows CRT backslash/quote rules, including empty values.
+function ConvertTo-CaptureNativeArgument([AllowEmptyString()][string]$Value) {
+    $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+    return '"' + $escaped + '"'
+}
 
 function Write-CaptureSettings([string]$Path, [bool]$PauseOutsideActiveHours) {
     $activeHoursEnabled = if ($PauseOutsideActiveHours) { 'true' } else { 'false' }
@@ -288,7 +303,7 @@ max_duration_seconds=0
 start_minimized=false
 close_to_tray=true
 show_notifications=true
-emergency_hotkey=true
+emergency_hotkey=false
 "@
     $encoding = New-Object Text.UTF8Encoding($false)
     [IO.File]::WriteAllText($Path, $content.TrimStart(), $encoding)
@@ -352,7 +367,7 @@ function Stop-CaptureProcess([Diagnostics.Process]$Process) {
 
 function Start-CaptureOwner([string]$ConfigPath) {
     $owner = Start-Process -FilePath $executablePath -ArgumentList @(
-        '--show', '--config', $ConfigPath) -PassThru
+        '--show', '--config', (ConvertTo-CaptureNativeArgument $ConfigPath)) -PassThru
     try {
         $window = [IntPtr]::Zero
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
