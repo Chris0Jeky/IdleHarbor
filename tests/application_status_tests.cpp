@@ -201,7 +201,10 @@ void SessionRecoveryContracts(HINSTANCE instance) {
         session_snapshot = {true, false, false};
         ApplicationStatusTestAccess::Start(app);
         Expect(session_queries == 2 && ApplicationStatusTestAccess::Running(app), "Start retries after unlock even without a notification or process restart");
-        Expect(NativeText(GetDlgItem(window, kStatus)) == L"Running", "recovered Start clears the old error in native status");
+        const auto recovered_status = NativeText(GetDlgItem(window, kStatus));
+        Expect(recovered_status.starts_with(L"Running; no time limit") &&
+                   recovered_status == ApplicationStatusTestAccess::Display(app),
+               "recovered Start clears the old error and publishes the active session status");
         ApplicationStatusTestAccess::Stop(app);
         Expect(!ApplicationStatusTestAccess::Running(app), "Stop remains immediate after recovery");
         Expect(IsWindowVisible(window) == FALSE, "recovery fixture never displays a desktop window");
