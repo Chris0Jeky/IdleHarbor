@@ -478,8 +478,6 @@ class Application final {
         ResizeToPreferredWorkArea();
 
         InitializeTrayIcon();
-        session_notifications_available_ =
-            WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
         EstablishSessionState();
         ApplyEmergencyHotkeySetting();
 
@@ -2295,6 +2293,13 @@ class Application final {
     // where the state is about to matter, and leave an established state alone so the
     // session-change notifications stay the authority on it.
     bool EstablishSessionState() {
+        // Remote Desktop Services may not be ready at automatic startup. A failed
+        // registration is retryable, just like an unreadable input desktop; do
+        // not block the UI waiting for services or re-register a healthy observer.
+        if (!session_notifications_available_ && window_ != nullptr) {
+            session_notifications_available_ =
+                WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
+        }
         if (!session_notifications_available_ || session_state_available_) {
             return false;
         }

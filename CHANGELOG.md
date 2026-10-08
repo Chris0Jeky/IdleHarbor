@@ -14,6 +14,9 @@ where practical.
 
 ### Fixed
 
+- Starting a guarded session retries transient Windows session-notification registration failures
+  instead of requiring an application restart after automatic startup. Registration and the current
+  lock/disconnect state must both succeed before Start is allowed.
 - Failed power release is visible in application status and leaves Stop enabled for retry;
   a new session is blocked until cleanup succeeds. Old tray-menu session actions are discarded
   after expiry or replacement, including same-tick replacement.
