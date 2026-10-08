@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Product and release boundary
 
@@ -55,6 +55,22 @@ The concurrent #110 overlaps #109. Its extra timestamp-stability coverage is
 retained in the preview suite without reapplying conflicting production changes.
 The consolidation PR carries the final integrated validation and supersession
 record. See [the continuation handoff](docs/MAINTENANCE-CONTINUED-2026-10-07.md).
+
+## Session toolkit (#117 / #118)
+
+The unreleased source adds tray quick timers, manual Pause/Resume, bounded snooze, extension and
+remaining-time status/tooltip with strict CLI equivalents. Session controls do not save preferences;
+expiry continues during holds and Resume rechecks safeguards. Failed power release stops automatic
+activity, keeps Stop available for retry and blocks a new session until cleanup succeeds. Tray actions
+capture a session generation so nested-loop expiry/replacement cannot modify a replacement session.
+
+On 2026-10-08, the complete MSVC 19.29 x64 Release build and all sixteen CTest targets passed locally,
+including 65 core session assertions, 113 CLI checks, 101 actual-Application/hidden-control checks and
+73 menu-session interleaving checks. Native tests use real hidden controls and menus with test-local
+power/input/tray/dialog boundaries; they do not move the pointer or acquire real power requests.
+Explorer interaction, cross-process forwarding timing, visible UI/screenshots and ARM64 execution
+remain unverified. Hosted exact-head CI and independent review remain merge gates for PR #118.
+Existing release archives, website screenshots and installed-user binaries remain v0.2.0.
 
 ## Executable checks and their limits
 

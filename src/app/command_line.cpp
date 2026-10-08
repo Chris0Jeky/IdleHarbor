@@ -150,6 +150,30 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
             result.options.show_version = true;
         } else if (option == L"--start" || option == L"--jiggle" || option == L"-j") {
             SetCommand(result, RequestedCommand::Start, option);
+        } else if (option == L"--pause") {
+            SetCommand(result, RequestedCommand::Pause, option);
+        } else if (option == L"--resume") {
+            SetCommand(result, RequestedCommand::Resume, option);
+        } else if (option == L"--start-for" || option == L"--snooze" || option == L"--extend") {
+            const auto value = TakeValue(result, arguments, index);
+            if (value.has_value()) {
+                const auto maximum = std::chrono::hours(option == L"--snooze" ? 24 : 24 * 30);
+                const auto parsed = ParseDuration(*value, false, maximum);
+                if (!parsed.has_value()) {
+                    AddError(result, L"Invalid duration for " + std::wstring(option) +
+                        (option == L"--snooze" ? L"; use 1s to 24h." : L"; use 1s to 720h."));
+                } else {
+                    const auto command = option == L"--start-for" ? RequestedCommand::StartFor
+                                       : option == L"--snooze" ? RequestedCommand::Snooze : RequestedCommand::Extend;
+                    if (SetCommand(result, command, option)) {
+                        if (result.options.command_duration.has_value() && result.options.command_duration != parsed) {
+                            AddError(result, L"Conflicting session-action durations.");
+                        } else {
+                            result.options.command_duration = parsed;
+                        }
+                    }
+                }
+            }
         } else if (option == L"--stop") {
             SetCommand(result, RequestedCommand::Stop, option);
         } else if (option == L"--toggle") {
@@ -262,6 +286,18 @@ CommandLineParseResult ParseCommandLine(const std::vector<std::wstring_view>& ar
         }
     }
 
+    const auto& options = result.options;
+    const bool live_control = options.command == RequestedCommand::Pause || options.command == RequestedCommand::Resume ||
+                              options.command == RequestedCommand::Snooze || options.command == RequestedCommand::Extend;
+    const bool preference_options = options.profile || options.motion_mode || options.power_mode || options.interval ||
+        options.pause_on_input || options.stop_after || options.distance || options.battery_threshold ||
+        options.randomize || options.pause_on_fullscreen || options.close_to_tray;
+    if (live_control && (preference_options || options.minimized || options.portable || options.config_path)) {
+        AddError(result, L"Pause, Resume, Snooze and Extend operate on the current session only; do not combine them with settings or storage options.");
+    }
+    if (options.command == RequestedCommand::StartFor && options.stop_after) {
+        AddError(result, L"--start-for is a one-shot duration; do not combine it with --stop-after.");
+    }
     return result;
 }
 
@@ -273,6 +309,11 @@ Usage:
 
 Commands (choose at most one):
   --start, -j                 Start an IdleHarbor session
+  --start-for DURATION        Start once for 1s to 720h without changing defaults
+  --pause                     Pause until an explicit --resume
+  --resume                    Clear manual pause; still respect all safeguards
+  --snooze DURATION           Pause for 1s to 24h, then recheck safeguards
+  --extend DURATION           Add time to an unexpired timed session (720h total)
   --stop                      Stop the current session
   --toggle                    Toggle running/stopped
   --status                    Show the current state
@@ -305,6 +346,8 @@ Launch and storage:
   --help, -h, -?              Show this help
 
 Durations accept s, m, or h suffixes; an omitted suffix means seconds.
+Session limits keep counting during Pause/Snooze. Extend never restarts an expired
+session. Pause/Resume/Snooze/Extend cannot be combined with preference options.
 IdleHarbor is visible and user-controlled. It does not hide from monitoring or
 bypass device policy, and injected input may be blocked or detected.
 )HELP";
@@ -326,6 +369,16 @@ std::wstring_view CommandName(const RequestedCommand command) noexcept {
             return L"show";
         case RequestedCommand::Exit:
             return L"exit";
+        case RequestedCommand::StartFor:
+            return L"start-for";
+        case RequestedCommand::Pause:
+            return L"pause";
+        case RequestedCommand::Resume:
+            return L"resume";
+        case RequestedCommand::Snooze:
+            return L"snooze";
+        case RequestedCommand::Extend:
+            return L"extend";
     }
     return L"unknown";
 }
