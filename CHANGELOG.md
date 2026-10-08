@@ -8,6 +8,8 @@ where practical.
 
 ### Fixed
 
+- Documentation capture explicitly quotes spaced configuration paths, reuses its native helper
+  on repeated invocation and disables the emergency hotkey in capture-only settings.
 - Tray failure no longer replaces paused or stopped reasons with generic status. Recovery retracts
   only the transient icon warning, and native status text, the tooltip and `--status` retain the
   same unsaved-settings prefix and underlying reason.

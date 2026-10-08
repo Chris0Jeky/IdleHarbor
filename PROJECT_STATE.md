@@ -100,6 +100,11 @@ low-level power object's state and bool result, not every UI caller of void Clea
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. #70's serialization issue is
 addressed by #113, without claiming the other native capture gates are complete.
+The #49 portability slice quotes owner configuration paths, reuses the loaded capture helper
+and disables the capture-only emergency hotkey. Thirty executable checks pass in each of Windows
+PowerShell 5.1 and PowerShell 7, including an actual native argv probe and repeated initialization.
+See [capture validation](docs/CAPTURE-MANIFEST-VALIDATION.md). A real spaced-path capture and two
+`-Force` captures in one Windows PowerShell 5.1 process remain pending; screenshots are unchanged.
 Preserve their native/desktop evidence requirements rather than substituting a
 source check or a passing headless build.
 
