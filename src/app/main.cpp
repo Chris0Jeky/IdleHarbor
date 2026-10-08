@@ -2400,6 +2400,7 @@ class Application final {
             runtime_settings_.randomize);
         next_pulse_tick_ = GetTickCount64() + static_cast<ULONGLONG>(sampler_->next().count()) * 1000ULL;
         session_active_ = true;
+        ++session_generation_;
         if (SetTimer(window_, kTimerId, 1000, nullptr) == 0) {
             FailSession(L"session timer could not start (" + WindowsErrorText(GetLastError()) + L")");
             return;
@@ -2421,6 +2422,9 @@ class Application final {
 
     void EndSession(const PolicyDecision& decision) {
         const bool transitioned_to_stopped = session_active_;
+        if (transitioned_to_stopped) {
+            ++session_generation_;
+        }
         KillTimer(window_, kTimerId);
         input_monitor_.Stop();
         ReleasePowerRequest();
@@ -2875,6 +2879,7 @@ class Application final {
     bool tray_added_ = false;
     bool tray_unavailable_ = false;
     bool power_cleanup_pending_ = false;
+    std::uint64_t session_generation_ = 0;
     bool hotkey_registered_ = false;
     bool session_notifications_available_ = false;
     bool session_state_available_ = false;

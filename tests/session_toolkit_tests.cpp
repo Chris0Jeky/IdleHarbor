@@ -275,4 +275,5 @@ int main() {
     Check(current_power==ES_CONTINUOUS,"all test power requests are released");
     if(failures) { std::cerr<<failures<<" of "<<checks<<" native session-toolkit checks failed.\n";return 1; }
     std::cout<<"Native session toolkit passed ("<<checks<<" checks; no live input, power, tray or visible window).\n";
+    return 0;
 }

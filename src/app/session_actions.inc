@@ -73,6 +73,7 @@
     }
 
     void ShowTrayMenu() {
+        const auto menu_session_generation = session_generation_;
         HMENU menu = CreatePopupMenu();
         if (menu == nullptr) {
             ShowWindow(window_, SW_SHOW);
@@ -136,8 +137,14 @@
         GetCursorPos(&cursor);
         const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY, cursor.x, cursor.y, 0, window_, nullptr);
         DestroyMenu(menu);
-        // The menu's nested loop may deliver timer/forwarded messages. Every
-        // action below rechecks the live state rather than trusting menu state.
+        // Timer/forwarded messages in the nested loop may replace the session,
+        // even at the same clock tick. Show and Exit remain global actions.
+        if (command != 0 && command != kStatus && command != kExitMenu &&
+            menu_session_generation != session_generation_) {
+            MessageBoxW(window_, L"The session changed while the menu was open. Open the menu again to choose an action.",
+                        L"IdleHarbor session", MB_OK | MB_ICONINFORMATION);
+            return;
+        }
         if (command == kStatus) {
             ShowWindow(window_, SW_SHOW);
             SetForegroundWindow(window_);
