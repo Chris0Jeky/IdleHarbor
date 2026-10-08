@@ -18,10 +18,17 @@ enum class RequestedCommand {
     Status,
     Show,
     Exit,
+    StartFor,
+    Pause,
+    Resume,
+    Snooze,
+    Extend,
 };
 
 struct CommandLineOptions {
     RequestedCommand command = RequestedCommand::Launch;
+    // A one-shot session action, never a saved preference override.
+    std::optional<std::chrono::seconds> command_duration;
     std::optional<std::wstring> profile;
     std::optional<std::wstring> motion_mode;
     std::optional<std::wstring> power_mode;

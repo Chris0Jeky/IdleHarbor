@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <random>
 #include <string>
 #include <string_view>
@@ -35,6 +36,7 @@ enum class PolicyReason {
     Fullscreen,
     OutsideActiveHours,
     MaxDuration,
+    ManualPause,
 };
 
 struct Point {
@@ -63,6 +65,7 @@ struct Settings {
     static constexpr std::uint32_t kMaximumDistance = 120;
     static constexpr Seconds kMinimumInterval{1};
     static constexpr Seconds kMaximumInterval{24 * 60 * 60};
+    static constexpr Seconds kMaximumDuration{30 * 24 * 60 * 60};
 
     ProfileKind profile{ProfileKind::Balanced};
     MotionMode motion{MotionMode::Zen};
@@ -143,12 +146,23 @@ public:
     void start(Seconds now) noexcept;
     void stop() noexcept;
 
+    // Session-only controls. Zero duration means pause until explicit Resume;
+    // snoozes are bounded to one day. Resume clears no automatic safeguard.
+    [[nodiscard]] bool pause(Seconds now, Seconds duration = Seconds{0}) noexcept;
+    [[nodiscard]] bool resume() noexcept;
+    // Positive extensions are accepted only for unexpired timed sessions, with
+    // at most thirty days total duration. They do not reset elapsed time.
+    [[nodiscard]] bool extend_duration(Seconds now, Seconds extra) noexcept;
+    [[nodiscard]] std::optional<Seconds> remaining_duration(Seconds now) const noexcept;
+    [[nodiscard]] bool manually_paused() const noexcept;
+
     [[nodiscard]] PolicyDecision evaluate(const PolicyInput& input) noexcept;
     [[nodiscard]] EngineState state() const noexcept;
     [[nodiscard]] PolicyReason reason() const noexcept;
 
 private:
     [[nodiscard]] PolicyDecision stopped_decision() const noexcept;
+    [[nodiscard]] bool expire_if_due(Seconds now) noexcept;
 
     Settings settings_{};
     EngineState state_{EngineState::Stopped};
@@ -156,6 +170,9 @@ private:
     Seconds started_at_{};
     Seconds last_activity_at_{};
     bool has_activity_{false};
+    bool manually_paused_{false};
+    Seconds paused_at_{};
+    Seconds pause_duration_{};
 };
 
 [[nodiscard]] std::string status_text(const PolicyDecision& decision);

@@ -122,6 +122,11 @@ status in visible dialogs rather than a console stream.
 | Option | Effect |
 | --- | --- |
 | `--start`, `--jiggle`, `-j` | Start a session |
+| `--start-for DURATION` | Start once for 1 second to 30 days without changing the default duration |
+| `--pause` | Pause until an explicit Resume; the session deadline keeps counting |
+| `--resume` | Clear the manual hold and recheck all safeguards |
+| `--snooze DURATION` | Pause for 1 second to 24 hours, then recheck safeguards |
+| `--extend DURATION` | Add time to an unexpired timed session, up to 30 days total |
 | `--stop` | Stop the current session |
 | `--toggle` | Toggle running/stopped |
 | `--status` | Show the current state in a dialog |
@@ -148,6 +153,35 @@ the resulting values should become the next launch defaults. This is true for op
 owner invocation and for options forwarded by a later invocation.
 
 Run `IdleHarbor.exe --help` for the exact current syntax and ranges.
+
+### Session timers and manual holds
+
+Durations accept `s`, `m` or `h` suffixes; no suffix means seconds. For example:
+
+```powershell
+IdleHarbor.exe --start-for 30m
+IdleHarbor.exe --snooze 5m
+IdleHarbor.exe --extend 1h
+IdleHarbor.exe --resume
+```
+
+The tray offers **Start for** 15/30/60/120 minutes while stopped, **Pause** or **Resume** while
+active, **Snooze for** 5/15/30 minutes, and **Add 15 minutes** or **Add 1 hour** for timed sessions.
+These actions leave saved preferences unchanged. The status card, tooltip and `--status` show
+remaining time, or “no time limit” for an unlimited session. Existing screenshots show the
+released v0.2.0 controls; the session toolkit is an unreleased source feature.
+
+The maximum-duration clock continues through manual pause, snooze, sleep and hibernation. Genuine
+activity during a snooze still contributes to cooldown. Resume clears only the manual hold;
+lock/disconnect, battery, fullscreen, active-hours and input safeguards continue to apply. Extend
+adds to the existing deadline and does not restart the clock or revive an expired session.
+An unlimited session cannot be extended. Pause/Resume/Snooze/Extend cannot be combined with
+settings, storage or launch options; `--start-for` cannot be combined with `--stop-after`.
+
+If power-request release fails, the session stops automatic activity, shows a release-failure
+warning and keeps **Stop** enabled for an explicit retry. A new Start is blocked until release
+succeeds. If a session ends or is replaced while a tray menu is open, choose its session action
+again from a fresh menu; **Show** and **Exit** remain available.
 
 ## Advanced INI settings
 
@@ -209,7 +243,7 @@ independently whitelist around endpoint controls.
 ## Visibility and stopping
 
 Minimize-to-tray reduces window clutter; it is not concealment. The tray menu provides Show, Start
-or Stop, and Exit. The emergency hotkey is an additional stop path, not a replacement for the
+or Stop, timed session controls, and Exit. The emergency hotkey is an additional stop path, not a replacement for the
 visible controls. A tray icon may be unavailable while Windows Explorer is restarting; use
 `--show` if needed.
 
