@@ -868,14 +868,10 @@ class Application final {
         const DWORD corners = 2; // DWMWCP_ROUND; ignored by older Windows.
         set(window_, 33, &corners, sizeof(corners));
         const DWORD material = !high_contrast_ && settings_.soft_backdrop ? 2 : 1; // Mica / none.
-        if (SUCCEEDED(set(window_, 38, &material, sizeof(material))) && material == 2) {
-            const MARGINS glass{-1, -1, -1, -1};
-            backdrop_enabled_ = SUCCEEDED(extend(window_, &glass));
-        }
-        if (!backdrop_enabled_) {
-            const MARGINS solid{};
-            extend(window_, &solid);
-        }
+        const bool material_applied = SUCCEEDED(set(window_, 38, &material, sizeof(material))) && material == 2;
+        // Native GDI controls do not maintain glass alpha; keep the entire client opaque.
+        const MARGINS solid{};
+        backdrop_enabled_ = SUCCEEDED(extend(window_, &solid)) && material_applied;
     }
 
     [[nodiscard]] HBRUSH SurfaceBrush() const noexcept {
@@ -2063,8 +2059,8 @@ class Application final {
         place_section(3);
         place_check(dark_appearance_, L"Dark appearance", kDarkAppearance,
                     L"Use the charcoal appearance. Turn off for the light appearance; Save keeps your choice.");
-        place_check(soft_backdrop_, L"Soft window backdrop", kSoftBackdrop,
-                    L"Use a subtle native Mica backdrop on supported Windows 11 versions. Controls remain opaque; high contrast uses a solid background.");
+        place_check(soft_backdrop_, L"Soft title-bar backdrop", kSoftBackdrop,
+                    L"Use a subtle native title-bar backdrop on supported Windows 11 versions. The entire control area stays opaque; high contrast uses a solid background.");
         place_check(
             start_minimized_,
             L"Start minimized to the notification area",
@@ -2278,7 +2274,7 @@ class Application final {
                 (*input > 0 ? L" · Input pause " + std::to_wstring(*input) + L" s" : L"");
         }
         return std::wstring(IsChecked(dark_appearance_) ? L"Dark" : L"Light") +
-            (IsChecked(soft_backdrop_) ? L" · Soft backdrop" : L" · Solid background");
+            (IsChecked(soft_backdrop_) ? L" · Soft title bar" : L" · Solid background");
     }
 
     void UpdateSectionSummaries() {
@@ -3163,18 +3159,8 @@ class Application final {
             return reinterpret_cast<LRESULT>(SurfaceBrush());
         case WM_ERASEBKGND: {
             RECT client{}; GetClientRect(window_, &client);
-            FillRect(reinterpret_cast<HDC>(w_param), &client, backdrop_enabled_ && !high_contrast_ && !printing_
-                ? static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)) : SurfaceBrush());
+            FillRect(reinterpret_cast<HDC>(w_param), &client, SurfaceBrush());
             return 1;
-        }
-        case WM_PRINT:
-        case WM_PRINTCLIENT: {
-            // PrintWindow cannot composite Mica; render the solid theme for captures.
-            const bool previous = printing_;
-            printing_ = true;
-            const LRESULT result = DefWindowProcW(window_, message, w_param, l_param);
-            printing_ = previous;
-            return result;
         }
         case WM_THEMECHANGED:
         case WM_SYSCOLORCHANGE:
@@ -3366,7 +3352,6 @@ class Application final {
     COLORREF surface_color_ = CLR_INVALID;
     HMODULE dwm_module_ = nullptr;
     bool backdrop_enabled_ = false;
-    bool printing_ = false;
     bool high_contrast_ = false;
     UINT taskbar_created_message_ = 0;
     UINT dpi_ = USER_DEFAULT_SCREEN_DPI;

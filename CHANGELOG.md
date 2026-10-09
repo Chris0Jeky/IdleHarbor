@@ -34,6 +34,10 @@ where practical.
 
 ### Fixed
 
+- Full-window glass could hide native controls until a capture overlay changed
+  composition. The optional material now stays in the title bar, while the whole
+  control area remains opaque. Capture tests no longer bypass the material path.
+
 - Documentation capture explicitly quotes spaced configuration paths, reuses its native helper
   on repeated invocation and disables the emergency hotkey in capture-only settings.
 - Starting a guarded session retries transient Windows session-notification registration failures

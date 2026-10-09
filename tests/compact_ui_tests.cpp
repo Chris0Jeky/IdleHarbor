@@ -1,6 +1,31 @@
 #include <fstream>
 #include <iostream>
+#include <windows.h>
+#include <dwmapi.h>
+#include <cstring>
+
+namespace {
+bool nonzero_glass_margins = false;
+int frame_extension_calls = 0;
+HRESULT (WINAPI* real_extend_frame)(HWND, const MARGINS*) = nullptr;
+HRESULT WINAPI RecordFrameExtension(HWND window, const MARGINS* margins) {
+    ++frame_extension_calls;
+    nonzero_glass_margins |= margins->cxLeftWidth != 0 || margins->cxRightWidth != 0 ||
+                            margins->cyTopHeight != 0 || margins->cyBottomHeight != 0;
+    return real_extend_frame(window, margins);
+}
+FARPROC WINAPI RecordMaterialProc(HMODULE module, LPCSTR name) {
+    const auto proc = ::GetProcAddress(module, name);
+    if (proc != nullptr && std::strcmp(name, "DwmExtendFrameIntoClientArea") == 0) {
+        real_extend_frame = reinterpret_cast<decltype(real_extend_frame)>(proc);
+        return reinterpret_cast<FARPROC>(RecordFrameExtension);
+    }
+    return proc;
+}
+}
+#define GetProcAddress RecordMaterialProc
 #include "application-under-test.inc"
+#undef GetProcAddress
 
 namespace {
 int failures = 0;
@@ -39,12 +64,13 @@ bool Capture(HWND window, const std::filesystem::path& path) {
 }
 
 struct ApplicationStatusTestAccess {
-    static COLORREF PaintPixel(HWND control, int x, int y) {
+    static COLORREF PaintPixel(HWND control, int x, int y, bool erase = false) {
         RECT bounds{}; GetClientRect(control, &bounds);
         HDC source = GetDC(control), memory = CreateCompatibleDC(source);
         HBITMAP bitmap = CreateCompatibleBitmap(source, bounds.right, bounds.bottom);
         const auto previous = SelectObject(memory, bitmap);
-        SendMessageW(control, WM_PRINTCLIENT, reinterpret_cast<WPARAM>(memory), PRF_CLIENT);
+        SendMessageW(control, erase ? WM_ERASEBKGND : WM_PRINTCLIENT, reinterpret_cast<WPARAM>(memory),
+                     erase ? 0 : PRF_CLIENT);
         const COLORREF color = GetPixel(memory, x, y);
         SelectObject(memory, previous); DeleteObject(bitmap); DeleteDC(memory); ReleaseDC(control, source);
         return color;
@@ -63,14 +89,7 @@ struct ApplicationStatusTestAccess {
             nullptr, nullptr, GetModuleHandleW(nullptr), &app);
         Check(window != nullptr, "real native window is created");
         if (window == nullptr) return;
-        const auto capture_window = [&](const wchar_t* path) {
-            // PrintWindow cannot composite DWM material; preview the solid fallback.
-            const bool previous_backdrop = app.backdrop_enabled_;
-            app.backdrop_enabled_ = false;
-            const bool result = Capture(window, path);
-            app.backdrop_enabled_ = previous_backdrop;
-            return result;
-        };
+        const auto capture_window = [&](const wchar_t* path) { return Capture(window, path); };
         app.RefreshControls(); app.UpdateButtons();
         if (capture) { ShowWindow(window, SW_SHOWNOACTIVATE); UpdateWindow(window); }
         Check(Shown(app.profile_) && Shown(app.power_) && Shown(app.duration_preset_), "routine choices are visible");
@@ -113,9 +132,14 @@ struct ApplicationStatusTestAccess {
         Check(ControlText(app.section_buttons_[1]).find(L"Review unfinished") != std::wstring::npos,
               "invalid safety edits are not presented as valid safeguards");
         app.settings_ = original_settings; app.RefreshControls();
-        Check(ControlText(app.section_buttons_[2]).find(L"Light · Soft backdrop") != std::wstring::npos,
+        Check(ControlText(app.section_buttons_[2]).find(L"Light · Soft title bar") != std::wstring::npos,
               "appearance preference is visible while collapsed");
         if (!app.high_contrast_) {
+            const bool previous_backdrop = app.backdrop_enabled_;
+            app.backdrop_enabled_ = true;
+            Check(PaintPixel(window, app.Scale(10), app.Scale(10), true) == RGB(247,248,250),
+                  "light client background stays opaque with material enabled");
+            app.backdrop_enabled_ = previous_backdrop;
             // Sample clear interior pixels, away from text, borders and chevrons.
             const COLORREF primary = PaintPixel(app.start_, app.Scale(10), app.Scale(10));
             Check(primary == RGB(0, 91, 211) || primary == RGB(0, 78, 186), "native Start renders the primary accent or hover state");
@@ -131,11 +155,16 @@ struct ApplicationStatusTestAccess {
             SetChecked(app.dark_appearance_, true);
             app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
             Check(app.settings_.dark_appearance && app.dirty_, "dark appearance updates live and enables Save");
-            Check(ControlText(app.section_buttons_[2]).find(L"Dark · Soft backdrop") != std::wstring::npos,
+            Check(ControlText(app.section_buttons_[2]).find(L"Dark · Soft title bar") != std::wstring::npos,
                   "appearance summary updates with the live preference");
             const COLORREF dark_field = PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10));
             Check(dark_field == RGB(37, 41, 50) || dark_field == RGB(45, 50, 61), "native duration renders the dark field or hover surface");
             Check(SettingsEqual(before_theme, app.settings_.session), "theme changes preserve session settings");
+            const bool dark_backdrop = app.backdrop_enabled_;
+            app.backdrop_enabled_ = true;
+            Check(PaintPixel(window, app.Scale(10), app.Scale(10), true) == RGB(23,25,31),
+                  "dark client background stays opaque with material enabled");
+            app.backdrop_enabled_ = dark_backdrop;
             if (capture) {
                 Check(capture_window(L"out/dark.bmp"), "dark compact appearance is captured");
                 SendMessageW(app.duration_preset_, CB_SHOWDROPDOWN, TRUE, 0);
@@ -299,6 +328,8 @@ struct ApplicationStatusTestAccess {
                   idleharbor::app::SettingsLayoutMode::Stacked, "fixture exercises the actual stacked layout");
             if (capture) Check(capture_window(L"out/narrow.bmp"), "narrow render is captured");
         }
+        Check(frame_extension_calls > 0 && !nonzero_glass_margins,
+              "real DWM calls never extend glass into native control areas");
         // This fixture never starts a session, registers hooks, or emits input.
         DestroyWindow(window);
     }

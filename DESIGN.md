@@ -33,10 +33,11 @@ without changing the compact workflow. Light remains available.
   High contrast uses system foreground/highlight colours. Appearance can change
   during a session; saving still waits until the session stops.
 - Soft backdrop uses documented DWM Mica on supported Windows 11 versions,
-  dynamically loaded from the system directory. It affects the frame/peripheral
-  background; content and controls remain opaque. Older Windows, disabled material
-  and high contrast use a solid fallback. No whole-window opacity or custom chrome.
-  PrintWindow previews show the solid appearance because they cannot composite Mica.
+  dynamically loaded from the system directory. It affects only the native title
+  bar; the entire client area stays opaque. Frame-extension margins are always zero:
+  full-client glass can make native GDI controls transparent. Older Windows, disabled
+  material and high contrast use a solid fallback. No whole-window opacity or custom
+  chrome. PrintWindow uses the same opaque client paint path as normal display.
 - Start is primary when stopped; Stop becomes primary during a session. Status
   text and fixed actions remain available while the settings body scrolls.
 
@@ -65,6 +66,7 @@ the defined hover colour without moving the user's cursor (issue #126).
 Synthetic window captures inspect compact/custom/expanded, dark dropdown and native
 system-colour fallback states. This does not prove screen-reader speech, actual
 Windows high-contrast activation or physical multi-monitor transitions.
-Installed-window DWM queries prove the dark title bar and Mica attribute are active
-on the current machine; a pixel read inside the foreground app confirms the composed
-header is not the black surface returned by an uncomposited PrintWindow capture.
+The native fixture records calls to the real DWM frame-extension function and
+rejects every nonzero margin. Client-background pixel tests exercise both palettes
+with material enabled, and captures no longer disable the material flag. Attribute
+queries and PrintWindow alone do not prove live compositor/control visibility.
