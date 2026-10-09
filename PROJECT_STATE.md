@@ -2,6 +2,30 @@
 
 Last updated: 2026-10-09
 
+## Premium native styling (2026-10-09)
+
+The owner retains the compact workflow and requests a premium, almost Apple-like
+visual treatment. The source now uses a soft neutral surface, clearer type hierarchy,
+rounded fields/actions and quiet chevron disclosures. Native control roles, selection,
+numeric caret/Undo, keyboard access and high-contrast fallback remain. See `PRODUCT.md`
+and `DESIGN.md` for the owner priorities and visual/interaction contract.
+
+MSVC 19.29 x64 Release and all seventeen CTest targets pass. The synthetic capture
+run passes 439 checks, including actual painted action/field colours, disabled state,
+numeric editing/Undo and bounded GDI-resource churn. Two visual inspection rounds
+cover compact, custom, expanded and native system-colour fallback renders. The live
+help test passes 31 tooltips and six fitting hints; the live 192-DPI wheel/repaint
+test passes three churn cycles. Actual Windows high-contrast activation, screen-reader
+speech, physical monitor transitions and ARM64 execution remain unverified.
+
+The tested executable is installed and reopened stopped. Installed SHA-256:
+`8596406dedde7bbaa2050c10def1ce611937b1a995ff9fcdc48d288076fef480`.
+It matches the source build; saved settings bytes and the existing startup task are
+unchanged. The prior executable, settings, startup XML and synthetic previews are
+retained outside Git at `Documents/Codex/IdleHarbor-premium-ui-2026-10-09`.
+This remains an unreleased development build labelled v0.2.0. Published archives,
+website screenshots and `HUMAN_TODO.md` owner gates remain unchanged.
+
 ## Compact native window (2026-10-09)
 
 The source window now prioritizes Profile, Keep awake and Session duration.
@@ -20,7 +44,7 @@ transitions and ARM64 execution remain unverified. Published release archives an
 website screenshots still describe v0.2.0; `HUMAN_TODO.md` retains owner account gates.
 
 The owner authorized ending the active session and replacing the desktop executable.
-The installed x64 build SHA-256 is
+The earlier compact x64 build SHA-256 was
 `ca75477afeec8dbc26407eed24e3085494ccc632a630445736cc694a54eccbeb`;
 it matches the tested source build. Saved settings bytes and the existing startup
 task are unchanged, and the app is reopened stopped with `--show`. A prior binary

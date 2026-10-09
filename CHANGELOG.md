@@ -6,6 +6,12 @@ where practical.
 
 ## [Unreleased]
 
+### Changed
+
+- Refined the compact window with a soft neutral surface, clearer typography,
+  rounded controls, quiet disclosure rows and a blue primary session action.
+  Native keyboard/editing behaviour and Windows high-contrast rendering remain.
+
 ### Added
 
 - Compact native settings window with duration presets, exact custom seconds and

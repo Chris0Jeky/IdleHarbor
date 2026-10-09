@@ -387,15 +387,15 @@ HFONT CreateScaledFont(const UINT dpi, const int point_size, const int weight) n
 }
 
 HFONT CreateUiFont(const UINT dpi) noexcept {
-    return CreateScaledFont(dpi, 9, FW_NORMAL);
+    return CreateScaledFont(dpi, 10, FW_NORMAL);
 }
 
 HFONT CreateHeadingFont(const UINT dpi) noexcept {
-    return CreateScaledFont(dpi, 10, FW_SEMIBOLD);
+    return CreateScaledFont(dpi, 16, FW_SEMIBOLD);
 }
 
 HFONT CreateHintFont(const UINT dpi) noexcept {
-    return CreateScaledFont(dpi, 8, FW_NORMAL);
+    return CreateScaledFont(dpi, 9, FW_NORMAL);
 }
 
 PowerRequestMode ToPlatformPowerMode(const PowerMode mode) {
@@ -701,6 +701,50 @@ class Application final {
         const UINT_PTR subclass_id,
         const DWORD_PTR reference_data) noexcept {
         auto* application = reinterpret_cast<Application*>(reference_data);
+        if (application != nullptr && !application->high_contrast_ && application->IsNumericControl(window)) {
+            if (message == WM_NCCALCSIZE) {
+                auto* rect = w_param != 0 ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(l_param)->rgrc[0]
+                                          : reinterpret_cast<RECT*>(l_param);
+                InflateRect(rect, -application->Scale(8), -application->Scale(6));
+                return 0;
+            }
+            if (message == WM_NCPAINT) {
+                const HDC dc = GetWindowDC(window);
+                application->DrawNumericFrame(window, dc);
+                ReleaseDC(window, dc);
+                return 0;
+            }
+            if (message == WM_PRINT) {
+                const LRESULT result = DefSubclassProc(window, message, w_param, l_param);
+                if ((l_param & PRF_NONCLIENT) != 0) application->DrawNumericFrame(window, reinterpret_cast<HDC>(w_param));
+                return result;
+            }
+            if (message == WM_SETFOCUS || message == WM_KILLFOCUS || message == WM_ENABLE) {
+                const LRESULT result = DefSubclassProc(window, message, w_param, l_param);
+                if (message == WM_SETFOCUS) application->ObserveFocusChange();
+                RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
+                return result;
+            }
+        }
+        if (application != nullptr && !application->high_contrast_ && application->IsStyledControl(window)) {
+            if (message == WM_PAINT || message == WM_PRINTCLIENT) {
+                PAINTSTRUCT paint{};
+                const HDC dc = message == WM_PAINT ? BeginPaint(window, &paint) : reinterpret_cast<HDC>(w_param);
+                application->DrawControl(window, dc);
+                if (message == WM_PAINT) EndPaint(window, &paint);
+                return 0;
+            }
+            if (message == WM_ERASEBKGND) return 1;
+            if (message == WM_MOUSEMOVE) {
+                TRACKMOUSEEVENT tracking{sizeof(tracking), TME_LEAVE, window, 0};
+                TrackMouseEvent(&tracking);
+            }
+            if (message == WM_MOUSEMOVE || message == WM_MOUSELEAVE || message == WM_SETFOCUS ||
+                message == WM_KILLFOCUS || message == WM_ENABLE || message == BM_SETCHECK ||
+                message == CB_SETCURSEL || message == WM_SETTEXT) {
+                InvalidateRect(window, nullptr, FALSE);
+            }
+        }
         if (message == WM_NCDESTROY) {
             RemoveWindowSubclass(window, ChildWindowProc, subclass_id);
         } else if ((message == WM_COMMAND || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN) && application != nullptr) {
@@ -762,6 +806,143 @@ class Application final {
     };
 
     [[nodiscard]] int Scale(const int value) const noexcept { return ScaleForDpi(value, dpi_); }
+
+    static constexpr COLORREF kSurface = RGB(247, 248, 250);
+    static constexpr COLORREF kInk = RGB(29, 32, 38);
+    static constexpr COLORREF kMuted = RGB(94, 101, 113);
+    static constexpr COLORREF kAccent = RGB(0, 91, 211);
+
+    void RefreshAppearance() noexcept {
+        HIGHCONTRASTW contrast{sizeof(contrast)};
+        high_contrast_ = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0) != FALSE &&
+                         (contrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
+        if (surface_brush_ == nullptr) surface_brush_ = CreateSolidBrush(kSurface);
+        for (const HWND edit : {interval_, distance_, pause_input_, battery_, max_duration_}) {
+            if (edit != nullptr) SetWindowPos(edit, nullptr, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        }
+        if (window_ != nullptr) RedrawWindow(window_, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+    }
+
+    [[nodiscard]] HBRUSH SurfaceBrush() const noexcept {
+        return high_contrast_ || surface_brush_ == nullptr ? GetSysColorBrush(COLOR_WINDOW) : surface_brush_;
+    }
+
+    [[nodiscard]] bool IsNumericControl(const HWND control) const noexcept {
+        return control == interval_ || control == distance_ || control == pause_input_ ||
+               control == battery_ || control == max_duration_;
+    }
+
+    void DrawNumericFrame(const HWND control, const HDC dc) const noexcept {
+        if (dc == nullptr) return;
+        const int saved = SaveDC(dc);
+        RECT outer{}, client{};
+        GetWindowRect(control, &outer); GetClientRect(control, &client);
+        MapWindowPoints(control, nullptr, reinterpret_cast<POINT*>(&client), 2);
+        OffsetRect(&client, -outer.left, -outer.top);
+        OffsetRect(&outer, -outer.left, -outer.top);
+        ExcludeClipRect(dc, client.left, client.top, client.right, client.bottom);
+        FillRect(dc, &outer, SurfaceBrush());
+        const HBRUSH brush = CreateSolidBrush(IsWindowEnabled(control) ? RGB(255, 255, 255) : kSurface);
+        const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), GetFocus() == control ? kAccent : RGB(219, 223, 230));
+        const auto old_brush = SelectObject(dc, brush), old_pen = SelectObject(dc, pen);
+        InflateRect(&outer, -Scale(1), -Scale(1));
+        RoundRect(dc, outer.left, outer.top, outer.right, outer.bottom, Scale(12), Scale(12));
+        SelectObject(dc, old_pen); SelectObject(dc, old_brush);
+        DeleteObject(pen); DeleteObject(brush);
+        RestoreDC(dc, saved);
+    }
+
+    [[nodiscard]] bool IsStyledControl(const HWND control) const noexcept {
+        wchar_t name[16]{};
+        GetClassNameW(control, name, 16);
+        return _wcsicmp(name, L"Button") == 0 || _wcsicmp(name, L"ComboBox") == 0;
+    }
+
+    void DrawControl(const HWND control, const HDC dc) const noexcept {
+        if (dc == nullptr) return;
+        const int saved = SaveDC(dc);
+        RECT bounds{};
+        GetClientRect(control, &bounds);
+        FillRect(dc, &bounds, SurfaceBrush());
+        const int id = GetDlgCtrlID(control);
+        const bool combo = ComboBoxForId(id) != nullptr;
+        const bool disclosure = id >= kMotionSection && id <= kWindowSection;
+        const bool check = !combo && !disclosure &&
+                           (GetWindowLongPtrW(control, GWL_STYLE) & BS_TYPEMASK) == BS_AUTOCHECKBOX;
+        const bool enabled = IsWindowEnabled(control) != FALSE;
+        const bool focused = GetFocus() == control;
+        POINT pointer{};
+        GetCursorPos(&pointer); ScreenToClient(control, &pointer);
+        const bool hover = enabled && PtInRect(&bounds, pointer) != FALSE;
+        const LRESULT state = combo ? 0 : SendMessageW(control, BM_GETSTATE, 0, 0);
+        const bool pressed = combo ? SendMessageW(control, CB_GETDROPPEDSTATE, 0, 0) != 0 : (state & BST_PUSHED) != 0;
+        const bool primary = control == start_ || (control == stop_ && session_active_);
+        const COLORREF ink = enabled ? kInk : RGB(122, 128, 139);
+        const auto rounded = [&](RECT rect, COLORREF fill, COLORREF line, int radius) {
+            const HBRUSH brush = CreateSolidBrush(fill);
+            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), line);
+            const auto old_brush = SelectObject(dc, brush), old_pen = SelectObject(dc, pen);
+            RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom, Scale(radius), Scale(radius));
+            SelectObject(dc, old_pen); SelectObject(dc, old_brush);
+            DeleteObject(pen); DeleteObject(brush);
+        };
+        RECT text = bounds;
+        if (check) {
+            RECT box{Scale(1), (bounds.bottom - Scale(16)) / 2, Scale(17), (bounds.bottom + Scale(16)) / 2};
+            const bool checked = (state & BST_CHECKED) != 0;
+            rounded(box, checked && enabled ? kAccent : RGB(255, 255, 255),
+                    focused ? kAccent : checked && enabled ? kAccent : RGB(157, 164, 176), 5);
+            if (checked) {
+                const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(2), 1), enabled ? RGB(255, 255, 255) : ink);
+                const auto old = SelectObject(dc, pen);
+                MoveToEx(dc, box.left + Scale(4), box.top + Scale(8), nullptr);
+                LineTo(dc, box.left + Scale(7), box.top + Scale(11));
+                LineTo(dc, box.left + Scale(12), box.top + Scale(5));
+                SelectObject(dc, old); DeleteObject(pen);
+            }
+            text.left += Scale(26);
+        } else {
+            const COLORREF fill = !enabled ? RGB(237, 239, 243) : primary ? (pressed ? RGB(0, 65, 161) : hover ? RGB(0, 78, 186) : kAccent)
+                                      : pressed ? RGB(229, 232, 238) : hover ? RGB(240, 242, 246) : RGB(255, 255, 255);
+            RECT frame = bounds;
+            InflateRect(&frame, -Scale(1), -Scale(1));
+            rounded(frame, disclosure && !hover && !focused ? kSurface : fill,
+                    focused ? kAccent : disclosure ? (hover ? RGB(226, 230, 236) : kSurface)
+                    : primary && enabled ? fill : RGB(219, 223, 230), 12);
+            text.left += Scale(12); text.right -= Scale(combo || disclosure ? 34 : 12);
+        }
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, primary && enabled && !combo && !disclosure ? RGB(255, 255, 255) : ink);
+        SelectObject(dc, reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0)));
+        std::wstring label = ControlText(control);
+        if (disclosure) {
+            label.erase(0, 5); // Native accessible names still include Show/Hide.
+            for (std::size_t at = 0; (at = label.find(L"&&", at)) != std::wstring::npos; ++at) label.erase(at, 1);
+        }
+        DrawTextW(dc, label.c_str(), -1, &text,
+                  DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
+                      (combo || disclosure || check ? DT_LEFT : DT_CENTER));
+        if (combo || disclosure) {
+            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), enabled ? kMuted : ink);
+            const auto old = SelectObject(dc, pen);
+            const int x = bounds.right - Scale(19), y = bounds.bottom / 2;
+            if (combo || IsChecked(control)) {
+                MoveToEx(dc, x - Scale(4), y - Scale(2), nullptr); LineTo(dc, x, y + Scale(2)); LineTo(dc, x + Scale(4), y - Scale(2));
+            } else {
+                MoveToEx(dc, x - Scale(2), y - Scale(4), nullptr); LineTo(dc, x + Scale(2), y); LineTo(dc, x - Scale(2), y + Scale(4));
+            }
+            SelectObject(dc, old); DeleteObject(pen);
+        }
+        if (focused && primary && enabled) {
+            RECT focus = bounds; InflateRect(&focus, -Scale(3), -Scale(3));
+            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), RGB(255, 255, 255));
+            const auto old_pen = SelectObject(dc, pen), old_brush = SelectObject(dc, GetStockObject(NULL_BRUSH));
+            RoundRect(dc, focus.left, focus.top, focus.right, focus.bottom, Scale(8), Scale(8));
+            SelectObject(dc, old_brush); SelectObject(dc, old_pen); DeleteObject(pen);
+        }
+        RestoreDC(dc, saved);
+    }
 
     [[nodiscard]] idleharbor::app::PixelRect WorkAreaFor(const RECT& rectangle) const noexcept {
         MONITORINFO monitor_info{sizeof(monitor_info)};
@@ -983,7 +1164,7 @@ class Application final {
                 } else if (child.kind == BodyControlKind::Label) {
                     narrow_y += 28;
                 } else if (child.kind == BodyControlKind::Field) {
-                    narrow_y += 38;
+                    narrow_y += 44;
                 } else if (child.kind == BodyControlKind::Hint) {
                     narrow_y += child.focus_height + 6;
                 } else {
@@ -994,7 +1175,7 @@ class Application final {
                 child.arranged_y = narrow_y;
                 if (child.kind == BodyControlKind::Field) {
                     child.arranged_y -= 3;
-                    narrow_y += 38;
+                    narrow_y += 44;
                 } else if (child.kind == BodyControlKind::Heading) {
                     narrow_y += 40;
                 } else if (child.kind == BodyControlKind::Check) {
@@ -1381,10 +1562,13 @@ class Application final {
             const HFONT heading_for_children = replacement_heading_font != nullptr ? replacement_heading_font : replacement_font;
             const HFONT hint_for_children = replacement_hint_font != nullptr ? replacement_hint_font : replacement_font;
             for (const auto& child : child_layouts_) {
-                const HFONT face = child.kind == BodyControlKind::Heading ? heading_for_children
+                const HFONT face = child.kind == BodyControlKind::Heading && GetDlgCtrlID(child.window) == 0 ? heading_for_children
                                  : child.kind == BodyControlKind::Hint    ? hint_for_children
                                                                          : replacement_font;
                 SendMessageW(child.window, WM_SETFONT, reinterpret_cast<WPARAM>(face), TRUE);
+                if (ComboBoxForId(GetDlgCtrlID(child.window)) != nullptr) {
+                    SendMessageW(child.window, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), Scale(24));
+                }
             }
             ApplyHelpTipMetrics(replacement_font);
             if (ui_font_ != nullptr) {
@@ -1473,6 +1657,7 @@ class Application final {
     }
 
     void CreateControls() {
+        RefreshAppearance();
         ui_font_ = CreateUiFont(dpi_);
         const HFONT font = ui_font_ != nullptr ? ui_font_ : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
         heading_font_ = CreateHeadingFont(dpi_);
@@ -1533,7 +1718,7 @@ class Application final {
                 section == 0 ? nullptr : reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMotionSection + section - 1)),
                 instance_,
                 nullptr);
-            SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(heading), TRUE);
+            SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(section == 0 ? heading : font), TRUE);
             TrackChild(control, 20, y, 525, 32, 32, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
             if (section != 0) {
                 section_buttons_[section - 1] = control;
@@ -1554,6 +1739,7 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+            SendMessageW(target, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), scale(24));
             AddHelpTip(target, tip);
             TrackChild(
                 target,
@@ -1561,7 +1747,7 @@ class Application final {
                 y - 3,
                 245,
                 260,
-                26,
+                30,
                 ChildWidthMode::Fill,
                 LayoutRegion::Body,
                 BodyControlKind::Field);
@@ -1575,14 +1761,16 @@ class Application final {
                 scale(300),
                 scale(y - 3),
                 scale(145),
-                scale(26),
+                scale(32),
                 body_parent,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                 instance_,
                 nullptr);
             SendMessageW(target, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
             AddHelpTip(target, tip);
-            TrackChild(target, 300, y - 3, 145, 26, 26, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Field);
+            TrackChild(target, 300, y - 3, 145, 32, 32, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Field);
+            SetWindowPos(target, nullptr, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         };
         // A wrapped explanation under a field. Its height depends on how many
         // lines the text takes at this DPI, so it is measured rather than fixed.
@@ -2001,15 +2189,24 @@ class Application final {
         if (draw_item == nullptr || draw_item->hDC == nullptr) {
             return;
         }
-        const HBRUSH background = GetSysColorBrush(COLOR_WINDOW);
+        const HBRUSH background = SurfaceBrush();
         FillRect(draw_item->hDC, &draw_item->rcItem, background);
         const int old_mode = SetBkMode(draw_item->hDC, TRANSPARENT);
-        const COLORREF old_color = SetTextColor(draw_item->hDC, GetSysColor(COLOR_WINDOWTEXT));
+        const COLORREF old_color = SetTextColor(draw_item->hDC, high_contrast_ ? GetSysColor(COLOR_WINDOWTEXT) : kMuted);
         const HFONT old_font = static_cast<HFONT>(SelectObject(
             draw_item->hDC,
             ui_font_ != nullptr ? ui_font_ : GetStockObject(DEFAULT_GUI_FONT)));
         RECT text_rect = draw_item->rcItem;
-        InflateRect(&text_rect, -Scale(12), -Scale(2));
+        InflateRect(&text_rect, 0, -Scale(2));
+        if (!high_contrast_) {
+            const HBRUSH dot = CreateSolidBrush(session_active_ ? RGB(28, 128, 83) : RGB(122, 128, 139));
+            const auto old_brush = SelectObject(draw_item->hDC, dot);
+            const auto old_pen = SelectObject(draw_item->hDC, GetStockObject(NULL_PEN));
+            const int y = (text_rect.top + text_rect.bottom) / 2;
+            Ellipse(draw_item->hDC, text_rect.left, y - Scale(3), text_rect.left + Scale(6), y + Scale(3));
+            SelectObject(draw_item->hDC, old_pen); SelectObject(draw_item->hDC, old_brush); DeleteObject(dot);
+            text_rect.left += Scale(16);
+        }
         DrawTextW(
             draw_item->hDC,
             DisplayStatusText().c_str(),
@@ -2798,14 +2995,21 @@ class Application final {
             break;
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLORBTN:
-            SetTextColor(reinterpret_cast<HDC>(w_param), GetSysColor(COLOR_WINDOWTEXT));
-            SetBkColor(reinterpret_cast<HDC>(w_param), GetSysColor(COLOR_WINDOW));
-            return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+            SetTextColor(reinterpret_cast<HDC>(w_param), high_contrast_ ? GetSysColor(COLOR_WINDOWTEXT) :
+                std::any_of(child_layouts_.begin(), child_layouts_.end(), [&](const ChildLayout& child) {
+                    return child.window == reinterpret_cast<HWND>(l_param) && child.kind == BodyControlKind::Hint;
+                }) ? kMuted : kInk);
+            SetBkColor(reinterpret_cast<HDC>(w_param), high_contrast_ ? GetSysColor(COLOR_WINDOW) : kSurface);
+            return reinterpret_cast<LRESULT>(SurfaceBrush());
+        case WM_ERASEBKGND: {
+            RECT client{}; GetClientRect(window_, &client);
+            FillRect(reinterpret_cast<HDC>(w_param), &client, SurfaceBrush());
+            return 1;
+        }
         case WM_THEMECHANGED:
         case WM_SYSCOLORCHANGE:
-            if (status_ != nullptr) {
-                InvalidateRect(status_, nullptr, TRUE);
-            }
+        case WM_SETTINGCHANGE:
+            RefreshAppearance();
             return 0;
         case WM_TIMER:
             if (w_param == kTimerId) {
@@ -2907,6 +3111,10 @@ class Application final {
             StopSession();
             return TRUE;
         case WM_DESTROY:
+            if (surface_brush_ != nullptr) {
+                DeleteObject(surface_brush_);
+                surface_brush_ = nullptr;
+            }
             if (session_active_) {
                 StopSession();
             }
@@ -2978,6 +3186,8 @@ class Application final {
     HICON tray_icon_ = nullptr;
     HFONT ui_font_ = nullptr;
     HFONT heading_font_ = nullptr;
+    HBRUSH surface_brush_ = nullptr;
+    bool high_contrast_ = false;
     UINT taskbar_created_message_ = 0;
     UINT dpi_ = USER_DEFAULT_SCREEN_DPI;
     bool tray_added_ = false;

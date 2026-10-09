@@ -132,8 +132,10 @@ x64 and ARM64 archives. The packaging parser and ownership tests can be run inde
 IdleHarbor stores local settings only. The app has no network service or telemetry path and sends
 nothing anywhere.
 
-The window title shows the executable's version. The compact window is currently
-an unreleased source change; the screenshots above show the published v0.2.0 layout.
+The window title shows the executable's version. The compact window uses a light,
+restrained design with rounded controls, quiet disclosures and a blue primary action.
+It is currently an unreleased source change; the screenshots above show the
+published v0.2.0 layout. Windows high-contrast mode retains native control rendering.
 
 The project website (<https://chris0jeky.github.io/IdleHarbor/>) is separate from the app: it runs
 the Pulseboard beta SDK. A **Beta** bar offers three categories: **Usage counts** (daily aggregate
