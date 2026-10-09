@@ -64,6 +64,7 @@ constexpr UINT kDeferredCommandMessage = WM_APP + 3;
 constexpr UINT kDeferredFocusMessage = WM_APP + 4;
 constexpr UINT kDeferredSelectionMessage = WM_APP + 5;
 constexpr UINT kTimerId = 1;
+constexpr UINT kScrollTimerId = 2;
 constexpr UINT_PTR kChildSubclassId = 1;
 constexpr int kEmergencyHotkeyId = 1;
 constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
@@ -602,6 +603,7 @@ class Application final {
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
         case WM_CHAR:
+            CancelSmoothScroll();
             focus_trigger_ = FocusRevealTrigger::Keyboard;
             break;
         case WM_LBUTTONDOWN:
@@ -609,6 +611,7 @@ class Application final {
         case WM_RBUTTONDOWN:
         case WM_MBUTTONDOWN:
         case WM_NCLBUTTONDOWN:
+            CancelSmoothScroll();
             focus_trigger_ = FocusRevealTrigger::Pointer;
             break;
         default:
@@ -630,6 +633,23 @@ class Application final {
         if (EnsureFocusedControlVisible(focus_trigger_)) {
             last_focus_ = focused;
         }
+    }
+
+    [[nodiscard]] bool HandlePageNavigation(const MSG& message) {
+        if (message.message != WM_KEYDOWN || IsAnyComboBoxDropped()) return false;
+        wchar_t name[32]{}; GetClassNameW(GetFocus(), name, 32);
+        if (lstrcmpiW(name, L"EDIT") == 0 || lstrcmpiW(name, L"COMBOBOX") == 0 ||
+            lstrcmpiW(name, L"SCROLLBAR") == 0) return false;
+        int target = scroll_position_;
+        switch (message.wParam) {
+        case VK_PRIOR: target -= ViewportHeight(); break;
+        case VK_NEXT: target += ViewportHeight(); break;
+        case VK_HOME: target = 0; break;
+        case VK_END: target = ContentHeight(); break;
+        default: return false;
+        }
+        RequestSmoothScroll(target);
+        return true;
     }
 
     [[nodiscard]] bool HandleTabNavigation(const MSG& message) {
@@ -707,6 +727,10 @@ class Application final {
         const UINT_PTR subclass_id,
         const DWORD_PTR reference_data) noexcept {
         auto* application = reinterpret_cast<Application*>(reference_data);
+        if (application != nullptr && (message == WM_LBUTTONDOWN || message == WM_KEYDOWN ||
+                                      (message == CB_SHOWDROPDOWN && w_param != FALSE))) {
+            application->CancelSmoothScroll();
+        }
         if (application != nullptr && !application->high_contrast_ && application->IsNumericControl(window)) {
             if (message == WM_NCCALCSIZE) {
                 auto* rect = w_param != 0 ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(l_param)->rgrc[0]
@@ -735,11 +759,12 @@ class Application final {
         if (application != nullptr && message == WM_MOUSELEAVE && application->hovered_control_ == window) {
             application->hovered_control_ = nullptr;
         }
-        if (application != nullptr && !application->high_contrast_ && application->IsStyledControl(window)) {
+        if (application != nullptr && !application->high_contrast_ &&
+            (application->IsStyledControl(window) || window == application->scrollbar_)) {
             if (message == WM_PAINT || message == WM_PRINTCLIENT) {
                 PAINTSTRUCT paint{};
                 const HDC dc = message == WM_PAINT ? BeginPaint(window, &paint) : reinterpret_cast<HDC>(w_param);
-                application->DrawControl(window, dc);
+                application->PaintStyledControl(window, dc);
                 if (message == WM_PAINT) EndPaint(window, &paint);
                 return 0;
             }
@@ -751,8 +776,14 @@ class Application final {
             }
             if (message == WM_MOUSELEAVE || message == WM_SETFOCUS ||
                 message == WM_KILLFOCUS || message == WM_ENABLE || message == BM_SETCHECK ||
-                message == CB_SETCURSEL || message == WM_SETTEXT) {
-                InvalidateRect(window, nullptr, FALSE);
+                message == CB_SETCURSEL || message == CB_SHOWDROPDOWN || message == WM_SETTEXT ||
+                message == BM_SETSTATE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP ||
+                message == WM_KEYDOWN || message == WM_KEYUP || message == WM_CAPTURECHANGED ||
+                message == WM_CANCELMODE) {
+                const LRESULT result = DefSubclassProc(window, message, w_param, l_param);
+                if (message == WM_SETFOCUS) application->ObserveFocusChange();
+                if (IsWindow(window)) InvalidateRect(window, nullptr, FALSE);
+                return result;
             }
         }
         if (message == WM_NCDESTROY) {
@@ -765,7 +796,7 @@ class Application final {
         } else if (message == WM_SETFOCUS && application != nullptr) {
             application->ObserveFocusChange();
         } else if (message == WM_VSCROLL && application != nullptr && window == application->settings_viewport_) {
-            application->HandleVerticalScroll(w_param);
+            if (reinterpret_cast<HWND>(l_param) == application->scrollbar_) application->HandleVerticalScroll(w_param);
             return 0;
         } else if (message == WM_MOUSEWHEEL && application != nullptr) {
             if (application->IsDroppedComboBox(window)) {
@@ -837,9 +868,13 @@ class Application final {
     }
 
     void RefreshAppearance() noexcept {
+        CancelSmoothScroll();
         HIGHCONTRASTW contrast{sizeof(contrast)};
         high_contrast_ = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0) != FALSE &&
                          (contrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
+        BOOL animate = TRUE;
+        SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animate, 0);
+        scroll_motion_enabled_ = animate != FALSE && !high_contrast_;
         if (surface_brush_ == nullptr || surface_color_ != Colors().surface) {
             const HBRUSH surface = CreateSolidBrush(Colors().surface), field = CreateSolidBrush(Colors().field);
             if (surface != nullptr && field != nullptr) {
@@ -939,6 +974,56 @@ class Application final {
         return _wcsicmp(name, L"Button") == 0 || _wcsicmp(name, L"ComboBox") == 0;
     }
 
+    void PaintStyledControl(const HWND control, const HDC dc) const noexcept {
+        RECT bounds{}; GetClientRect(control, &bounds);
+        const HDC buffer = CreateCompatibleDC(dc);
+        const HBITMAP bitmap = CreateCompatibleBitmap(dc, std::max(bounds.right, 1L), std::max(bounds.bottom, 1L));
+        const HGDIOBJ previous = buffer != nullptr && bitmap != nullptr ? SelectObject(buffer, bitmap) : nullptr;
+        const HDC target = previous != nullptr && previous != HGDI_ERROR ? buffer : dc;
+        if (control == scrollbar_) DrawScrollbar(control, target);
+        else DrawControl(control, target);
+        if (target == buffer) {
+            BitBlt(dc, 0, 0, bounds.right, bounds.bottom, buffer, 0, 0, SRCCOPY);
+            SelectObject(buffer, previous);
+        }
+        if (bitmap != nullptr) DeleteObject(bitmap);
+        if (buffer != nullptr) DeleteDC(buffer);
+    }
+
+    void DrawScrollbar(const HWND control, const HDC dc) const noexcept {
+        SCROLLBARINFO info{sizeof(info)};
+        if (GetScrollBarInfo(control, OBJID_CLIENT, &info) == FALSE) {
+            DefSubclassProc(control, WM_PRINTCLIENT, reinterpret_cast<WPARAM>(dc), PRF_CLIENT);
+            return;
+        }
+        RECT bounds{}; GetClientRect(control, &bounds);
+        FillRect(dc, &bounds, SurfaceBrush());
+        POINT pointer{}; GetCursorPos(&pointer); ScreenToClient(control, &pointer);
+        const bool hover = PtInRect(&bounds, pointer) != FALSE;
+        constexpr DWORD unavailable = 0x00000001, pressed = 0x00000008, invisible = 0x00008000;
+        const COLORREF ink = hover || GetCapture() == control ? Colors().accent : Colors().muted;
+        const int center = bounds.right / 2;
+        if ((info.rgstate[3] & (unavailable | invisible)) == 0 && info.xyThumbBottom > info.xyThumbTop) {
+            const HBRUSH brush = CreateSolidBrush(ink);
+            const auto old_brush = SelectObject(dc, brush), old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+            const int half = std::max(Scale(3), 1);
+            RoundRect(dc, center - half, info.xyThumbTop, center + half, info.xyThumbBottom, half * 2, half * 2);
+            SelectObject(dc, old_pen); SelectObject(dc, old_brush); DeleteObject(brush);
+        }
+        for (int arrow = 0; arrow < 2; ++arrow) {
+            const DWORD state = info.rgstate[arrow == 0 ? 1 : 5];
+            if ((state & (unavailable | invisible)) != 0) continue;
+            const int y = arrow == 0 ? info.dxyLineButton / 2 : bounds.bottom - info.dxyLineButton / 2;
+            const int direction = arrow == 0 ? -1 : 1;
+            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), (state & pressed) != 0 ? Colors().accent : ink);
+            const auto old = SelectObject(dc, pen);
+            MoveToEx(dc, center - Scale(3), y - direction * Scale(1), nullptr);
+            LineTo(dc, center, y + direction * Scale(2));
+            LineTo(dc, center + Scale(3), y - direction * Scale(1));
+            SelectObject(dc, old); DeleteObject(pen);
+        }
+    }
+
     void DrawControl(const HWND control, const HDC dc) const noexcept {
         if (dc == nullptr) return;
         const int saved = SaveDC(dc);
@@ -987,7 +1072,7 @@ class Application final {
                                       : pressed ? Colors().pressed : hover ? Colors().hover : Colors().field;
             RECT frame = bounds;
             InflateRect(&frame, -Scale(1), -Scale(1));
-            rounded(frame, disclosure && !hover && !focused ? Colors().surface : fill,
+            rounded(frame, disclosure && !hover && !focused && !pressed ? Colors().surface : fill,
                     focused ? Colors().accent : disclosure ? (hover ? Colors().border : Colors().surface)
                     : primary && enabled ? fill : Colors().border, 12);
             text.left += Scale(12); text.right -= Scale(combo || disclosure ? 34 : 12);
@@ -1193,6 +1278,7 @@ class Application final {
     }
 
     void LayoutControls() {
+        CancelSmoothScroll();
         if (child_layouts_.empty() || window_ == nullptr) {
             return;
         }
@@ -1212,9 +1298,13 @@ class Application final {
                 SWP_NOACTIVATE | SWP_NOZORDER);
         }
         RECT viewport_client{};
+        if (settings_viewport_ != nullptr && GetClientRect(settings_viewport_, &viewport_client) != FALSE && scrollbar_ != nullptr) {
+            SetWindowPos(scrollbar_, HWND_TOP, viewport_client.right - Scale(16), 0, Scale(16), viewport_client.bottom,
+                         SWP_NOACTIVATE | (scrollbar_visible_ ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+        }
         const int viewport_width = settings_viewport_ != nullptr &&
                                             GetClientRect(settings_viewport_, &viewport_client) != FALSE
-                                        ? std::max(static_cast<int>(viewport_client.right), 1)
+                                        ? std::max(static_cast<int>(viewport_client.right) - (scrollbar_visible_ ? Scale(16) : 0), 1)
                                         : std::max(regions.viewport.right - regions.viewport.left, 1);
         const auto settings_layout = idleharbor::app::DetermineSettingsLayout(viewport_width, static_cast<int>(dpi_));
         const bool stacked = settings_layout == idleharbor::app::SettingsLayoutMode::Stacked;
@@ -1431,12 +1521,7 @@ class Application final {
         updating_viewport_ = true;
         constexpr int kMaxLayoutPasses = 4;
         const int requested_scroll_position = scroll_position_;
-        if (settings_viewport_ != nullptr) {
-            // A visible scrollbar reduces GetClientRect(). Start each resize pass
-            // from the scrollbar-free candidate so a height increase can shed an
-            // inherited bar and return to the wider layout.
-            ShowScrollBar(settings_viewport_, SB_VERT, FALSE);
-        }
+        scrollbar_visible_ = false;
         const auto publish_scroll_info = [&](const bool include_position) {
             const int viewport_height = ViewportHeight();
             SCROLLINFO scroll_info{sizeof(scroll_info)};
@@ -1452,12 +1537,9 @@ class Application final {
                 scroll_info.fMask |= SIF_POS;
                 scroll_info.nPos = scroll_position_;
             }
-            if (settings_viewport_ != nullptr) {
-                SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
-                ShowScrollBar(
-                    settings_viewport_,
-                    SB_VERT,
-                    ContentHeight() > viewport_height ? TRUE : FALSE);
+            if (scrollbar_ != nullptr) {
+                SetScrollInfo(scrollbar_, SB_CTL, &scroll_info, TRUE);
+                scrollbar_visible_ = ContentHeight() > viewport_height;
             }
             return viewport_height;
         };
@@ -1485,7 +1567,18 @@ class Application final {
         RepaintWindowAndChildren();
     }
 
+    void CancelSmoothScroll() noexcept {
+        if (scroll_animating_ && window_ != nullptr) KillTimer(window_, kScrollTimerId);
+        scroll_animating_ = false;
+        scroll_target_ = scroll_position_;
+    }
+
     void ScrollTo(const int position) {
+        CancelSmoothScroll();
+        SetScrollPosition(position);
+    }
+
+    void SetScrollPosition(const int position) {
         // Moving the body would move the control an open list is anchored to.
         if (IsAnyComboBoxDropped()) {
             return;
@@ -1498,17 +1591,51 @@ class Application final {
         SCROLLINFO scroll_info{sizeof(scroll_info)};
         scroll_info.fMask = SIF_POS;
         scroll_info.nPos = scroll_position_;
-        if (settings_viewport_ != nullptr) {
-            SetScrollInfo(settings_viewport_, SB_VERT, &scroll_info, TRUE);
+        if (scrollbar_ != nullptr) {
+            SetScrollInfo(scrollbar_, SB_CTL, &scroll_info, TRUE);
         }
-        LayoutControls();
-        RepaintSettingsViewport();
+        HDWP batch = BeginDeferWindowPos(static_cast<int>(child_layouts_.size()));
+        for (const auto& child : child_layouts_) {
+            if (child.region != LayoutRegion::Body || (GetWindowLongPtrW(child.window, GWL_STYLE) & WS_VISIBLE) == 0) continue;
+            if (batch != nullptr) batch = DeferWindowPos(batch, child.window, nullptr, Scale(child.arranged_x),
+                Scale(child.arranged_y) - scroll_position_, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+        }
+        if (batch == nullptr || EndDeferWindowPos(batch) == FALSE) {
+            for (const auto& child : child_layouts_) {
+                if (child.region == LayoutRegion::Body && (GetWindowLongPtrW(child.window, GWL_STYLE) & WS_VISIBLE) != 0)
+                    SetWindowPos(child.window, nullptr, Scale(child.arranged_x), Scale(child.arranged_y) - scroll_position_, 0, 0,
+                                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+            }
+        }
+        RedrawWindow(settings_viewport_, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+    }
+
+    void RequestSmoothScroll(const int position) {
+        const int target = idleharbor::app::ClampScrollPosition(position, ContentHeight(), ViewportHeight());
+        if (IsAnyComboBoxDropped()) { CancelSmoothScroll(); return; }
+        if (!scroll_motion_enabled_ || IsWindowVisible(window_) == FALSE) { ScrollTo(target); return; }
+        if (scroll_animating_ && target == scroll_target_) return;
+        CancelSmoothScroll();
+        if (target == scroll_position_) return;
+        scroll_from_ = scroll_position_;
+        scroll_target_ = target;
+        scroll_started_ = GetTickCount64();
+        scroll_animating_ = SetTimer(window_, kScrollTimerId, 16, nullptr) != 0;
+        if (!scroll_animating_) ScrollTo(target);
+    }
+
+    void AdvanceSmoothScroll() {
+        if (!scroll_animating_) return;
+        if (IsAnyComboBoxDropped() || IsWindowVisible(window_) == FALSE) { CancelSmoothScroll(); return; }
+        SetScrollPosition(idleharbor::app::AnimatedScrollPosition(scroll_from_, scroll_target_, GetTickCount64() - scroll_started_));
+        if (scroll_position_ == scroll_target_) CancelSmoothScroll();
     }
 
     void HandleVerticalScroll(const WPARAM w_param) {
         SCROLLINFO scroll_info{sizeof(scroll_info)};
         scroll_info.fMask = SIF_ALL;
-        if (settings_viewport_ == nullptr || GetScrollInfo(settings_viewport_, SB_VERT, &scroll_info) == FALSE) {
+        if (scrollbar_ == nullptr || GetScrollInfo(scrollbar_, SB_CTL, &scroll_info) == FALSE) {
             return;
         }
         int target = scroll_position_;
@@ -1542,14 +1669,6 @@ class Application final {
     }
 
     void HandleMouseWheel(const WPARAM w_param) {
-        const auto wheel = idleharbor::app::ConsumeWheelDelta(
-            wheel_delta_remainder_,
-            GET_WHEEL_DELTA_WPARAM(w_param));
-        wheel_delta_remainder_ = wheel.remainder;
-        if (wheel.steps == 0) {
-            return;
-        }
-
         UINT scroll_lines = 3;
         if (SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &scroll_lines, 0) == FALSE) {
             scroll_lines = 3;
@@ -1561,9 +1680,18 @@ class Application final {
                                                 ? ViewportHeight()
                                                 : static_cast<long long>(Scale(kBaseScrollLine)) * scroll_lines;
         const long long maximum = idleharbor::app::MaximumScrollPosition(ContentHeight(), ViewportHeight());
-        const long long requested = static_cast<long long>(scroll_position_) -
-                                    static_cast<long long>(wheel.steps) * distance_per_step;
-        ScrollTo(static_cast<int>(std::clamp(requested, 0LL, maximum)));
+        const int delta = GET_WHEEL_DELTA_WPARAM(w_param);
+        const auto wheel = idleharbor::app::ConsumeWheelDelta(wheel_delta_remainder_, delta,
+            static_cast<int>(std::min(distance_per_step, static_cast<long long>(INT_MAX))));
+        wheel_delta_remainder_ = wheel.remainder;
+        if (wheel.pixels == 0) return;
+        const bool continuing = scroll_animating_ &&
+                                (delta < 0 ? scroll_target_ > scroll_position_ : scroll_target_ < scroll_position_);
+        const long long requested = static_cast<long long>(continuing && std::abs(delta) >= WHEEL_DELTA
+                                                              ? scroll_target_ : scroll_position_) - wheel.pixels;
+        const int target = static_cast<int>(std::clamp(requested, 0LL, maximum));
+        if (std::abs(delta) < WHEEL_DELTA) ScrollTo(target);
+        else RequestSmoothScroll(target);
     }
 
     [[nodiscard]] bool IsDroppedComboBox(const HWND window) const noexcept {
@@ -1766,7 +1894,7 @@ class Application final {
             WS_EX_CONTROLPARENT,
             L"STATIC",
             nullptr,
-            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_VSCROLL,
+            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
             0,
             0,
             0,
@@ -1777,6 +1905,9 @@ class Application final {
             nullptr);
         if (settings_viewport_ != nullptr) {
             SetWindowSubclass(settings_viewport_, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
+            scrollbar_ = CreateWindowExW(0, L"SCROLLBAR", L"Settings scroll bar", WS_CHILD | SBS_VERT,
+                                        0, 0, 0, 0, settings_viewport_, nullptr, instance_, nullptr);
+            if (scrollbar_ != nullptr) SetWindowSubclass(scrollbar_, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
         }
         const HWND body_parent = settings_viewport_ != nullptr ? settings_viewport_ : window_;
         const auto add_label = [&](const wchar_t* text, const int y, const wchar_t* tip) {
@@ -3203,6 +3334,10 @@ class Application final {
             RefreshAppearance();
             return 0;
         case WM_TIMER:
+            if (w_param == kScrollTimerId) {
+                AdvanceSmoothScroll();
+                return 0;
+            }
             if (w_param == kTimerId) {
                 if (input_observer_requested_ && GetTickCount64() >= next_input_hook_refresh_tick_) {
                     const auto capabilities = input_monitor_.Refresh();
@@ -3279,7 +3414,7 @@ class Application final {
             ApplyMinimumTrackingSize(reinterpret_cast<MINMAXINFO*>(l_param));
             return 0;
         case WM_VSCROLL:
-            HandleVerticalScroll(w_param);
+            if (reinterpret_cast<HWND>(l_param) == scrollbar_) HandleVerticalScroll(w_param);
             return 0;
         case WM_MOUSEWHEEL:
             if (IsSettingsViewportPoint(l_param)) {
@@ -3292,6 +3427,7 @@ class Application final {
                 *reinterpret_cast<const RECT*>(l_param));
             return 0;
         case WM_CLOSE:
+            CancelSmoothScroll();
             if (settings_.close_to_tray && tray_added_ && !exiting_) {
                 ShowWindow(window_, SW_HIDE);
                 return 0;
@@ -3302,6 +3438,7 @@ class Application final {
             StopSession();
             return TRUE;
         case WM_DESTROY:
+            CancelSmoothScroll();
             if (dwm_module_ != nullptr) { FreeLibrary(dwm_module_); dwm_module_ = nullptr; }
             if (field_brush_ != nullptr) { DeleteObject(field_brush_); field_brush_ = nullptr; }
             if (surface_brush_ != nullptr) {
@@ -3350,6 +3487,8 @@ class Application final {
     HINSTANCE instance_ = nullptr;
     HWND window_ = nullptr;
     HWND settings_viewport_ = nullptr;
+    HWND scrollbar_ = nullptr;
+    bool scrollbar_visible_ = false;
     HWND status_ = nullptr;
     HWND profile_ = nullptr;
     HWND motion_ = nullptr;
@@ -3413,6 +3552,11 @@ class Application final {
     bool updating_viewport_ = false;
     int body_content_height_ = 0;
     int wheel_delta_remainder_ = 0;
+    bool scroll_motion_enabled_ = true;
+    bool scroll_animating_ = false;
+    int scroll_from_ = 0;
+    int scroll_target_ = 0;
+    ULONGLONG scroll_started_ = 0;
     std::uint64_t next_pulse_tick_ = 0;
     ULONGLONG next_input_hook_refresh_tick_ = 0;
     std::wstring status_text_ = L"Stopped: ready";
@@ -3543,7 +3687,8 @@ int WINAPI wWinMain(const HINSTANCE instance, const HINSTANCE, const PWSTR, cons
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
         application.NoteInputTrigger(message);
-        if (!application.HandleTabNavigation(message) && IsDialogMessageW(application.window(), &message) == FALSE) {
+        if (!application.HandlePageNavigation(message) && !application.HandleTabNavigation(message) &&
+            IsDialogMessageW(application.window(), &message) == FALSE) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }

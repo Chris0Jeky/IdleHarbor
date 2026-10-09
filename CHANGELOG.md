@@ -8,6 +8,12 @@ where practical.
 
 ### Changed
 
+- Settings scrolling responds proportionally to small wheel movements; wheel notches
+  settle with a short, interruptible transition that respects reduced motion.
+  A slim themed scrollbar retains native dragging and accessibility behavior.
+  Page Up/Down and Home/End navigate settings from buttons, preserving editing keys.
+  Buffered control painting and native press/release redraws improve interaction feedback.
+
 - Session duration leads the main view. Expandable settings now show current motion,
   safeguard and appearance summaries in a quieter second line, including native
   accessible names; unfinished edits remain intact.

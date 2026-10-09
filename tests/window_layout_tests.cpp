@@ -51,28 +51,49 @@ void test_focus_reveal_scrolls_only_when_needed() {
 
 void test_wheel_delta_accumulates_high_resolution_input() {
     using idleharbor::app::ConsumeWheelDelta;
-    auto result = ConsumeWheelDelta(0, 40);
-    CHECK(result.steps == 0);
+    auto result = ConsumeWheelDelta(0, 40, 97);
+    CHECK(result.pixels == 32);
     CHECK(result.remainder == 40);
-    result = ConsumeWheelDelta(result.remainder, 40);
-    CHECK(result.steps == 0);
+    result = ConsumeWheelDelta(result.remainder, 40, 97);
+    CHECK(result.pixels == 32);
     CHECK(result.remainder == 80);
-    result = ConsumeWheelDelta(result.remainder, 40);
-    CHECK(result.steps == 1);
+    result = ConsumeWheelDelta(result.remainder, 40, 97);
+    CHECK(result.pixels == 33);
     CHECK(result.remainder == 0);
 }
 
 void test_wheel_delta_preserves_direction_and_remainder() {
     using idleharbor::app::ConsumeWheelDelta;
-    auto result = ConsumeWheelDelta(0, -200);
-    CHECK(result.steps == -1);
-    CHECK(result.remainder == -80);
-    result = ConsumeWheelDelta(result.remainder, 40);
-    CHECK(result.steps == 0);
-    CHECK(result.remainder == -40);
-    result = ConsumeWheelDelta(result.remainder, 160);
-    CHECK(result.steps == 1);
+    auto result = ConsumeWheelDelta(0, -1, 97);
+    CHECK(result.pixels == 0);
+    CHECK(result.remainder == -97);
+    result = ConsumeWheelDelta(result.remainder, 1, 97);
+    CHECK(result.pixels == 0);
     CHECK(result.remainder == 0);
+    result = ConsumeWheelDelta(result.remainder, 120, 97);
+    CHECK(result.pixels == 97);
+    CHECK(result.remainder == 0);
+    int pixels = 0, remainder = 0;
+    for (int delta = 0; delta < 120; ++delta) {
+        result = ConsumeWheelDelta(remainder, -1, 97);
+        pixels += result.pixels; remainder = result.remainder;
+    }
+    CHECK(pixels == -97 && remainder == 0);
+}
+
+void test_scroll_easing_settles_without_overshoot() {
+    using idleharbor::app::AnimatedScrollPosition;
+    CHECK(AnimatedScrollPosition(20, 220, 0) == 20);
+    CHECK(AnimatedScrollPosition(20, 220, 80) == 195);
+    CHECK(AnimatedScrollPosition(20, 220, 160) == 220);
+    CHECK(AnimatedScrollPosition(220, 20, 500) == 20);
+    int previous = 20;
+    for (std::uint64_t elapsed = 1; elapsed <= 160; ++elapsed) {
+        const int position = AnimatedScrollPosition(20, 220, elapsed);
+        CHECK(position >= previous && position <= 220);
+        previous = position;
+        CHECK(AnimatedScrollPosition(220, 20, elapsed) >= 20);
+    }
 }
 
 void test_fixed_safety_regions_never_scroll_with_the_body() {
@@ -307,6 +328,7 @@ int main() {
     test_focus_reveal_scrolls_only_when_needed();
     test_wheel_delta_accumulates_high_resolution_input();
     test_wheel_delta_preserves_direction_and_remainder();
+    test_scroll_easing_settles_without_overshoot();
     test_fixed_safety_regions_never_scroll_with_the_body();
     test_focus_reveal_is_gated_by_actual_focus_change();
     test_tab_order_keeps_fixed_actions_after_the_settings_body();

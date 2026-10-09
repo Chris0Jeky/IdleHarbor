@@ -61,6 +61,19 @@ The preferred window height is 500 logical pixels so the compact view still fits
 returns focus to the disclosure when its contents held focus. Disclosure never
 changes settings. Session settings remain locked while running; Stop remains enabled.
 
+Scrolling translates the arranged body without remeasuring fields or moving fixed
+actions. Precision wheel deltas move proportionally with fractional-pixel carry;
+notches settle over 160 ms without overshoot. Reversal starts from the visible
+position, repeated input accumulates its destination, and boundary input does not
+prolong settling. Windows reduced motion and high contrast use immediate scrolling.
+Focus reveal, pointer interaction, open dropdowns, layout and closing cancel motion.
+Page Up/Down and Home/End scroll from buttons while edits, combos and the native
+scrollbar retain their own keys. The 16-pixel logical scrollbar gutter contains a
+6-pixel rounded thumb, painted from native hit geometry; high contrast uses native
+painting. Native controls retain input handling and accessibility roles. Button
+press/release paints follow native state updates, and themed paints use a temporary
+GDI buffer whose objects are released after each paint.
+
 ## Proof boundary
 
 The real-control fixture covers duration/persistence, disclosure, keyboard access,
@@ -75,3 +88,8 @@ The native fixture records calls to the real DWM frame-extension function and
 rejects every nonzero margin. Client-background pixel tests exercise both palettes
 with material enabled, and captures no longer disable the material flag. Attribute
 queries and PrintWindow alone do not prove live compositor/control visibility.
+Scroll regressions cover small deltas, accumulation, reversal, interruption,
+reduced-motion behavior, native scrollbar geometry and fixed-action position calls.
+The live viewport check drags the native thumb and replays wheel input, then compares
+natural pixels with an explicit repaint. These checks do not measure hardware
+touchpad feel, frame timing or CPU usage, or prove screen-reader speech.
