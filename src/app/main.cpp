@@ -69,7 +69,7 @@ constexpr int kEmergencyHotkeyId = 1;
 constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
 constexpr std::size_t kMaximumDeferredCommands = 32;
 constexpr int kBaseWindowWidth = 600;
-constexpr int kBaseWindowHeight = 480;
+constexpr int kBaseWindowHeight = 500;
 constexpr int kBaseWindowMargin = 12;
 constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
@@ -998,9 +998,23 @@ class Application final {
             label.erase(0, 5); // Native accessible names still include Show/Hide.
             for (std::size_t at = 0; (at = label.find(L"&&", at)) != std::wstring::npos; ++at) label.erase(at, 1);
         }
-        DrawTextW(dc, label.c_str(), -1, &text,
-                  DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
-                      (combo || disclosure || check ? DT_LEFT : DT_CENTER));
+        if (disclosure) {
+            const auto split = label.find(L'\n');
+            RECT title = text; title.top = Scale(2); title.bottom = Scale(23);
+            DrawTextW(dc, label.substr(0, split).c_str(), -1, &title,
+                      DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+            if (split != std::wstring::npos) {
+                RECT summary = text; summary.top = Scale(24); summary.bottom = bounds.bottom - Scale(2);
+                SelectObject(dc, hint_font_ != nullptr ? hint_font_ : ui_font_);
+                SetTextColor(dc, Colors().muted);
+                DrawTextW(dc, label.c_str() + split + 1, -1, &summary,
+                          DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+            }
+        } else {
+            DrawTextW(dc, label.c_str(), -1, &text,
+                      DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
+                          (combo || check ? DT_LEFT : DT_CENTER));
+        }
         if (combo || disclosure) {
             const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), enabled ? Colors().muted : ink);
             const auto old = SelectObject(dc, pen);
@@ -1239,7 +1253,7 @@ class Application final {
                 measure_hint(child, stacked_body.width);
                 child.arranged_width = stacked_body.width;
                 if (child.kind == BodyControlKind::Heading) {
-                    narrow_y += 36;
+                    narrow_y += child.focus_height + 4;
                 } else if (child.kind == BodyControlKind::Label) {
                     narrow_y += 28;
                 } else if (child.kind == BodyControlKind::Field) {
@@ -1256,7 +1270,7 @@ class Application final {
                     child.arranged_y -= 3;
                     narrow_y += 44;
                 } else if (child.kind == BodyControlKind::Heading) {
-                    narrow_y += 40;
+                    narrow_y += child.focus_height + 8;
                 } else if (child.kind == BodyControlKind::Check) {
                     narrow_y += 32;
                 }
@@ -1789,7 +1803,7 @@ class Application final {
                 0,
                 section == 0 ? L"STATIC" : L"BUTTON",
                 text,
-                WS_CHILD | WS_VISIBLE | (section == 0 ? SS_LEFT | SS_NOPREFIX : WS_TABSTOP | BS_AUTOCHECKBOX | BS_PUSHLIKE | BS_LEFT),
+                WS_CHILD | WS_VISIBLE | (section == 0 ? SS_LEFT | SS_NOPREFIX : WS_TABSTOP | BS_AUTOCHECKBOX | BS_PUSHLIKE | BS_LEFT | BS_MULTILINE),
                 scale(20),
                 scale(y),
                 scale(525),
@@ -1799,7 +1813,8 @@ class Application final {
                 instance_,
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(section == 0 ? heading : font), TRUE);
-            TrackChild(control, 20, y, 525, 32, 32, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
+            TrackChild(control, 20, y, 525, section == 0 ? 32 : 44, section == 0 ? 32 : 44,
+                       ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
             if (section != 0) {
                 section_buttons_[section - 1] = control;
             }
@@ -1953,11 +1968,24 @@ class Application final {
             creating_section_ = 0;
             const std::wstring text = L"Show " + std::wstring(kSectionNames[section - 1]);
             add_heading(text.c_str(), body_y, section);
-            body_y += 40;
+            body_y += 52;
             creating_section_ = section;
         };
 
         place_heading(L"Session");
+        add_label(L"Session duration", body_y, kMaxDurationTip);
+        add_combo(duration_preset_, body_y, kDurationPreset, kMaxDurationTip);
+        for (const wchar_t* text : {L"Until stopped", L"15 minutes", L"30 minutes", L"1 hour", L"2 hours", L"4 hours", L"Custom duration"}) {
+            SendMessageW(duration_preset_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
+        }
+        body_y += 38;
+        creating_section_ = 4;
+        add_label(L"Custom duration (seconds)", body_y, kMaxDurationTip);
+        add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
+        body_y += 28;
+        place_hint(kMaxDurationHint);
+
+        creating_section_ = 0;
         add_label(L"Profile", body_y, kProfileTip);
         add_combo(profile_, body_y, kProfile, kProfileTip);
         body_y += 28;
@@ -1975,18 +2003,6 @@ class Application final {
         for (const auto& text : powers) {
             SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
-
-        add_label(L"Session duration", body_y, kMaxDurationTip);
-        add_combo(duration_preset_, body_y, kDurationPreset, kMaxDurationTip);
-        for (const wchar_t* text : {L"Until stopped", L"15 minutes", L"30 minutes", L"1 hour", L"2 hours", L"4 hours", L"Custom duration"}) {
-            SendMessageW(duration_preset_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
-        }
-        body_y += 38;
-        creating_section_ = 4;
-        add_label(L"Custom duration (seconds)", body_y, kMaxDurationTip);
-        add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
-        body_y += 28;
-        place_hint(kMaxDurationHint);
 
         place_section(1);
         add_label(L"Motion", body_y, kMotionTip);
@@ -2242,12 +2258,46 @@ class Application final {
         return !settings_load_warnings_.empty() || !AppSettingsEqual(settings_, saved_settings_);
     }
 
+    [[nodiscard]] std::wstring SectionSummary(const int index) const {
+        if (index == 0) {
+            const auto motion = ControlText(motion_);
+            if (ComboIndex(motion_) == 0) return L"Motion off";
+            const auto interval = ParseUnsigned(ControlText(interval_));
+            return motion + (interval && *interval > 0 && *interval <= 86400
+                ? std::wstring(IsChecked(randomize_) ? L" · Up to " : L" · Every ") +
+                    std::to_wstring(*interval) + L" s" : L" · Review pulse interval");
+        }
+        if (index == 1) {
+            const auto input = ParseUnsigned(ControlText(pause_input_));
+            const auto battery = ParseUnsigned(ControlText(battery_));
+            const int enabled = (input && *input > 0 ? 1 : 0) + (battery && *battery > 0 ? 1 : 0) +
+                IsChecked(lock_pause_) + IsChecked(disconnect_pause_) + IsChecked(fullscreen_) + IsChecked(pause_on_battery_);
+            if (!input || *input > 86400 || !battery || *battery > 100) return L"Review unfinished safety settings";
+            if (enabled == 0) return L"All safety pauses off";
+            return std::to_wstring(enabled) + (enabled == 1 ? L" safeguard enabled" : L" safeguards enabled") +
+                (*input > 0 ? L" · Input pause " + std::to_wstring(*input) + L" s" : L"");
+        }
+        return std::wstring(IsChecked(dark_appearance_) ? L"Dark" : L"Light") +
+            (IsChecked(soft_backdrop_) ? L" · Soft backdrop" : L" · Solid background");
+    }
+
+    void UpdateSectionSummaries() {
+        for (int index = 0; index < 3; ++index) {
+            if (section_buttons_[index] != nullptr) {
+                const std::wstring name = (expanded_sections_[index] ? L"Hide " : L"Show ") +
+                    std::wstring(kSectionNames[index]) + L"\n" + SectionSummary(index);
+                if (ControlText(section_buttons_[index]) != name) SetControlText(section_buttons_[index], name);
+            }
+        }
+    }
+
     void UpdateDirtyPresentation() {
         // Order matters: the status card explains the Save action, so it is
         // published before the button is relabelled and before UpdateButtons
         // enables it. Anything observing the window mid-transaction then sees a
         // stale card only while Save still reads as unavailable.
         SyncStatusControl();
+        UpdateSectionSummaries();
         if (save_ != nullptr) {
             SetControlText(save_, dirty_ ? L"Save changes" : L"Save");
         }
@@ -2629,7 +2679,7 @@ class Application final {
         }
         expanded_sections_[index] = !expanded_sections_[index];
         SetChecked(section_buttons_[index], expanded_sections_[index]);
-        SetControlText(section_buttons_[index], (expanded_sections_[index] ? L"Hide " : L"Show ") + std::wstring(kSectionNames[index]));
+        UpdateSectionSummaries();
         UpdateViewport();
         EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
     }

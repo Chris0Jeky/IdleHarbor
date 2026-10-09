@@ -2,6 +2,33 @@
 
 Last updated: 2026-10-09
 
+## Duration-first settings refinement (2026-10-09)
+
+The owner asks to keep improving the premium UI. Session duration now leads the
+routine choices, with exact custom seconds immediately below it when selected.
+Expandable rows have a quieter second line describing motion/timing, all six
+possible safety pauses and appearance preferences. Summaries live in the native
+accessible names, preserve incomplete edits and distinguish randomized intervals.
+Native high-contrast buttons retain multiline text. The preferred height is 500
+logical pixels so the preset view still fits without scrolling.
+
+All seventeen x64 Release CTests pass; the final direct native fixture passes
+476 checks, including a real stacked-layout window, summary updates and native
+control/persistence checks. Removing battery-power pauses from the count fails
+the regression, and the restored build passes. Two bounded visual rounds inspect
+light/dark, custom/expanded and native system-colour fallback previews. The live
+help check passes 33 tips and six fitting hints; the live 192-DPI repaint test
+passes three churn cycles. Actual OS high contrast, screen-reader speech, physical
+monitor transitions and Windows 10/ARM64 execution remain unverified.
+
+The tested executable is installed and reopened with the v0.2.0 title; its SHA-256
+is `c9b1d07571f93766faf302f687da399eca1cbc2ce1df8c2b4bc3409c855d4154`.
+Saved settings bytes and startup XML remain unchanged. Backups, the tested binary
+and local evidence survive outside Git at
+`Documents/Codex/IdleHarbor-refined-settings-2026-10-09`.
+This remains an unreleased development build; published packages and the owner
+account gates in `HUMAN_TODO.md` are unchanged.
+
 ## Dark appearance and native material (2026-10-09)
 
 The owner requests dark mode and richer depth after the premium styling pass.

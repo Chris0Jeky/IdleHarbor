@@ -22,7 +22,8 @@ without changing the compact workflow. Light remains available.
 - Accent: #005bd3 for primary actions, checked controls and keyboard focus.
   Hover and pressed states deepen the accent. Disabled actions use muted neutrals.
 - Segoe UI: 16pt semibold heading, 10pt controls, 9pt explanations.
-  Routine rows use a 44 logical-pixel rhythm; disclosures use 40.
+  Routine rows use a 44 logical-pixel rhythm; disclosures reserve 44 pixels
+  for a title and a quieter 9pt current-settings summary, on a 52-pixel rhythm.
 - Rounded field/button corners, fine neutral borders, no gradients or decorative
   shadows. Visible blue focus borders; a white inset marks focus on a blue action.
 - Native controls retain their roles, names, selection, caret, Undo and Tab
@@ -41,11 +42,16 @@ without changing the compact workflow. Light remains available.
 
 ## Interaction contract
 
-Profile, Keep awake and Session duration are always visible. Duration offers
+Session duration comes first, followed by Profile and Keep awake; all remain visible. Duration offers
 Until stopped, 15/30 minutes, 1/2/4 hours and Custom duration. Custom exposes exact
 seconds, preserving non-preset CLI/config values. Motion & timing, Safety pauses
 and Window & notifications begin collapsed and may expand independently.
-Accessible disclosure names include Show/Hide and native checked state. Collapsing
+Disclosure rows expose current motion/timing, the enabled safeguard count and
+appearance preferences without expansion. Their native accessible names include
+the summary, Show/Hide and native checked state. Randomized timing says Up to;
+invalid numeric edits prompt review without modifying the input. Summary values
+describe the editable configuration, not proof that a safeguard is currently pausing.
+The preferred window height is 500 logical pixels so the compact view still fits. Collapsing
 returns focus to the disclosure when its contents held focus. Disclosure never
 changes settings. Session settings remain locked while running; Stop remains enabled.
 
