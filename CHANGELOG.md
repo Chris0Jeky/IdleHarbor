@@ -8,6 +8,10 @@ where practical.
 
 ### Changed
 
+- Session duration leads the main view. Expandable settings now show current motion,
+  safeguard and appearance summaries in a quieter second line, including native
+  accessible names; unfinished edits remain intact.
+
 - Dark appearance with matching native dropdowns and an optional native Mica
   backdrop. Window & notifications contains saved light/dark and soft/solid switches;
   appearance changes preserve unfinished settings edits and remain available while running.

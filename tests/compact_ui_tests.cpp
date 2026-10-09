@@ -59,7 +59,7 @@ struct ApplicationStatusTestAccess {
         const UINT dpi = GetDpiForSystem();
         const std::wstring title = L"IdleHarbor v" + std::wstring(idleharbor::kVersion);
         const HWND window = CreateWindowExW(0, L"IdleHarbor.CompactFixture", title.c_str(),
-            WS_OVERLAPPEDWINDOW, 24, 24, ScaleForDpi(600, dpi), ScaleForDpi(480, dpi),
+            WS_OVERLAPPEDWINDOW, 24, 24, ScaleForDpi(600, dpi), ScaleForDpi(kBaseWindowHeight, dpi),
             nullptr, nullptr, GetModuleHandleW(nullptr), &app);
         Check(window != nullptr, "real native window is created");
         if (window == nullptr) return;
@@ -78,6 +78,43 @@ struct ApplicationStatusTestAccess {
         Check(!Shown(app.max_duration_), "preset duration hides custom seconds");
         Check(app.ContentHeight() <= app.ViewportHeight(), "default view fits without scrolling");
         Check(ControlText(window).find(idleharbor::kVersion) != std::wstring::npos, "window displays the canonical version");
+        RECT duration_rect{}, profile_rect{};
+        GetWindowRect(app.duration_preset_, &duration_rect); GetWindowRect(app.profile_, &profile_rect);
+        Check(duration_rect.top < profile_rect.top, "session duration is the first routine choice");
+        const auto original_settings = app.settings_;
+        SendMessageW(app.motion_, CB_SETCURSEL, 2, 0);
+        SetControlText(app.interval_, L"120"); SetChecked(app.randomize_, false);
+        app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[0]).find(L"Zen · Every 120 s") != std::wstring::npos,
+              "collapsed motion summary exposes the edited interval through the native name");
+        SetChecked(app.randomize_, true); app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[0]).find(L"Up to 120 s") != std::wstring::npos,
+              "randomized motion does not claim an exact interval");
+        SetControlText(app.interval_, L""); app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[0]).find(L"Review pulse interval") != std::wstring::npos &&
+              ControlText(app.interval_).empty(), "summary preserves and identifies incomplete edits");
+        SendMessageW(app.motion_, CB_SETCURSEL, 0, 0); app.QueueComboBoxSelection(kMotion, CBN_SELCHANGE);
+        Check(ControlText(app.section_buttons_[0]).find(L"Motion off") != std::wstring::npos,
+              "Off motion summary does not imply pulses");
+        SetControlText(app.interval_, L"120"); SetControlText(app.pause_input_, L"0"); SetControlText(app.battery_, L"0");
+        for (const auto control : {app.lock_pause_, app.disconnect_pause_, app.fullscreen_, app.pause_on_battery_}) SetChecked(control, false);
+        app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[1]).find(L"All safety pauses off") != std::wstring::npos,
+              "summary calls out disabled safeguards");
+        SetChecked(app.lock_pause_, true); app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[1]).find(L"1 safeguard enabled") != std::wstring::npos,
+              "one enabled safety pause is counted accurately");
+        SetControlText(app.pause_input_, L"120"); SetControlText(app.battery_, L"20");
+        for (const auto control : {app.disconnect_pause_, app.fullscreen_, app.pause_on_battery_}) SetChecked(control, true);
+        app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[1]).find(L"6 safeguards enabled · Input pause 120 s") != std::wstring::npos,
+              "summary includes every safety pause including battery power");
+        SetControlText(app.battery_, L"101"); app.UpdateDirtyStateFromControls();
+        Check(ControlText(app.section_buttons_[1]).find(L"Review unfinished") != std::wstring::npos,
+              "invalid safety edits are not presented as valid safeguards");
+        app.settings_ = original_settings; app.RefreshControls();
+        Check(ControlText(app.section_buttons_[2]).find(L"Light · Soft backdrop") != std::wstring::npos,
+              "appearance preference is visible while collapsed");
         if (!app.high_contrast_) {
             // Sample clear interior pixels, away from text, borders and chevrons.
             const COLORREF primary = PaintPixel(app.start_, app.Scale(10), app.Scale(10));
@@ -94,6 +131,8 @@ struct ApplicationStatusTestAccess {
             SetChecked(app.dark_appearance_, true);
             app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
             Check(app.settings_.dark_appearance && app.dirty_, "dark appearance updates live and enables Save");
+            Check(ControlText(app.section_buttons_[2]).find(L"Dark · Soft backdrop") != std::wstring::npos,
+                  "appearance summary updates with the live preference");
             const COLORREF dark_field = PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10));
             Check(dark_field == RGB(37, 41, 50) || dark_field == RGB(45, 50, 61), "native duration renders the dark field or hover surface");
             Check(SettingsEqual(before_theme, app.settings_.session), "theme changes preserve session settings");
@@ -128,10 +167,10 @@ struct ApplicationStatusTestAccess {
             Check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) <= theme_resources + 2, "theme switching releases replaced brushes");
         }
         if (capture) {
-            SetFocus(app.profile_);
+            SetFocus(app.duration_preset_);
             MSG tab{}; tab.message = WM_KEYDOWN; tab.wParam = VK_TAB;
+            Check(app.HandleTabNavigation(tab) && GetFocus() == app.profile_, "Tab reaches Profile after duration");
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.power_, "Tab reaches Keep awake");
-            Check(app.HandleTabNavigation(tab) && GetFocus() == app.duration_preset_, "Tab reaches session duration");
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.section_buttons_[0], "Tab skips collapsed custom and advanced controls");
             Check(capture_window(L"out/compact.bmp"), "compact render is captured");
             app.high_contrast_ = true;
@@ -179,6 +218,8 @@ struct ApplicationStatusTestAccess {
         }
         Check(Shown(app.motion_) && Shown(app.battery_) && Shown(app.emergency_hotkey_), "all settings remain reachable");
         Check(AppSettingsEqual(settings, app.settings_), "disclosure does not alter preferences");
+        Check(ControlText(app.section_buttons_[0]).find(L'\n') != std::wstring::npos,
+              "expanded native names retain the settings summary");
         if (capture) {
             SetFocus(app.interval_);
             app.ToggleSection(0);
@@ -242,12 +283,21 @@ struct ApplicationStatusTestAccess {
         Check(saved.settings.session.max_duration == Seconds{123}, "custom seconds persist through actual save and reload");
         Check(AppSettingsEqual(settings, saved.settings), "disclosure and Save preserve every other setting");
         std::filesystem::remove(settings_path);
-        if (capture) {
+        {
             app.ToggleSection(0); app.ToggleSection(1); app.ToggleSection(2);
             RECT narrow{24, 24, 24 + ScaleForDpi(420, 144), 24 + ScaleForDpi(600, 144)};
             app.ApplyDpiChange(144, narrow);
-            app.ScrollTo(0);
-            Check(capture_window(L"out/narrow.bmp"), "narrow render is captured");
+            // Force the small-work-area width; the normal resize path keeps the preferred width.
+            SetWindowPos(window, nullptr, 24, 24, ScaleForDpi(420, 144), ScaleForDpi(600, 144), SWP_NOZORDER | SWP_NOACTIVATE);
+            app.UpdateViewport(); app.ScrollTo(0);
+            RECT duration{}, profile{}; GetWindowRect(app.duration_preset_, &duration); GetWindowRect(app.profile_, &profile);
+            Check(duration.top < profile.top, "stacked layout retains duration-first order");
+            RECT section{}; GetWindowRect(app.section_buttons_[0], &section);
+            Check(section.bottom - section.top == app.Scale(44), "stacked disclosure reserves both summary lines");
+            RECT viewport_client{}; GetClientRect(app.settings_viewport_, &viewport_client);
+            Check(idleharbor::app::DetermineSettingsLayout(viewport_client.right, 144) ==
+                  idleharbor::app::SettingsLayoutMode::Stacked, "fixture exercises the actual stacked layout");
+            if (capture) Check(capture_window(L"out/narrow.bmp"), "narrow render is captured");
         }
         // This fixture never starts a session, registers hooks, or emits input.
         DestroyWindow(window);
@@ -257,7 +307,12 @@ struct ApplicationStatusTestAccess {
 
 int main(int argc, char**) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    WNDCLASSW cls{}; cls.lpfnWndProc = Application::WindowProc;
+    WNDCLASSW cls{};
+    cls.lpfnWndProc = [](HWND window, UINT message, WPARAM w_param, LPARAM l_param) -> LRESULT {
+        // Emulate a small work area without changing the user's display or app minimum.
+        if (message == WM_GETMINMAXINFO) return DefWindowProcW(window, message, w_param, l_param);
+        return Application::WindowProc(window, message, w_param, l_param);
+    };
     cls.hInstance = GetModuleHandleW(nullptr); cls.lpszClassName = L"IdleHarbor.CompactFixture";
     cls.hbrBackground = GetSysColorBrush(COLOR_WINDOW); cls.hIcon = LoadIdleHarborIcon(cls.hInstance);
     if (!RegisterClassW(&cls)) return 1;
