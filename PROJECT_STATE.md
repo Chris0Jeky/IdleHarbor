@@ -22,14 +22,17 @@ and one after it, retaining leave/reentry and independent state redraws. Native
 status tests add emergency-stop, close/tray and pending-power-cleanup coverage.
 Mutating candidate isolation and all three safety seams fails five assertions;
 restoring the fixture passes. All seventeen x64 Release CTests pass; the direct
-compact fixture passes 552 checks, status passes 372 assertions in 16 scenarios,
-and the batched native preview run passes 566 checks.
+compact fixture passes 554 checks, status passes 372 assertions in 16 scenarios,
+and the batched native preview run passes 566 checks before the final bound guard.
+PR review catches a custom-duration group-4 bounds read in the new recovery path;
+expansion is now limited to the actual three disclosure groups. Both Start and Save
+custom-duration rejection retain those groups' state, with scoped tests rerun.
 
 One visual inspection covers light validation feedback, dark compact and narrow
 custom-duration states. Live help passes 33 tips/six fitting hints; the live
 192-DPI repaint test passes three churn cycles. The tested executable is installed
 and reopened as v0.2.0, with settings bytes and startup XML unchanged. SHA-256:
-`cc13a647763123238ff77259e508614f98f6a8026dd332360eb1b823522ab133`.
+`6175b371a8a097addcea6d955527a63fd5a2559de110d8adcf0fff182b811e94`.
 Backups, Muse receipts, previews and native evidence are retained outside Git at
 `Documents/Codex/IdleHarbor-qa-2026-10-09`.
 

@@ -2547,7 +2547,8 @@ class Application final {
         const auto child = std::find_if(child_layouts_.begin(), child_layouts_.end(), [control](const ChildLayout& item) {
             return item.window == control;
         });
-        if (child != child_layouts_.end() && child->section > 0 && !expanded_sections_[child->section - 1]) {
+        if (child != child_layouts_.end() && child->section > 0 &&
+            child->section <= static_cast<int>(expanded_sections_.size()) && !expanded_sections_[child->section - 1]) {
             ToggleSection(child->section - 1);
         }
         if (control != nullptr) {

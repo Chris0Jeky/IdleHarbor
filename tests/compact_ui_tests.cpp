@@ -133,6 +133,7 @@ struct ApplicationStatusTestAccess {
                 SetControlText(app.max_duration_, L"123");
                 SetControlText(control, L""); app.UpdateDirtyStateFromControls();
                 const auto before = app.settings_;
+                const auto before_sections = app.expanded_sections_;
                 const int dialogs_before = settings_dialogs;
                 if (start) app.StartSession(); else app.Save();
                 Check(settings_dialogs == dialogs_before + 1 && !app.session_active_,
@@ -140,6 +141,8 @@ struct ApplicationStatusTestAccess {
                 Check(ControlText(control).empty() && app.dirty_, "validation preserves the unfinished edit");
                 Check(AppSettingsEqual(before, app.settings_), "rejected settings leave the last valid configuration intact");
                 Check(Shown(control) && GetFocus() == control, "validation reveals and focuses the field to correct");
+                if (control == app.max_duration_) Check(app.expanded_sections_ == before_sections && app.custom_duration_,
+                      "custom-duration errors preserve all three disclosure states and their separate visibility group");
                 if (control != app.max_duration_) Check(ControlText(app.max_duration_) == L"123",
                       "validation preserves other unfinished form edits");
             }
