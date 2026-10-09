@@ -17,6 +17,8 @@ struct AppSettings {
     bool close_to_tray = true;
     bool show_notifications = true;
     bool emergency_hotkey = true;
+    bool dark_appearance = true;
+    bool soft_backdrop = true;
 };
 
 struct SettingsLoadResult {

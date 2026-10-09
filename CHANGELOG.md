@@ -8,6 +8,12 @@ where practical.
 
 ### Changed
 
+- Dark appearance with matching native dropdowns and an optional native Mica
+  backdrop. Window & notifications contains saved light/dark and soft/solid switches;
+  appearance changes preserve unfinished settings edits and remain available while running.
+- Native field-paint regression checks accept the specified hover colour, avoiding
+  cursor-dependent failures.
+
 - Refined the compact window with a soft neutral surface, clearer typography,
   rounded controls, quiet disclosure rows and a blue primary session action.
   Native keyboard/editing behaviour and Windows high-contrast rendering remain.

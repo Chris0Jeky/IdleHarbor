@@ -2,6 +2,39 @@
 
 Last updated: 2026-10-09
 
+## Dark appearance and native material (2026-10-09)
+
+The owner requests dark mode and richer depth after the premium styling pass.
+Dark is now the initial appearance. Window & notifications adds saved Dark appearance
+and Soft window backdrop checkboxes. The native Mica frame is optional, dynamically
+loaded from the system directory, and falls back to a solid surface on unsupported
+Windows or in high contrast. Content/controls stay opaque. Native dropdown items
+match the palette; theme changes preserve numeric edits and may run during a session.
+Existing settings files without these keys receive the dark/soft defaults; no schema
+or session-policy change. Issue #126's cursor-dependent paint assertion is addressed.
+
+MSVC 19.29 x64 Release and all seventeen CTests pass. The capture run passes 474
+checks, including real dark dropdown routing, live theme changes, unfinished-edit
+preservation and repeated brush replacement. Settings tests cover both appearance
+values, old-file defaults and malformed-value recovery. The live help test passes
+33 tooltips and six fitting hints; the live 192-DPI wheel/repaint test passes three
+churn cycles. Two bounded visual rounds cover light/dark and expanded/dropdown states;
+PrintWindow previews explicitly render the solid fallback, not the DWM composition.
+
+Installed executable SHA-256:
+`47f20f94c8fe70b2fd33d28ba8ec01cf086f6fbd175715f2d3e37816dba31e27`.
+The build is installed and visible with the v0.2.0 title, stopped. DWM queries return
+success with backdrop=2 (Mica) and dark-caption=1. A pixel sampled only inside the
+foreground app's header is 0x2f2e2f, confirming actual composition rather than a
+black uncomposited capture. Saved settings bytes and the startup task are unchanged.
+Binary/settings/task backups and local synthetic previews are retained outside Git
+at `Documents/Codex/IdleHarbor-dark-material-2026-10-09`.
+
+Actual OS high-contrast activation, screen-reader speech, physical monitor transitions,
+Windows 10 fallback execution and ARM64 execution remain unverified. This remains an
+unreleased development build labelled v0.2.0; published archives/screenshots and
+`HUMAN_TODO.md` owner account gates are unchanged.
+
 ## Premium native styling (2026-10-09)
 
 The owner retains the compact workflow and requests a premium, almost Apple-like

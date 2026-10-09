@@ -349,6 +349,8 @@ SettingsLoadResult LoadSettings(const std::filesystem::path& path) {
     });
     ApplyBool(values, "start_minimized", result, [&](const bool value) { result.settings.start_minimized = value; });
     ApplyBool(values, "close_to_tray", result, [&](const bool value) { result.settings.close_to_tray = value; });
+    ApplyBool(values, "dark_appearance", result, [&](const bool value) { result.settings.dark_appearance = value; });
+    ApplyBool(values, "soft_backdrop", result, [&](const bool value) { result.settings.soft_backdrop = value; });
     ApplyBool(values, "show_notifications", result, [&](const bool value) {
         result.settings.show_notifications = value;
     });
@@ -431,7 +433,9 @@ bool SaveSettings(
            << "start_minimized=" << BoolText(settings.start_minimized) << "\r\n"
            << "close_to_tray=" << BoolText(settings.close_to_tray) << "\r\n"
            << "show_notifications=" << BoolText(settings.show_notifications) << "\r\n"
-           << "emergency_hotkey=" << BoolText(settings.emergency_hotkey) << "\r\n";
+           << "emergency_hotkey=" << BoolText(settings.emergency_hotkey) << "\r\n"
+           << "dark_appearance=" << BoolText(settings.dark_appearance) << "\r\n"
+           << "soft_backdrop=" << BoolText(settings.soft_backdrop) << "\r\n";
     output.close();
     if (!output) {
         error = "Could not finish writing the temporary settings file.";
