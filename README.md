@@ -134,6 +134,10 @@ nothing anywhere.
 
 The window title shows the executable's version. The compact window uses a light,
 restrained design with rounded controls, quiet disclosures and a blue primary action.
+Dark appearance is the default. **Window & notifications** contains **Dark appearance**
+and **Soft window backdrop**; Save keeps these choices. The backdrop uses native
+Mica where supported, with opaque controls and a solid fallback. Appearance can
+change during a session; Save remains unavailable until Stop.
 It is currently an unreleased source change; the screenshots above show the
 published v0.2.0 layout. Windows high-contrast mode retains native control rendering.
 

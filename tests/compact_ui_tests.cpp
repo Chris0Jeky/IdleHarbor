@@ -54,6 +54,7 @@ struct ApplicationStatusTestAccess {
         Application app{GetModuleHandleW(nullptr)};
         app.settings_.session = idleharbor::core::settings_for_profile(ProfileKind::Balanced);
         app.settings_.emergency_hotkey = false;
+        app.settings_.dark_appearance = false;
         app.saved_settings_ = app.settings_;
         const UINT dpi = GetDpiForSystem();
         const std::wstring title = L"IdleHarbor v" + std::wstring(idleharbor::kVersion);
@@ -62,6 +63,14 @@ struct ApplicationStatusTestAccess {
             nullptr, nullptr, GetModuleHandleW(nullptr), &app);
         Check(window != nullptr, "real native window is created");
         if (window == nullptr) return;
+        const auto capture_window = [&](const wchar_t* path) {
+            // PrintWindow cannot composite DWM material; preview the solid fallback.
+            const bool previous_backdrop = app.backdrop_enabled_;
+            app.backdrop_enabled_ = false;
+            const bool result = Capture(window, path);
+            app.backdrop_enabled_ = previous_backdrop;
+            return result;
+        };
         app.RefreshControls(); app.UpdateButtons();
         if (capture) { ShowWindow(window, SW_SHOWNOACTIVATE); UpdateWindow(window); }
         Check(Shown(app.profile_) && Shown(app.power_) && Shown(app.duration_preset_), "routine choices are visible");
@@ -73,13 +82,50 @@ struct ApplicationStatusTestAccess {
             // Sample clear interior pixels, away from text, borders and chevrons.
             const COLORREF primary = PaintPixel(app.start_, app.Scale(10), app.Scale(10));
             Check(primary == RGB(0, 91, 211) || primary == RGB(0, 78, 186), "native Start renders the primary accent or hover state");
-            Check(PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10)) == RGB(255, 255, 255), "native duration renders a white field");
+            const COLORREF field = PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10));
+            Check(field == RGB(255, 255, 255) || field == RGB(240, 242, 246), "native duration renders the light field or hover surface");
             const DWORD before = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
             for (int paint = 0; paint < 100; ++paint) PaintPixel(app.start_, app.Scale(10), app.Scale(10));
             Check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) <= before + 1, "repeated control painting releases GDI resources");
             EnableWindow(app.start_, FALSE);
             Check(PaintPixel(app.start_, app.Scale(10), app.Scale(10)) == RGB(237, 239, 243), "disabled primary action is visibly muted");
             EnableWindow(app.start_, TRUE);
+            const auto before_theme = app.settings_.session;
+            SetChecked(app.dark_appearance_, true);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+            Check(app.settings_.dark_appearance && app.dirty_, "dark appearance updates live and enables Save");
+            const COLORREF dark_field = PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10));
+            Check(dark_field == RGB(37, 41, 50) || dark_field == RGB(45, 50, 61), "native duration renders the dark field or hover surface");
+            Check(SettingsEqual(before_theme, app.settings_.session), "theme changes preserve session settings");
+            if (capture) {
+                Check(capture_window(L"out/dark.bmp"), "dark compact appearance is captured");
+                SendMessageW(app.duration_preset_, CB_SHOWDROPDOWN, TRUE, 0);
+                COMBOBOXINFO info{sizeof(info)}; GetComboBoxInfo(app.duration_preset_, &info);
+                Check(PaintPixel(info.hwndList, app.Scale(10), app.Scale(10)) == RGB(137, 186, 255),
+                      "native dropdown routes selected-item painting through the theme");
+                Check(Capture(info.hwndList, L"out/dark-dropdown.bmp"), "native dark dropdown is captured");
+                SendMessageW(app.duration_preset_, CB_SHOWDROPDOWN, FALSE, 0);
+            }
+            SetChecked(app.soft_backdrop_, false);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kSoftBackdrop, BN_CLICKED), reinterpret_cast<LPARAM>(app.soft_backdrop_));
+            Check(!app.settings_.soft_backdrop && !app.backdrop_enabled_, "solid preference disables native backdrop");
+            SetChecked(app.dark_appearance_, false);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+            Check(!app.settings_.dark_appearance, "light appearance can be restored live");
+            SetControlText(app.interval_, L"");
+            SetChecked(app.dark_appearance_, true);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+            Check(app.settings_.dark_appearance && ControlText(app.interval_).empty(), "appearance changes preserve unfinished numeric edits");
+            SetControlText(app.interval_, std::to_wstring(before_theme.interval.count()));
+            SetChecked(app.dark_appearance_, false);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+            app.saved_settings_ = app.settings_; app.dirty_ = false; app.UpdateDirtyPresentation();
+            const DWORD theme_resources = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+            for (int toggle = 0; toggle < 20; ++toggle) {
+                app.settings_.dark_appearance = !app.settings_.dark_appearance;
+                app.RefreshAppearance();
+            }
+            Check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) <= theme_resources + 2, "theme switching releases replaced brushes");
         }
         if (capture) {
             SetFocus(app.profile_);
@@ -87,10 +133,10 @@ struct ApplicationStatusTestAccess {
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.power_, "Tab reaches Keep awake");
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.duration_preset_, "Tab reaches session duration");
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.section_buttons_[0], "Tab skips collapsed custom and advanced controls");
-            Check(Capture(window, L"out/compact.bmp"), "compact render is captured");
+            Check(capture_window(L"out/compact.bmp"), "compact render is captured");
             app.high_contrast_ = true;
             RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
-            Check(Capture(window, L"out/system-colors.bmp"), "system-color native fallback is captured");
+            Check(capture_window(L"out/system-colors.bmp"), "system-color native fallback is captured");
             app.RefreshAppearance();
         }
 
@@ -123,7 +169,7 @@ struct ApplicationStatusTestAccess {
         std::wstring error;
         Check(!app.ReadControls(error), "custom duration preserves thirty-day validation");
         SetControlText(app.max_duration_, L"123"); app.UpdateDirtyStateFromControls();
-        if (capture) Check(Capture(window, L"out/custom.bmp"), "custom render is captured");
+        if (capture) Check(capture_window(L"out/custom.bmp"), "custom render is captured");
 
         const auto settings = app.settings_;
         for (int index = 0; index < 3; ++index) {
@@ -139,7 +185,14 @@ struct ApplicationStatusTestAccess {
             Check(GetFocus() == app.section_buttons_[0], "collapse returns focus to the disclosure button");
             app.ToggleSection(0);
         }
-        if (capture) Check(Capture(window, L"out/expanded.bmp"), "expanded render is captured");
+        if (capture) Check(capture_window(L"out/expanded.bmp"), "expanded render is captured");
+        if (capture) {
+            SetChecked(app.dark_appearance_, true);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+            Check(capture_window(L"out/dark-expanded.bmp"), "dark expanded appearance is captured");
+            SetChecked(app.dark_appearance_, false);
+            app.HandleMessage(WM_COMMAND, MAKEWPARAM(kDarkAppearance, BN_CLICKED), reinterpret_cast<LPARAM>(app.dark_appearance_));
+        }
 
         if (!app.high_contrast_) {
             const HWND previous_focus = GetFocus();
@@ -177,6 +230,7 @@ struct ApplicationStatusTestAccess {
         app.RefreshControls();
         app.session_active_ = true; app.UpdateButtons();
         Check(IsWindowEnabled(app.stop_) && !IsWindowEnabled(app.duration_preset_), "running session keeps Stop available and locks duration");
+        Check(IsWindowEnabled(app.dark_appearance_) && IsWindowEnabled(app.soft_backdrop_), "appearance remains available while running");
         app.session_active_ = false; app.UpdateButtons();
         Check(AppSettingsEqual(settings, app.settings_), "layout and disclosure preserve all values");
         const auto settings_path = std::filesystem::temp_directory_path() /
@@ -193,7 +247,7 @@ struct ApplicationStatusTestAccess {
             RECT narrow{24, 24, 24 + ScaleForDpi(420, 144), 24 + ScaleForDpi(600, 144)};
             app.ApplyDpiChange(144, narrow);
             app.ScrollTo(0);
-            Check(Capture(window, L"out/narrow.bmp"), "narrow render is captured");
+            Check(capture_window(L"out/narrow.bmp"), "narrow render is captured");
         }
         // This fixture never starts a session, registers hooks, or emits input.
         DestroyWindow(window);

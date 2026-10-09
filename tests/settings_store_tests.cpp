@@ -56,6 +56,8 @@ int main() {
     settings.start_minimized = true;
     settings.close_to_tray = false;
     settings.show_notifications = false;
+    settings.dark_appearance = false;
+    settings.soft_backdrop = false;
 
     std::string error;
     Expect(idleharbor::app::SaveSettings(path, settings, error), "settings save succeeds");
@@ -77,6 +79,17 @@ int main() {
     Expect(loaded.settings.start_minimized, "launch visibility round-trips");
     Expect(!loaded.settings.close_to_tray, "close behavior round-trips");
     Expect(!loaded.settings.show_notifications, "notification behavior round-trips");
+    Expect(!loaded.settings.dark_appearance && !loaded.settings.soft_backdrop, "light and solid appearance preferences round-trip");
+    const auto dark_path = test_root / L"dark.ini";
+    AppSettings dark_settings;
+    Expect(idleharbor::app::SaveSettings(dark_path, dark_settings, error), "dark appearance saves");
+    const auto dark_loaded = idleharbor::app::LoadSettings(dark_path);
+    Expect(dark_loaded.settings.dark_appearance && dark_loaded.settings.soft_backdrop, "dark and soft preferences round-trip");
+    const auto invalid_appearance_path = test_root / L"invalid-appearance.ini";
+    { std::ofstream appearance(invalid_appearance_path); appearance << "dark_appearance=perhaps\nsoft_backdrop=perhaps\n"; }
+    const auto invalid_appearance = idleharbor::app::LoadSettings(invalid_appearance_path);
+    Expect(invalid_appearance.warnings.size() == 2 && invalid_appearance.settings.dark_appearance &&
+           invalid_appearance.settings.soft_backdrop, "invalid appearance values recover with separate warnings");
 
     const auto malformed_path = test_root / L"malformed.ini";
     {
@@ -85,6 +98,7 @@ int main() {
                      "distance=999\npause_when_locked=perhaps\nnot a setting\n";
     }
     const auto malformed = idleharbor::app::LoadSettings(malformed_path);
+    Expect(malformed.settings.dark_appearance && malformed.settings.soft_backdrop, "older settings receive dark and soft appearance defaults");
     Expect(malformed.file_found, "malformed file is found");
     Expect(malformed.warnings.size() == 4, "malformed values preserve every warning");
     Expect(ContainsWarning(malformed, "schema is not supported"), "unsupported schema warning is preserved");

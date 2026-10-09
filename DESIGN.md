@@ -10,10 +10,15 @@ with session choices. Uniform type and stock borders left little visual hierarch
 Use a quiet light surface, white rounded fields, a strong Session heading and
 one blue primary action. Secondary settings become unboxed disclosure rows with
 drawn chevrons. The existing Windows title bar, icon and executable version remain.
+The owner's follow-up adds a default dark appearance and subtle native material.
+Charcoal surfaces, cool white type and a pale blue primary action provide depth
+without changing the compact workflow. Light remains available.
 
 ## Visual rules
 
 - Surface: #f7f8fa; text: #1d2026; supporting text: #5e6571.
+- Dark surface: #17191f; fields: #252932; text: #edf1f7; supporting text:
+  #aab2c0; accent: #89baff with #0c203a primary-action text for contrast.
 - Accent: #005bd3 for primary actions, checked controls and keyboard focus.
   Hover and pressed states deepen the accent. Disabled actions use muted neutrals.
 - Segoe UI: 16pt semibold heading, 10pt controls, 9pt explanations.
@@ -23,6 +28,14 @@ drawn chevrons. The existing Windows title bar, icon and executable version rema
 - Native controls retain their roles, names, selection, caret, Undo and Tab
   behaviour. Only their painting changes. High contrast uses native/system colours;
   theme and settings changes refresh the palette and numeric field frames.
+- Native dropdowns render matching item colours and retain selection semantics.
+  High contrast uses system foreground/highlight colours. Appearance can change
+  during a session; saving still waits until the session stops.
+- Soft backdrop uses documented DWM Mica on supported Windows 11 versions,
+  dynamically loaded from the system directory. It affects the frame/peripheral
+  background; content and controls remain opaque. Older Windows, disabled material
+  and high contrast use a solid fallback. No whole-window opacity or custom chrome.
+  PrintWindow previews show the solid appearance because they cannot composite Mica.
 - Start is primary when stopped; Stop becomes primary during a session. Status
   text and fixed actions remain available while the settings body scrolls.
 
@@ -40,6 +53,12 @@ changes settings. Session settings remain locked while running; Stop remains ena
 
 The real-control fixture covers duration/persistence, disclosure, keyboard access,
 numeric editing/Undo, DPI layouts, actual rendered field/action colours and repeated
-GDI painting. Synthetic window captures inspect compact/custom/expanded and native
+GDI painting. Theme switching preserves unfinished edits, settings round-trip through
+real files, and repeated palette switches release brushes. Field assertions accept
+the defined hover colour without moving the user's cursor (issue #126).
+Synthetic window captures inspect compact/custom/expanded, dark dropdown and native
 system-colour fallback states. This does not prove screen-reader speech, actual
 Windows high-contrast activation or physical multi-monitor transitions.
+Installed-window DWM queries prove the dark title bar and Mica attribute are active
+on the current machine; a pixel read inside the foreground app confirms the composed
+header is not the black surface returned by an uncomposited PrintWindow capture.

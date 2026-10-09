@@ -20,7 +20,7 @@ $expectedTools = [ordered]@{
     'labels (profile, motion, keep awake, interval, motion size, real input, battery, duration, custom duration)' = 9
     'combo boxes (profile, motion, keep awake, duration)' = 4
     'edits (interval, motion size, real input, battery, duration)' = 5
-    'check boxes'                                  = 9
+    'check boxes'                                  = 11
     'action buttons (start, stop, save)'           = 3
 }
 $expectedTotal = ($expectedTools.Values | Measure-Object -Sum).Sum
