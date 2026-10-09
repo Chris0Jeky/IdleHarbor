@@ -11,6 +11,12 @@ int settings_dialogs = 0;
 bool reverse_tab = false;
 HWND measured_hover = nullptr;
 int hover_invalidations = 0;
+HWND measured_fixed = nullptr;
+int fixed_positions = 0;
+BOOL WINAPI RecordPosition(HWND window, HWND after, int x, int y, int width, int height, UINT flags) {
+    if (window == measured_fixed) ++fixed_positions;
+    return ::SetWindowPos(window, after, x, y, width, height, flags);
+}
 BOOL WINAPI RecordInvalidation(HWND window, const RECT* area, BOOL erase) {
     if (window == measured_hover) ++hover_invalidations;
     return ::InvalidateRect(window, area, erase);
@@ -42,7 +48,9 @@ FARPROC WINAPI RecordMaterialProc(HMODULE module, LPCSTR name) {
 #define MessageBoxW RecordSettingsDialog
 #define GetKeyState FixtureKeyState
 #define InvalidateRect RecordInvalidation
+#define SetWindowPos RecordPosition
 #include "application-under-test.inc"
+#undef SetWindowPos
 #undef InvalidateRect
 #undef GetKeyState
 #undef MessageBoxW
@@ -191,6 +199,13 @@ struct ApplicationStatusTestAccess {
             Check(hover_invalidations == 3, "leaving and reentering a control each repaint the changed hover state");
             SendMessageW(app.start_, WM_ENABLE, TRUE, 0);
             Check(hover_invalidations == 4, "enable changes retain their independent repaint");
+            measured_hover = nullptr;
+            measured_hover = app.start_; hover_invalidations = 0;
+            SendMessageW(app.start_, BM_SETSTATE, TRUE, 0);
+            Check(hover_invalidations > 0, "native button press invalidates after its state changes");
+            Check(PaintPixel(app.start_, app.Scale(10), app.Scale(10)) == app.Colors().accent_pressed,
+                  "pressed action displays its pressed palette");
+            SendMessageW(app.start_, BM_SETSTATE, FALSE, 0);
             measured_hover = nullptr;
         }
         SendMessageW(app.motion_, CB_SETCURSEL, 2, 0);
@@ -386,6 +401,74 @@ struct ApplicationStatusTestAccess {
             SetFocus(previous_focus);
         }
 
+        app.ScrollTo(0); measured_fixed = app.stop_; fixed_positions = 0;
+        for (int step = 1; step <= 10; ++step) app.ScrollTo(step * 5);
+        std::cout << "Fixed footer positions per 10 scroll updates: " << fixed_positions << '\n';
+        Check(fixed_positions == 0, "scrolling only moves the already-arranged body");
+        measured_fixed = nullptr;
+        app.ScrollTo(100);
+        app.HandleMouseWheel(MAKEWPARAM(0, 40));
+        Check(app.scroll_position_ < 100, "high-resolution wheel input moves before a complete detent");
+        {
+            const bool was_visible = IsWindowVisible(window) != FALSE;
+            const bool motion_enabled = app.scroll_motion_enabled_;
+            ShowWindow(window, SW_SHOWNOACTIVATE);
+            app.scroll_motion_enabled_ = true; app.ScrollTo(0);
+            app.HandleMouseWheel(MAKEWPARAM(0, -120));
+            Check(app.scroll_animating_ && app.scroll_position_ == 0 && app.scroll_target_ > 0,
+                  "detent starts a bounded transition without jumping the form");
+            const int first_target = app.scroll_target_;
+            app.HandleMouseWheel(MAKEWPARAM(0, -120));
+            Check(app.scroll_target_ > first_target, "rapid wheel input accumulates its destination");
+            app.scroll_started_ = GetTickCount64() - 80; app.AdvanceSmoothScroll();
+            Check(app.scroll_position_ > 0 && app.scroll_position_ < app.scroll_target_, "animation advances between endpoints");
+            const int destination = app.scroll_target_;
+            app.RequestSmoothScroll(destination);
+            Check(GetTickCount64() - app.scroll_started_ >= 80, "repeated input at the same boundary does not prolong settling");
+            app.scroll_started_ = GetTickCount64() - 200; app.AdvanceSmoothScroll();
+            Check(app.scroll_position_ == destination && !app.scroll_animating_, "animation settles exactly and removes its timer");
+            app.ScrollTo(200); app.HandleMouseWheel(MAKEWPARAM(0, -120));
+            app.scroll_started_ = GetTickCount64() - 80; app.AdvanceSmoothScroll();
+            const int reversing_position = app.scroll_position_;
+            app.HandleMouseWheel(MAKEWPARAM(0, 120));
+            Check(app.scroll_target_ < reversing_position && app.scroll_position_ == reversing_position,
+                  "wheel reversal changes direction from the visible position without a jump");
+            app.RequestSmoothScroll(0); app.ScrollTo(app.scroll_position_);
+            Check(!app.scroll_animating_, "immediate focus reveal cancels motion even at the current position");
+            app.RequestSmoothScroll(0); app.UpdateViewport();
+            Check(!app.scroll_animating_, "layout cancels a stale animated destination");
+            app.scroll_motion_enabled_ = false; app.RequestSmoothScroll(0);
+            Check(app.scroll_position_ == 0 && !app.scroll_animating_, "reduced motion moves directly to the requested position");
+            app.scroll_motion_enabled_ = true; app.RequestSmoothScroll(200);
+            SendMessageW(app.profile_, CB_SHOWDROPDOWN, TRUE, 0);
+            const int held = app.scroll_position_;
+            app.HandleMouseWheel(MAKEWPARAM(0, -120));
+            Check(!app.scroll_animating_ && app.scroll_position_ == held, "dropdown opening cancels motion and holds its anchor");
+            SendMessageW(app.profile_, CB_SHOWDROPDOWN, FALSE, 0);
+            app.scroll_motion_enabled_ = false;
+            SetFocus(app.section_buttons_[0]);
+            MSG page{}; page.message = WM_KEYDOWN; page.wParam = VK_END;
+            Check(app.HandlePageNavigation(page) && app.scroll_position_ ==
+                idleharbor::app::MaximumScrollPosition(app.ContentHeight(), app.ViewportHeight()), "End reaches the settings bottom from a button");
+            SetFocus(app.interval_); page.wParam = VK_HOME;
+            Check(!app.HandlePageNavigation(page), "Home retains native text-editing semantics");
+            SetFocus(app.profile_); page.wParam = VK_NEXT;
+            Check(!app.HandlePageNavigation(page), "Page Down retains native combo semantics");
+            app.scroll_motion_enabled_ = motion_enabled;
+            if (!was_visible) ShowWindow(window, SW_HIDE);
+            SCROLLINFO info{sizeof(info)}; info.fMask = SIF_ALL;
+            Check(GetScrollInfo(app.scrollbar_, SB_CTL, &info) && info.nPos == app.scroll_position_,
+                  "native scrollbar exposes the current range and position");
+            SCROLLBARINFO geometry{sizeof(geometry)};
+            Check(GetScrollBarInfo(app.scrollbar_, OBJID_CLIENT, &geometry) && geometry.xyThumbBottom > geometry.xyThumbTop,
+                  "native accessibility geometry retains a usable thumb");
+            const DWORD resources = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+            for (int paint = 0; paint < 100; ++paint) {
+                PaintPixel(app.start_, app.Scale(10), app.Scale(10));
+                PaintPixel(app.scrollbar_, app.Scale(8), geometry.xyThumbTop + 1);
+            }
+            Check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) == resources, "buffered button and scrollbar paints release GDI objects");
+        }
         for (UINT test_dpi : {96u, 120u, 144u, 168u, 192u}) {
             RECT suggested{24, 24, 24 + ScaleForDpi(600, test_dpi), 24 + ScaleForDpi(480, test_dpi)};
             app.ApplyDpiChange(test_dpi, suggested);

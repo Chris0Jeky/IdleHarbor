@@ -2,6 +2,43 @@
 
 Last updated: 2026-10-09
 
+## Smooth native navigation (2026-10-09)
+
+The owner requests smoother scrolling, buttons and navigation, including a new
+scrollbar. Precision wheel deltas now move proportionally; detents settle over
+160 ms with interruption, accumulation, reversal and reduced-motion handling.
+Scrolling translates the arranged body in one deferred-position batch and schedules
+repainting without redoing form layout or repositioning fixed actions. A native
+SCROLLBAR child keeps dragging/input/accessibility semantics with a slim themed
+thumb and native high-contrast fallback. Page keys navigate settings from buttons
+without taking edit/combo keys. Buffered paints and post-native-state invalidation
+give action buttons immediate press/release feedback.
+
+The baseline native fixture fails three new regressions: press invalidation,
+sub-detent movement, and fixed-footer position calls (ten per ten scroll updates).
+After the change those footer calls are zero. All seventeen x64 Release CTests
+pass; final reversal changes pass the two scoped suites (574 compact checks).
+The batched preview run passes 587 checks before the final reversal adjustment.
+Repeated buffered paints preserve the GDI object count. Live help passes 33 tips
+and six fitting hints. Live native thumb dragging, wheel churn and natural/reference
+repainting pass at 192 DPI with hash
+`1586532c8db38864202a901d510f48c204a1dbaea8bf8d30b7fa98e7a520c76c`.
+The repaint fixture now discovers the named native scrollbar by enumerating its
+class rather than a nullable title lookup, and reads its SB_CTL range.
+
+The tested build is installed and reopened stopped as v0.2.0; settings bytes and
+startup XML are unchanged. SHA-256:
+`3d371a87353c6309928971d5ba462fc25e204f1bbee64eb4d1bd45faebb8d803`.
+One batched visual inspection covers light/dark expanded and narrow settings;
+one physical own-client confirmation shows the installed dark controls at 192 DPI.
+Backups, test logs and captures survive outside Git in
+`Documents/Codex/IdleHarbor-navigation-2026-10-09`.
+
+Physical touchpad feel, frame timing/CPU usage, screen-reader speech, actual OS
+high contrast, physical multi-monitor transitions and Windows 10/ARM64 execution
+are not verified. Published packages and HUMAN_TODO owner-account gates remain
+unchanged; this is an unreleased development build.
+
 ## Native UX recovery and bounded QA (2026-10-09)
 
 The owner requests continued UX/UI improvement and Muse QA. Three isolated,

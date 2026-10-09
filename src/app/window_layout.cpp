@@ -1,6 +1,8 @@
 #include "idleharbor/app/window_layout.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace idleharbor::app {
 
@@ -70,9 +72,19 @@ int ScrollPositionToReveal(
     return ClampScrollPosition(target, content_height, viewport_height);
 }
 
-WheelDeltaResult ConsumeWheelDelta(const int remainder, const int delta) noexcept {
-    const int total = remainder + delta;
-    return {total / kWheelDeltaPerStep, total % kWheelDeltaPerStep};
+WheelDeltaResult ConsumeWheelDelta(const int remainder, const int delta, const int pixels_per_detent) noexcept {
+    const auto total = static_cast<long long>(remainder) + static_cast<long long>(delta) * pixels_per_detent;
+    return {static_cast<int>(std::clamp(total / kWheelDeltaPerStep,
+                static_cast<long long>(std::numeric_limits<int>::min()),
+                static_cast<long long>(std::numeric_limits<int>::max()))),
+            static_cast<int>(total % kWheelDeltaPerStep)};
+}
+
+int AnimatedScrollPosition(const int from, const int target, const std::uint64_t elapsed_ms) noexcept {
+    if (elapsed_ms >= 160) return target;
+    const double remaining = 1.0 - static_cast<double>(elapsed_ms) / 160.0;
+    return static_cast<int>(std::llround(from + (static_cast<double>(target) - from) *
+                                      (1.0 - remaining * remaining * remaining)));
 }
 
 int LogicalPixels(const int physical_pixels, const int dpi) noexcept {

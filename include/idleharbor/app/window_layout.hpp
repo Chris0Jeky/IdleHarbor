@@ -12,7 +12,7 @@ struct PixelRect {
 };
 
 struct WheelDeltaResult {
-    int steps = 0;
+    int pixels = 0;
     int remainder = 0;
 };
 
@@ -73,7 +73,8 @@ struct StackedBodyLayout {
     int control_bottom,
     int content_height,
     int viewport_height) noexcept;
-[[nodiscard]] WheelDeltaResult ConsumeWheelDelta(int remainder, int delta) noexcept;
+[[nodiscard]] WheelDeltaResult ConsumeWheelDelta(int remainder, int delta, int pixels_per_detent) noexcept;
+[[nodiscard]] int AnimatedScrollPosition(int from, int target, std::uint64_t elapsed_ms) noexcept;
 [[nodiscard]] int LogicalPixels(int physical_pixels, int dpi) noexcept;
 [[nodiscard]] int PhysicalPixels(int logical_pixels, int dpi) noexcept;
 [[nodiscard]] ActionLayoutMode DetermineActionLayout(int client_width, int dpi) noexcept;

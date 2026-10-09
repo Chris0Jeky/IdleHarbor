@@ -35,6 +35,15 @@ public static class NativeViewportRepaint {
     public struct POINT { public int X, Y; }
 
     [StructLayout(LayoutKind.Sequential)]
+    public struct SCROLLBARINFO {
+        public uint cbSize;
+        public RECT rectangle;
+        public int lineButton, thumbTop, thumbBottom, reserved;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public uint[] state;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct SCROLLINFO {
         public uint cbSize;
         public uint fMask;
@@ -122,6 +131,13 @@ public static class NativeViewportRepaint {
     public static extern bool GetScrollInfo(IntPtr window, int bar, ref SCROLLINFO info);
 
     [DllImport("user32.dll")]
+    public static extern bool GetScrollBarInfo(IntPtr window, int objectId, ref SCROLLBARINFO info);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+
+    [DllImport("user32.dll")]
     public static extern bool GetPhysicalCursorPos(out POINT point);
 
     [DllImport("user32.dll")]
@@ -163,6 +179,20 @@ public static class NativeViewportRepaint {
             }
             const long WS_EX_CONTROLPARENT = 0x00010000L;
             if ((GetWindowLongPtr(window, -20).ToInt64() & WS_EX_CONTROLPARENT) != 0) {
+                result = window;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return result;
+    }
+
+    public static IntPtr FindSettingsScrollbar(IntPtr viewport) {
+        IntPtr result = IntPtr.Zero;
+        EnumChildWindows(viewport, (window, data) => {
+            StringBuilder name = new StringBuilder(32);
+            GetClassName(window, name, name.Capacity);
+            if (GetParent(window) == viewport && name.ToString() == "ScrollBar") {
                 result = window;
                 return false;
             }
@@ -238,10 +268,40 @@ function Get-ViewportScrollInfo([IntPtr]$Viewport) {
     $info = New-Object IdleHarbor.NativeViewportRepaint+SCROLLINFO
     $info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($info)
     $info.fMask = 0x0017 # SIF_RANGE | SIF_PAGE | SIF_POS | SIF_TRACKPOS
-    if (-not [IdleHarbor.NativeViewportRepaint]::GetScrollInfo($Viewport, 1, [ref]$info)) {
+    $bar = [IdleHarbor.NativeViewportRepaint]::FindSettingsScrollbar($Viewport)
+    if ($bar -eq [IntPtr]::Zero -or -not [IdleHarbor.NativeViewportRepaint]::GetScrollInfo($bar, 2, [ref]$info)) {
         throw 'GetScrollInfo failed for the settings viewport.'
     }
     return $info
+}
+
+function Test-NativeThumbDrag([IntPtr]$Window, [IntPtr]$Viewport) {
+    $bar = [IdleHarbor.NativeViewportRepaint]::FindSettingsScrollbar($Viewport)
+    $geometry = New-Object IdleHarbor.NativeViewportRepaint+SCROLLBARINFO
+    $geometry.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($geometry)
+    if (-not [IdleHarbor.NativeViewportRepaint]::GetScrollBarInfo($bar, -4, [ref]$geometry)) {
+        throw 'Could not read the native thumb geometry.'
+    }
+    $original = New-Object IdleHarbor.NativeViewportRepaint+POINT
+    if (-not [IdleHarbor.NativeViewportRepaint]::GetPhysicalCursorPos([ref]$original)) { throw 'Could not save cursor position.' }
+    [IdleHarbor.NativeViewportRepaint]::ActivateWindow($Window)
+    if ([IdleHarbor.NativeViewportRepaint]::GetForegroundWindow() -ne $Window) { throw 'Thumb test does not own the foreground.' }
+    $x = [int](($geometry.rectangle.Left + $geometry.rectangle.Right) / 2)
+    $y = $geometry.rectangle.Top + [int](($geometry.thumbTop + $geometry.thumbBottom) / 2)
+    try {
+        if (-not [IdleHarbor.NativeViewportRepaint]::SetPhysicalCursorPos($x, $y)) { throw 'Could not reach the native thumb.' }
+        [IdleHarbor.NativeViewportRepaint]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 50
+        $y = $geometry.rectangle.Bottom - $geometry.lineButton - 2
+        if (-not [IdleHarbor.NativeViewportRepaint]::SetPhysicalCursorPos($x, $y)) { throw 'Could not drag the native thumb.' }
+        Start-Sleep -Milliseconds 50
+    }
+    finally {
+        [IdleHarbor.NativeViewportRepaint]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+        [IdleHarbor.NativeViewportRepaint]::SetPhysicalCursorPos($original.X, $original.Y) | Out-Null
+    }
+    Start-Sleep -Milliseconds 50
+    if ((Get-ViewportScrollInfo $Viewport).nPos -le 0) { throw 'Dragging the themed native thumb did not move the settings.' }
 }
 
 function Invoke-ViewportWheelChurn(
@@ -280,6 +340,7 @@ function Invoke-ViewportWheelChurn(
             [IdleHarbor.NativeViewportRepaint]::mouse_event(0x0800, 0, 0, $wheelDown, [UIntPtr]::Zero)
             Start-Sleep -Milliseconds 20
         }
+        Start-Sleep -Milliseconds 200 # Allow the bounded wheel transition to settle.
         if ((Get-ViewportScrollInfo $Viewport).nPos -ne $Maximum) {
             throw 'Native wheel input did not reach the bottom of the settings viewport.'
         }
@@ -539,7 +600,10 @@ try {
     # disabled by an active, motion-free session.
     $activeScroll = Get-ViewportScrollInfo $viewport
     $maximum = [Math]::Max($activeScroll.nMax - [int]$activeScroll.nPage + 1, 0)
-    [IdleHarbor.NativeViewportRepaint]::SendMessage($viewport, 0x0115, [IntPtr]6, [IntPtr]::Zero) | Out-Null
+    $bar = [IdleHarbor.NativeViewportRepaint]::FindSettingsScrollbar($viewport)
+    [IdleHarbor.NativeViewportRepaint]::SendMessage($viewport, 0x0115, [IntPtr]6, $bar) | Out-Null
+    Test-NativeThumbDrag $window $viewport
+    [IdleHarbor.NativeViewportRepaint]::SendMessage($viewport, 0x0115, [IntPtr]6, $bar) | Out-Null
     Invoke-ViewportWheelChurn $window $viewport $maximum $ChurnCycles
     $natural = Get-ViewportScrollInfo $viewport
     if ($natural.nPos -le 0) {
