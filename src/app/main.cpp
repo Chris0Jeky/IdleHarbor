@@ -68,7 +68,7 @@ constexpr int kEmergencyHotkeyId = 1;
 constexpr ULONGLONG kInputHookRefreshIntervalMs = 10'000;
 constexpr std::size_t kMaximumDeferredCommands = 32;
 constexpr int kBaseWindowWidth = 600;
-constexpr int kBaseWindowHeight = 700;
+constexpr int kBaseWindowHeight = 480;
 constexpr int kBaseWindowMargin = 12;
 constexpr int kBaseScrollLine = 32;
 constexpr int kBaseMinimumClientHeight = 320;
@@ -76,10 +76,6 @@ constexpr int kBaseMinimumClientHeight = 320;
 // first control at or below this, or that control renders above the viewport's
 // top edge; the first heading lands at 56.
 constexpr int kBaseBodyOrigin = 52;
-// A floor for the scrollable content height, not the body's actual height --
-// the real body is well past this, so the floor never binds. It exists only so
-// a body that somehow measured as tiny still gets a usable scroll range.
-constexpr int kBaseBodyContentHeight = 570;
 constexpr int kBaseTipWidth = 320;
 // A hint keeps this width rather than filling the body, so the height reserved
 // for it at creation is exactly the height it renders at, whatever the window
@@ -168,15 +164,10 @@ constexpr wchar_t kSaveTip[] = L"Write the settings shown above to disk so they 
 // Short explanations shown under each field. They complement the hover
 // descriptions above rather than repeating them: this is what a reader needs
 // without reaching for the pointer, so it stays to a line or two.
-constexpr wchar_t kProfileHint[] =
-    L"Starting values you can edit. Every Session, Pulse, and Safeguards setting is replaced; "
-    L"Window & notifications are left alone.";
 constexpr wchar_t kMotionHint[] =
     L"Off emits nothing. Zen emits input without moving the pointer. Normal, Linear, and Circle "
     L"draw a visible path and return the pointer to where it was.";
-constexpr wchar_t kPowerHint[] =
-    L"Independent of motion, but not both off: motion Off with no request is refused, because "
-    L"nothing would be keeping the system awake.";
+
 constexpr wchar_t kIntervalHint[] =
     L"Time between motion pulses. The keep-awake request is continuous, so this does not change "
     L"it.";
@@ -211,7 +202,15 @@ enum ControlId : int {
     kStart = 120,
     kStop = 121,
     kSave = 122,
+    kDurationPreset = 123,
+    kMotionSection = 130,
+    kSafetySection = 131,
+    kWindowSection = 132,
 };
+
+constexpr std::array<std::uint64_t, 6> kDurationSeconds{0, 900, 1800, 3600, 7200, 14400};
+constexpr std::array<const wchar_t*, 3> kSectionNames{
+    L"Motion && timing", L"Safety pauses", L"Window && notifications"};
 
 // The contiguous edit and check range whose changes mark the settings dirty.
 // A new edit or check MUST land inside it and extend kLastDirtyControl,
@@ -462,7 +461,7 @@ class Application final {
         window_ = CreateWindowExW(
             0,
             kWindowClassName,
-            idleharbor::kProductName.data(),
+            (std::wstring(idleharbor::kProductName) + L" v" + std::wstring(idleharbor::kVersion)).c_str(),
             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -704,7 +703,7 @@ class Application final {
         auto* application = reinterpret_cast<Application*>(reference_data);
         if (message == WM_NCDESTROY) {
             RemoveWindowSubclass(window, ChildWindowProc, subclass_id);
-        } else if (message == WM_COMMAND && application != nullptr) {
+        } else if ((message == WM_COMMAND || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN) && application != nullptr) {
             return application->HandleMessage(message, w_param, l_param);
         } else if (message == WM_SETFOCUS && application != nullptr) {
             application->ObserveFocusChange();
@@ -759,6 +758,7 @@ class Application final {
         int arranged_width = 0;
         // Width the wrapped height was last measured at; 0 until measured.
         int measured_width = 0;
+        int section = 0;
     };
 
     [[nodiscard]] int Scale(const int value) const noexcept { return ScaleForDpi(value, dpi_); }
@@ -846,6 +846,7 @@ class Application final {
         const LayoutRegion region = LayoutRegion::Body,
         const BodyControlKind kind = BodyControlKind::Generic) {
         child_layouts_.push_back({window, x, y, width, height, focus_height, width_mode, region, kind});
+        child_layouts_.back().section = creating_section_;
         SetWindowSubclass(window, ChildWindowProc, kChildSubclassId, reinterpret_cast<DWORD_PTR>(this));
     }
 
@@ -945,10 +946,18 @@ class Application final {
             idleharbor::app::LogicalPixels(viewport_width, static_cast<int>(dpi_)),
             1);
         const auto stacked_body = idleharbor::app::ComputeStackedBodyLayout(logical_client_width);
-        int narrow_y = 0;
+        int narrow_y = 12;
         int body_bottom = 0;
         for (auto& child : child_layouts_) {
             if (child.region != LayoutRegion::Body) {
+                continue;
+            }
+            const bool visible = child.section == 0 ||
+                                 (child.section == 4 ? custom_duration_ : expanded_sections_[child.section - 1]);
+            SetWindowPos(child.window, nullptr, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                             (visible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+            if (!visible) {
                 continue;
             }
             // A hint is as tall as its text wraps to at the width it is given.
@@ -982,15 +991,26 @@ class Application final {
                 }
             } else {
                 child.arranged_x = child.x;
-                child.arranged_y = child.y - kBaseBodyOrigin;
+                child.arranged_y = narrow_y;
+                if (child.kind == BodyControlKind::Field) {
+                    child.arranged_y -= 3;
+                    narrow_y += 38;
+                } else if (child.kind == BodyControlKind::Heading) {
+                    narrow_y += 40;
+                } else if (child.kind == BodyControlKind::Check) {
+                    narrow_y += 32;
+                }
                 child.arranged_width = child.width_mode == ChildWidthMode::Fill
                                            ? std::max(80, logical_client_width - child.x - 20)
                                            : child.width;
                 measure_hint(child, child.arranged_width);
+                if (child.kind == BodyControlKind::Hint) {
+                    narrow_y += child.height + 10;
+                }
             }
             body_bottom = std::max(body_bottom, child.arranged_y + child.focus_height);
         }
-        body_content_height_ = std::max(Scale(kBaseBodyContentHeight), Scale(body_bottom + 16));
+        body_content_height_ = Scale(body_bottom + 16);
 
         const auto placement_for = [&](const ChildLayout& child) {
             int x = 0;
@@ -1271,7 +1291,7 @@ class Application final {
     }
 
     [[nodiscard]] bool IsDroppedComboBox(const HWND window) const noexcept {
-        const bool is_combo = window == profile_ || window == motion_ || window == power_;
+        const bool is_combo = window == profile_ || window == motion_ || window == power_ || window == duration_preset_;
         return is_combo && SendMessageW(window, CB_GETDROPPEDSTATE, 0, 0) != FALSE;
     }
 
@@ -1286,7 +1306,7 @@ class Application final {
         if (window_ == nullptr || IsWindowVisible(window_) == FALSE) {
             return false;
         }
-        for (const HWND combo : {profile_, motion_, power_}) {
+        for (const HWND combo : {profile_, motion_, power_, duration_preset_}) {
             if (combo == nullptr || IsWindowEnabled(combo) == FALSE) {
                 continue;
             }
@@ -1300,7 +1320,7 @@ class Application final {
     // Layout transactions reposition the very control a list is anchored to.
     // Close the list first so the transaction has nothing to displace.
     void CloseOpenComboBoxLists() noexcept {
-        for (const HWND combo : {profile_, motion_, power_}) {
+        for (const HWND combo : {profile_, motion_, power_, duration_preset_}) {
             if (combo != nullptr && SendMessageW(combo, CB_GETDROPPEDSTATE, 0, 0) != FALSE) {
                 SendMessageW(combo, CB_SHOWDROPDOWN, FALSE, 0);
             }
@@ -1499,22 +1519,25 @@ class Application final {
             AddHelpTip(control, tip);
             TrackChild(control, 20, y, 270, 24, 24, ChildWidthMode::Fixed, LayoutRegion::Body, BodyControlKind::Label);
         };
-        const auto add_heading = [&](const wchar_t* text, const int y) {
+        const auto add_heading = [&](const wchar_t* text, const int y, const int section = 0) {
             const HWND control = CreateWindowExW(
                 0,
-                L"STATIC",
+                section == 0 ? L"STATIC" : L"BUTTON",
                 text,
-                WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+                WS_CHILD | WS_VISIBLE | (section == 0 ? SS_LEFT | SS_NOPREFIX : WS_TABSTOP | BS_AUTOCHECKBOX | BS_PUSHLIKE | BS_LEFT),
                 scale(20),
                 scale(y),
                 scale(525),
-                scale(28),
+                scale(32),
                 body_parent,
-                nullptr,
+                section == 0 ? nullptr : reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMotionSection + section - 1)),
                 instance_,
                 nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(heading), TRUE);
-            TrackChild(control, 20, y, 525, 28, 28, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
+            TrackChild(control, 20, y, 525, 32, 32, ChildWidthMode::Fill, LayoutRegion::Body, BodyControlKind::Heading);
+            if (section != 0) {
+                section_buttons_[section - 1] = control;
+            }
         };
         const auto add_combo = [&](HWND& target, const int y, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
@@ -1623,7 +1646,7 @@ class Application final {
         };
 
         status_ = CreateWindowExW(
-            WS_EX_CLIENTEDGE,
+            0,
             L"STATIC",
             L"Stopped: ready",
             WS_CHILD | WS_VISIBLE | SS_OWNERDRAW | SS_NOTIFY,
@@ -1657,16 +1680,46 @@ class Application final {
             body_y += 32;
         };
 
+        const auto place_section = [&](const int section) {
+            creating_section_ = 0;
+            const std::wstring text = L"Show " + std::wstring(kSectionNames[section - 1]);
+            add_heading(text.c_str(), body_y, section);
+            body_y += 40;
+            creating_section_ = section;
+        };
+
         place_heading(L"Session");
         add_label(L"Profile", body_y, kProfileTip);
         add_combo(profile_, body_y, kProfile, kProfileTip);
         body_y += 28;
-        place_hint(kProfileHint);
+
         for (const auto profile : kProfiles) {
             const std::wstring text = Widen(idleharbor::core::profile_kind_name(profile));
             SendMessageW(profile_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
+        add_label(L"Keep awake", body_y, kPowerTip);
+        add_combo(power_, body_y, kPower, kPowerTip);
+        body_y += 28;
+
+        const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
+        for (const auto& text : powers) {
+            SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
+        }
+
+        add_label(L"Session duration", body_y, kMaxDurationTip);
+        add_combo(duration_preset_, body_y, kDurationPreset, kMaxDurationTip);
+        for (const wchar_t* text : {L"Until stopped", L"15 minutes", L"30 minutes", L"1 hour", L"2 hours", L"4 hours", L"Custom duration"}) {
+            SendMessageW(duration_preset_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
+        }
+        body_y += 38;
+        creating_section_ = 4;
+        add_label(L"Custom duration (seconds)", body_y, kMaxDurationTip);
+        add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
+        body_y += 28;
+        place_hint(kMaxDurationHint);
+
+        place_section(1);
         add_label(L"Motion", body_y, kMotionTip);
         add_combo(motion_, body_y, kMotion, kMotionTip);
         body_y += 28;
@@ -1682,16 +1735,7 @@ class Application final {
             SendMessageW(motion_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
         }
 
-        add_label(L"Keep awake", body_y, kPowerTip);
-        add_combo(power_, body_y, kPower, kPowerTip);
-        body_y += 28;
-        place_hint(kPowerHint);
-        const std::array<std::wstring, 3> powers{L"None", L"System sleep", L"Display and system"};
-        for (const auto& text : powers) {
-            SendMessageW(power_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text.c_str()));
-        }
 
-        place_heading(L"Pulse");
         add_label(L"Pulse interval (seconds)", body_y, kIntervalTip);
         add_edit(interval_, body_y, kInterval, kIntervalTip);
         body_y += 28;
@@ -1702,8 +1746,8 @@ class Application final {
         place_hint(kDistanceHint);
         place_check(randomize_, L"Randomize pulse interval", kRandomize, kRandomizeTip);
 
-        place_heading(L"Safeguards");
-        add_label(L"Pause after real input (seconds; 0 disables)", body_y, kPauseInputTip);
+        place_section(2);
+        add_label(L"After real input (seconds)", body_y, kPauseInputTip);
         add_edit(pause_input_, body_y, kPauseInput, kPauseInputTip);
         body_y += 28;
         place_hint(kPauseInputHint);
@@ -1713,7 +1757,7 @@ class Application final {
             L"Pause while the session is disconnected",
             kDisconnectPause,
             kDisconnectTip);
-        add_label(L"Low-battery threshold (percent; 0 disables)", body_y, kBatteryTip);
+        add_label(L"Low battery (%)", body_y, kBatteryTip);
         add_edit(battery_, body_y, kBattery, kBatteryTip);
         body_y += 28;
         place_hint(kBatteryHint);
@@ -1727,15 +1771,11 @@ class Application final {
             L"Pause while a full-screen application is foreground",
             kFullscreen,
             kFullscreenTip);
-        add_label(L"Maximum session duration (seconds; 0 disables)", body_y, kMaxDurationTip);
-        add_edit(max_duration_, body_y, kMaxDuration, kMaxDurationTip);
-        body_y += 28;
-        place_hint(kMaxDurationHint);
 
         // Everything under this heading is an application setting rather than a
         // session one, which is what lets the profile description promise the
         // section is left alone.
-        place_heading(L"Window & notifications");
+        place_section(3);
         place_check(
             start_minimized_,
             L"Start minimized to the notification area",
@@ -1756,6 +1796,8 @@ class Application final {
             L"Enable emergency stop: Ctrl+Alt+Shift+F12",
             kEmergencyHotkey,
             kHotkeyTip);
+
+        creating_section_ = 0;
 
         const auto add_button = [&](HWND& target, const wchar_t* text, const int x, const int id, const wchar_t* tip) {
             target = CreateWindowExW(
@@ -1959,11 +2001,10 @@ class Application final {
         if (draw_item == nullptr || draw_item->hDC == nullptr) {
             return;
         }
-        const HBRUSH background = GetSysColorBrush(COLOR_INFOBK);
+        const HBRUSH background = GetSysColorBrush(COLOR_WINDOW);
         FillRect(draw_item->hDC, &draw_item->rcItem, background);
-        FrameRect(draw_item->hDC, &draw_item->rcItem, GetSysColorBrush(COLOR_ACTIVEBORDER));
         const int old_mode = SetBkMode(draw_item->hDC, TRANSPARENT);
-        const COLORREF old_color = SetTextColor(draw_item->hDC, GetSysColor(COLOR_INFOTEXT));
+        const COLORREF old_color = SetTextColor(draw_item->hDC, GetSysColor(COLOR_WINDOWTEXT));
         const HFONT old_font = static_cast<HFONT>(SelectObject(
             draw_item->hDC,
             ui_font_ != nullptr ? ui_font_ : GetStockObject(DEFAULT_GUI_FONT)));
@@ -2018,6 +2059,7 @@ class Application final {
         SetChecked(fullscreen_, settings_.session.pause_when_fullscreen);
         SetChecked(pause_on_battery_, settings_.session.pause_on_battery);
         SetControlText(max_duration_, std::to_wstring(settings_.session.max_duration.count()));
+        SyncDurationPreset();
         SetChecked(start_minimized_, settings_.start_minimized);
         SetChecked(close_to_tray_, settings_.close_to_tray);
         SetChecked(notifications_, settings_.show_notifications);
@@ -2061,7 +2103,7 @@ class Application final {
         }
         for (const HWND control : {profile_, motion_, power_, interval_, distance_, randomize_, pause_input_,
                                    lock_pause_, disconnect_pause_, battery_, pause_on_battery_, fullscreen_,
-                                   max_duration_, start_minimized_, close_to_tray_, notifications_,
+                                   max_duration_, duration_preset_, start_minimized_, close_to_tray_, notifications_,
                                    emergency_hotkey_}) {
             if (control != nullptr) {
                 EnableWindow(control, session_active_ ? FALSE : TRUE);
@@ -2210,13 +2252,15 @@ class Application final {
             return motion_;
         case kPower:
             return power_;
+        case kDurationPreset:
+            return duration_preset_;
         default:
             return nullptr;
         }
     }
 
     [[nodiscard]] static bool IsComboBoxNotification(const int control_id, const int notification) noexcept {
-        const bool is_combo = control_id == kProfile || control_id == kMotion || control_id == kPower;
+        const bool is_combo = control_id == kProfile || control_id == kMotion || control_id == kPower || control_id == kDurationPreset;
         return is_combo && (notification == CBN_SELCHANGE || notification == CBN_CLOSEUP);
     }
 
@@ -2255,9 +2299,52 @@ class Application final {
         queued_combo_selection_ = 0;
         if (control_id == kProfile) {
             ApplySelectedProfile();
+        } else if (control_id == kDurationPreset) {
+            const int index = ComboIndex(duration_preset_);
+            if (index < 0 || index > static_cast<int>(kDurationSeconds.size())) {
+                return;
+            }
+            custom_duration_ = index == static_cast<int>(kDurationSeconds.size());
+            if (!custom_duration_) {
+                SetControlText(max_duration_, std::to_wstring(kDurationSeconds[index]));
+                UpdateDirtyStateFromControls();
+            }
+            UpdateViewport();
+            if (custom_duration_) {
+                SetFocus(max_duration_);
+                EnsureFocusedControlVisible(FocusRevealTrigger::Keyboard);
+            }
         } else {
             UpdateDirtyStateFromControls();
         }
+    }
+
+    void SyncDurationPreset() {
+        const auto value = ParseUnsigned(ControlText(max_duration_));
+        const auto found = value.has_value()
+                               ? std::find(kDurationSeconds.begin(), kDurationSeconds.end(), *value)
+                               : kDurationSeconds.end();
+        custom_duration_ = found == kDurationSeconds.end();
+        SendMessageW(duration_preset_, CB_SETCURSEL, static_cast<WPARAM>(found - kDurationSeconds.begin()), 0);
+        UpdateViewport();
+    }
+
+    void ToggleSection(const int index) {
+        CloseOpenComboBoxLists();
+        const HWND focused = GetFocus();
+        if (expanded_sections_[index]) {
+            const auto child = std::find_if(child_layouts_.begin(), child_layouts_.end(), [focused](const ChildLayout& item) {
+                return item.window == focused;
+            });
+            if (child != child_layouts_.end() && child->section == index + 1) {
+                SetFocus(section_buttons_[index]);
+            }
+        }
+        expanded_sections_[index] = !expanded_sections_[index];
+        SetChecked(section_buttons_[index], expanded_sections_[index]);
+        SetControlText(section_buttons_[index], (expanded_sections_[index] ? L"Hide " : L"Show ") + std::wstring(kSectionNames[index]));
+        UpdateViewport();
+        EnsureFocusedControlVisible(FocusRevealTrigger::Layout);
     }
 
     void ApplySelectedProfile() {
@@ -2684,6 +2771,8 @@ class Application final {
         case WM_COMMAND:
             if (IsComboBoxNotification(LOWORD(w_param), HIWORD(w_param))) {
                 QueueComboBoxSelection(LOWORD(w_param), HIWORD(w_param));
+            } else if (LOWORD(w_param) >= kMotionSection && LOWORD(w_param) <= kWindowSection && HIWORD(w_param) == BN_CLICKED) {
+                ToggleSection(LOWORD(w_param) - kMotionSection);
             } else if (LOWORD(w_param) == kStart && HIWORD(w_param) == BN_CLICKED) {
                 StartSession();
             } else if (LOWORD(w_param) == kStop && HIWORD(w_param) == BN_CLICKED) {
@@ -2707,6 +2796,11 @@ class Application final {
                 return TRUE;
             }
             break;
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLORBTN:
+            SetTextColor(reinterpret_cast<HDC>(w_param), GetSysColor(COLOR_WINDOWTEXT));
+            SetBkColor(reinterpret_cast<HDC>(w_param), GetSysColor(COLOR_WINDOW));
+            return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
         case WM_THEMECHANGED:
         case WM_SYSCOLORCHANGE:
             if (status_ != nullptr) {
@@ -2869,6 +2963,11 @@ class Application final {
     HWND pause_on_battery_ = nullptr;
     HWND fullscreen_ = nullptr;
     HWND max_duration_ = nullptr;
+    HWND duration_preset_ = nullptr;
+    std::array<HWND, 3> section_buttons_{};
+    std::array<bool, 3> expanded_sections_{};
+    int creating_section_ = 0;
+    bool custom_duration_ = false;
     HWND start_minimized_ = nullptr;
     HWND close_to_tray_ = nullptr;
     HWND notifications_ = nullptr;
@@ -2902,7 +3001,7 @@ class Application final {
     int queued_combo_selection_ = 0;
     int scroll_position_ = 0;
     bool updating_viewport_ = false;
-    int body_content_height_ = ScaleForDpi(kBaseBodyContentHeight, USER_DEFAULT_SCREEN_DPI);
+    int body_content_height_ = 0;
     int wheel_delta_remainder_ = 0;
     std::uint64_t next_pulse_tick_ = 0;
     ULONGLONG next_input_hook_refresh_tick_ = 0;

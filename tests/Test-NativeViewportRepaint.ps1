@@ -161,8 +161,8 @@ public static class NativeViewportRepaint {
             if (GetParent(window) != owner) {
                 return true;
             }
-            const long WS_VSCROLL = 0x00200000L;
-            if ((GetWindowLongPtr(window, -16).ToInt64() & WS_VSCROLL) != 0) {
+            const long WS_EX_CONTROLPARENT = 0x00010000L;
+            if ((GetWindowLongPtr(window, -20).ToInt64() & WS_EX_CONTROLPARENT) != 0) {
                 result = window;
                 return false;
             }
@@ -420,6 +420,10 @@ try {
     if ($viewport -eq [IntPtr]::Zero) {
         throw 'Could not find the settings viewport.'
     }
+    foreach ($id in @(130, 131, 132)) {
+        $button = [IdleHarbor.NativeViewportRepaint]::FindDescendantControl($window, $id)
+        [void][IdleHarbor.NativeViewportRepaint]::SendMessage($button, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+    }
     $initial = Get-ViewportScrollInfo $viewport
     $maximum = [Math]::Max($initial.nMax - [int]$initial.nPage + 1, 0)
     if ($maximum -le 0) {
@@ -533,6 +537,8 @@ try {
 
     # Exercise the real wheel-input route while the settings controls are
     # disabled by an active, motion-free session.
+    $activeScroll = Get-ViewportScrollInfo $viewport
+    $maximum = [Math]::Max($activeScroll.nMax - [int]$activeScroll.nPage + 1, 0)
     [IdleHarbor.NativeViewportRepaint]::SendMessage($viewport, 0x0115, [IntPtr]6, [IntPtr]::Zero) | Out-Null
     Invoke-ViewportWheelChurn $window $viewport $maximum $ChurnCycles
     $natural = Get-ViewportScrollInfo $viewport

@@ -1,6 +1,33 @@
 # Project state
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
+
+## Compact native window (2026-10-09)
+
+The source window now prioritizes Profile, Keep awake and Session duration.
+Duration has common presets and an exact Custom seconds field; Motion & timing,
+Safety pauses and Window & notifications start collapsed. All settings retain
+their existing validation and persistence. The title displays the canonical version,
+and status plus Start/Stop/Save remain outside the scrolling viewport.
+See `DESIGN.md` for the assessment, plan and interaction contract.
+
+MSVC 19.29 x64 Release and all seventeen CTest targets pass locally. The additional
+compact UI target checks real native controls and actual saved settings, with DPI
+layouts at 96/120/144/168/192. Synthetic stopped-window renders use the application
+manifest/icon and prove duration access, Tab order and focus recovery on collapse.
+No real session is started by that target. Screen-reader speech, physical monitor
+transitions and ARM64 execution remain unverified. Published release archives and
+website screenshots still describe v0.2.0; `HUMAN_TODO.md` retains owner account gates.
+
+The owner authorized ending the active session and replacing the desktop executable.
+The installed x64 build SHA-256 is
+`ca75477afeec8dbc26407eed24e3085494ccc632a630445736cc694a54eccbeb`;
+it matches the tested source build. Saved settings bytes and the existing startup
+task are unchanged, and the app is reopened stopped with `--show`. A prior binary
+and settings backup is retained outside Git under the dated local Codex evidence folder.
+The live help check passes with 31 tooltips and six fitting expanded-field hints;
+the live 192-DPI repaint/wheel check passes with three churn cycles. The capture
+portability regression passes 30 checks without recapturing published screenshots.
 
 ## Product and release boundary
 

@@ -8,6 +8,10 @@ where practical.
 
 ### Added
 
+- Compact native settings window with duration presets, exact custom seconds and
+  expandable Motion & timing, Safety pauses and Window & notifications sections.
+  Status and Start/Stop/Save remain fixed; the title shows the running version.
+
 - Session-only tray timers (15/30/60/120 minutes), manual Pause/Resume, bounded snooze,
   deadline extension and live remaining-time status/tooltip. Strict CLI equivalents use the
   existing duration syntax; elapsed limits and automatic safeguards remain authoritative.

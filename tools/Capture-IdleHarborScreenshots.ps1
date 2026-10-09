@@ -232,15 +232,15 @@ namespace IdleHarbor.Capture
 
         public static IntPtr FindSettingsViewport(IntPtr parent)
         {
-            const int GWL_STYLE = -16;
-            const int WS_VSCROLL = 0x00200000;
+            const int GWL_EXSTYLE = -20;
+            const int WS_EX_CONTROLPARENT = 0x00010000;
             IntPtr found = IntPtr.Zero;
             EnumChildWindows(parent, (window, parameter) =>
             {
                 StringBuilder className = new StringBuilder(128);
                 GetClassName(window, className, className.Capacity);
-                int style = GetWindowLong(window, GWL_STYLE);
-                if (className.ToString() == "Static" && (style & WS_VSCROLL) != 0)
+                int style = GetWindowLong(window, GWL_EXSTYLE);
+                if (className.ToString() == "Static" && (style & WS_EX_CONTROLPARENT) != 0)
                 {
                     found = window;
                     return false;
