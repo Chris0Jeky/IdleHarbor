@@ -2,6 +2,39 @@
 
 Last updated: 2026-10-09
 
+## Repair disappearing native controls (2026-10-09)
+
+The owner reports that only the material/window remains until Snipping Tool is
+activated. The previous integration extends DWM glass across the whole GDI client
+and erases its root background black. PrintWindow tests deliberately disabled the
+material flag, so earlier captures and DWM attribute queries did not prove normal
+composed control visibility. This repair supersedes those material-proof claims.
+
+Frame-extension margins are now always zero; the client always paints its opaque
+theme surface. Optional material is limited to the native title bar, and the label,
+summary and help describe that boundary. The capture-only production branch and
+test bypass are removed. No policy, schema or saved preference change.
+
+A new native regression records and forwards real DWM calls and rejects nonzero
+margins. Both palette/background tests plus the margin test fail on the previous
+source (three failures) and pass after repair. All seventeen x64 Release CTests
+pass; the material-enabled native capture run passes 492 checks. The live help
+check passes 33 tips/six fitting hints; the 192-DPI repaint test passes three cycles.
+
+The tested executable is installed and reopened stopped as v0.2.0. SHA-256:
+`47b4a52742c6397496ec28b0efd5fffe7390d40cfd808a68f8178b3a0d17ce34`.
+The temporary solid-mode mitigation is removed and original settings bytes are
+restored. A physical-pixel, foreground-client capture at 192 DPI (not PrintWindow
+or Snipping Tool) shows visible controls and the opaque #17191f root surface.
+DPI-aware coordinates are required: the first virtualized-coordinate probe was
+invalid and is superseded by the corrected own-client capture. Backups and evidence
+survive outside Git in `Documents/Codex/IdleHarbor-backdrop-repair-2026-10-09`.
+
+Screen-reader speech, actual OS high contrast, physical monitor transitions and
+Windows 10/ARM64 execution remain unverified. Owner confirmation of the repaired
+visibility is requested, not inferred. Published packages and HUMAN_TODO gates
+remain unchanged; this is an unreleased development build.
+
 ## Duration-first settings refinement (2026-10-09)
 
 The owner asks to keep improving the premium UI. Session duration now leads the

@@ -15,7 +15,8 @@ The owner requests a premium, minimal, almost Apple-like visual feel while
 retaining the simpler workflow delivered by the compact window.
 The owner subsequently requests richer surface depth, dark mode and subtle
 opacity. Dark is the initial appearance; a saved light-mode switch and a saved
-soft-backdrop switch live under Window & notifications.
+soft title-bar backdrop switch live under Window & notifications. The control area
+is always opaque after the full-window glass rendering repair.
 
 ## Constraints
 
