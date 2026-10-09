@@ -2,6 +2,43 @@
 
 Last updated: 2026-10-09
 
+## Native UX recovery and bounded QA (2026-10-09)
+
+The owner requests continued UX/UI improvement and Muse QA. Three isolated,
+read-only Muse Spark high lenses (bug hunt, test gaps, performance) complete with
+valid reports and integrity checks; all temporary lens worktrees are removed.
+Their claims are verified locally rather than treated as execution evidence.
+
+Start/Save rejection now preserves entries, expands the relevant section and
+selects its numeric field for correction. ReadControls commits only a fully valid
+candidate. Collapsed motion summaries flag invalid interval/size in every mode,
+including Off (issue #129). Tab enters at Session duration; preset-matching custom
+duration restores focus to its selector before the field disappears.
+
+The native fixture reproduces the previous misleading summaries (12 failures),
+edit/focus recovery defects (18 failures) and both keyboard defects (two failures).
+It measures 100 hover invalidations for 100 within-control moves before the fix,
+and one after it, retaining leave/reentry and independent state redraws. Native
+status tests add emergency-stop, close/tray and pending-power-cleanup coverage.
+Mutating candidate isolation and all three safety seams fails five assertions;
+restoring the fixture passes. All seventeen x64 Release CTests pass; the direct
+compact fixture passes 552 checks, status passes 372 assertions in 16 scenarios,
+and the batched native preview run passes 566 checks.
+
+One visual inspection covers light validation feedback, dark compact and narrow
+custom-duration states. Live help passes 33 tips/six fitting hints; the live
+192-DPI repaint test passes three churn cycles. The tested executable is installed
+and reopened as v0.2.0, with settings bytes and startup XML unchanged. SHA-256:
+`cc13a647763123238ff77259e508614f98f6a8026dd332360eb1b823522ab133`.
+Backups, Muse receipts, previews and native evidence are retained outside Git at
+`Documents/Codex/IdleHarbor-qa-2026-10-09`.
+
+The larger scroll/layout batching suggestion remains an unmeasured hypothesis;
+no speculative batching or cache is added. Actual OS high contrast, screen-reader
+speech, physical monitor transitions and Windows 10/ARM64 execution remain
+unverified. This is an unreleased development build; published packages and
+HUMAN_TODO owner account gates are unchanged.
+
 ## Repair disappearing native controls (2026-10-09)
 
 The owner reports that only the material/window remains until Snipping Tool is

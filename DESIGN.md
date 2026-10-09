@@ -52,6 +52,11 @@ appearance preferences without expansion. Their native accessible names include
 the summary, Show/Hide and native checked state. Randomized timing says Up to;
 invalid numeric edits prompt review without modifying the input. Summary values
 describe the editable configuration, not proof that a safeguard is currently pausing.
+Start/Save validation preserves all entries, expands the field's section and
+selects the offending value for correction. Settings apply only after every field
+passes validation. Tab enters the form at Session duration; hiding a custom-duration
+field returns its focus to the duration selector. Hover redraws follow entry/exit
+transitions, with independent focus, enable and selection redraws retained.
 The preferred window height is 500 logical pixels so the compact view still fits. Collapsing
 returns focus to the disclosure when its contents held focus. Disclosure never
 changes settings. Session settings remain locked while running; Stop remains enabled.
