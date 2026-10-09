@@ -17,8 +17,8 @@ if (@(Get-Process -Name IdleHarbor -ErrorAction SilentlyContinue).Count -ne 0) {
 # explanation without having to find the input.
 $expectedTools = [ordered]@{
     'status card'                                  = 1
-    'labels (profile, motion, keep awake, interval, motion size, real input, battery, duration)' = 8
-    'combo boxes (profile, motion, keep awake)'    = 3
+    'labels (profile, motion, keep awake, interval, motion size, real input, battery, duration, custom duration)' = 9
+    'combo boxes (profile, motion, keep awake, duration)' = 4
     'edits (interval, motion size, real input, battery, duration)' = 5
     'check boxes'                                  = 9
     'action buttons (start, stop, save)'           = 3
@@ -29,9 +29,7 @@ $expectedTotal = ($expectedTools.Values | Measure-Object -Sum).Sum
 # opening phrase per hint is enough to prove the static exists with the right
 # text, without pinning the whole sentence.
 $expectedHints = @(
-    'Starting values you can edit.',
     'Off emits nothing.',
-    'Independent of motion, but not both off',
     'Time between motion pulses.',
     'A 1 to 120 scale for the visible path',
     'Quiet time required after you really type',
@@ -80,6 +78,9 @@ public static class ControlHelpTips {
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetParent(IntPtr window);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetDlgItem(IntPtr window, int id);
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; }
@@ -145,14 +146,14 @@ public static class ControlHelpTips {
     // fields, and printed explanations; the status card and the action buttons
     // belong to the top-level window instead.
     public static IntPtr FindSettingsViewport(IntPtr owner) {
-        const int GWL_STYLE = -16;
-        const long WS_VSCROLL = 0x00200000L;
+        const int GWL_EXSTYLE = -20;
+        const long WS_EX_CONTROLPARENT = 0x00010000L;
         IntPtr result = IntPtr.Zero;
         EnumChildWindows(owner, (window, data) => {
             if (GetParent(window) != owner) {
                 return true;
             }
-            if ((GetWindowLongPtr(window, GWL_STYLE).ToInt64() & WS_VSCROLL) != 0) {
+            if ((GetWindowLongPtr(window, GWL_EXSTYLE).ToInt64() & WS_EX_CONTROLPARENT) != 0) {
                 result = window;
                 return false;
             }
@@ -278,6 +279,14 @@ try {
     if ($dpi -eq 0) {
         throw 'Could not read the window DPI.'
     }
+    # Expand the three native sections and the custom duration before measuring hints.
+    foreach ($id in @(130, 131, 132)) {
+        $button = [IdleHarbor.ControlHelpTips]::GetDlgItem($viewport, $id)
+        [void][IdleHarbor.ControlHelpTips]::SendMessage($button, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+    }
+    $duration = [IdleHarbor.ControlHelpTips]::GetDlgItem($viewport, 123)
+    [void][IdleHarbor.ControlHelpTips]::SendMessage($duration, 0x014E, [IntPtr]6, [IntPtr]::Zero)
+    [void][IdleHarbor.ControlHelpTips]::SendMessage($viewport, 0x0111, [IntPtr](123 -bor (1 -shl 16)), $duration)
     $bodyStatics = Get-BodyStatics $viewport
     $blank = @($bodyStatics | Where-Object { [string]::IsNullOrWhiteSpace($_.Text) })
     if ($blank.Count -ne 0) {

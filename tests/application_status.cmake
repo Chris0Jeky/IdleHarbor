@@ -22,3 +22,13 @@ target_link_libraries(idleharbor_application_status_tests PRIVATE idleharbor_cor
 idleharbor_configure_msvc(idleharbor_application_status_tests)
 add_test(NAME application_status COMMAND idleharbor_application_status_tests)
 set_tests_properties(application_status PROPERTIES TIMEOUT 30)
+
+add_executable(idleharbor_compact_ui_tests "${PROJECT_SOURCE_DIR}/tests/compact_ui_tests.cpp"
+  "${PROJECT_SOURCE_DIR}/resources/IdleHarbor.rc" "${PROJECT_SOURCE_DIR}/resources/app.manifest")
+target_include_directories(idleharbor_compact_ui_tests PRIVATE "${status_fixture_directory}" include "${PROJECT_SOURCE_DIR}/src/app")
+target_compile_features(idleharbor_compact_ui_tests PRIVATE cxx_std_20)
+target_compile_definitions(idleharbor_compact_ui_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(idleharbor_compact_ui_tests PRIVATE idleharbor_core idleharbor_app_support idleharbor_windows Comctl32 Shell32 Wtsapi32)
+idleharbor_configure_msvc(idleharbor_compact_ui_tests)
+add_test(NAME compact_ui COMMAND idleharbor_compact_ui_tests)
+set_tests_properties(compact_ui PROPERTIES TIMEOUT 30)

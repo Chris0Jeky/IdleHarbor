@@ -119,7 +119,11 @@ x64 and ARM64 archives. The packaging parser and ownership tests can be run inde
 ## Runtime at a glance
 
 1. Launch IdleHarbor and confirm the visible state is **Stopped**.
-2. Choose a profile or configure motion, power, and safeguard settings.
+2. Choose a profile, what to keep awake, and a session duration. Common durations
+   are one selection away; **Custom duration** exposes an exact seconds field.
+   Expand **Motion & timing**, **Safety pauses**, or **Window & notifications**
+   to adjust the remaining settings. Profile changes reset session settings,
+   including duration, while leaving window and notification preferences alone.
 3. Press **Start** for the specific session that needs idle prevention.
 4. Watch the status reason; genuine input, lock/session changes, battery policy, fullscreen policy,
    active hours, and maximum duration can pause or stop the session.
@@ -127,6 +131,9 @@ x64 and ARM64 archives. The packaging parser and ownership tests can be run inde
 
 IdleHarbor stores local settings only. The app has no network service or telemetry path and sends
 nothing anywhere.
+
+The window title shows the executable's version. The compact window is currently
+an unreleased source change; the screenshots above show the published v0.2.0 layout.
 
 The project website (<https://chris0jeky.github.io/IdleHarbor/>) is separate from the app: it runs
 the Pulseboard beta SDK. A **Beta** bar offers three categories: **Usage counts** (daily aggregate
