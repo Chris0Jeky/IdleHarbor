@@ -39,6 +39,17 @@ bool Capture(HWND window, const std::filesystem::path& path) {
 }
 
 struct ApplicationStatusTestAccess {
+    static COLORREF PaintPixel(HWND control, int x, int y) {
+        RECT bounds{}; GetClientRect(control, &bounds);
+        HDC source = GetDC(control), memory = CreateCompatibleDC(source);
+        HBITMAP bitmap = CreateCompatibleBitmap(source, bounds.right, bounds.bottom);
+        const auto previous = SelectObject(memory, bitmap);
+        SendMessageW(control, WM_PRINTCLIENT, reinterpret_cast<WPARAM>(memory), PRF_CLIENT);
+        const COLORREF color = GetPixel(memory, x, y);
+        SelectObject(memory, previous); DeleteObject(bitmap); DeleteDC(memory); ReleaseDC(control, source);
+        return color;
+    }
+
     static void Run(bool capture) {
         Application app{GetModuleHandleW(nullptr)};
         app.settings_.session = idleharbor::core::settings_for_profile(ProfileKind::Balanced);
@@ -58,6 +69,18 @@ struct ApplicationStatusTestAccess {
         Check(!Shown(app.max_duration_), "preset duration hides custom seconds");
         Check(app.ContentHeight() <= app.ViewportHeight(), "default view fits without scrolling");
         Check(ControlText(window).find(idleharbor::kVersion) != std::wstring::npos, "window displays the canonical version");
+        if (!app.high_contrast_) {
+            // Sample clear interior pixels, away from text, borders and chevrons.
+            const COLORREF primary = PaintPixel(app.start_, app.Scale(10), app.Scale(10));
+            Check(primary == RGB(0, 91, 211) || primary == RGB(0, 78, 186), "native Start renders the primary accent or hover state");
+            Check(PaintPixel(app.duration_preset_, app.Scale(10), app.Scale(10)) == RGB(255, 255, 255), "native duration renders a white field");
+            const DWORD before = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+            for (int paint = 0; paint < 100; ++paint) PaintPixel(app.start_, app.Scale(10), app.Scale(10));
+            Check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) <= before + 1, "repeated control painting releases GDI resources");
+            EnableWindow(app.start_, FALSE);
+            Check(PaintPixel(app.start_, app.Scale(10), app.Scale(10)) == RGB(237, 239, 243), "disabled primary action is visibly muted");
+            EnableWindow(app.start_, TRUE);
+        }
         if (capture) {
             SetFocus(app.profile_);
             MSG tab{}; tab.message = WM_KEYDOWN; tab.wParam = VK_TAB;
@@ -65,6 +88,10 @@ struct ApplicationStatusTestAccess {
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.duration_preset_, "Tab reaches session duration");
             Check(app.HandleTabNavigation(tab) && GetFocus() == app.section_buttons_[0], "Tab skips collapsed custom and advanced controls");
             Check(Capture(window, L"out/compact.bmp"), "compact render is captured");
+            app.high_contrast_ = true;
+            RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+            Check(Capture(window, L"out/system-colors.bmp"), "system-color native fallback is captured");
+            app.RefreshAppearance();
         }
 
         for (int index = 0; index < static_cast<int>(kDurationSeconds.size()); ++index) {
@@ -84,6 +111,14 @@ struct ApplicationStatusTestAccess {
         app.UpdateDirtyStateFromControls();
         app.RefreshControls();
         Check(ComboIndex(app.duration_preset_) == 6 && ControlText(app.max_duration_) == L"123", "non-preset values survive refresh exactly");
+        RECT numeric_client{}; GetClientRect(app.max_duration_, &numeric_client);
+        Check(numeric_client.bottom >= app.Scale(18), "padded native numeric field retains usable text and caret space");
+        SetFocus(app.max_duration_);
+        SendMessageW(app.max_duration_, EM_SETSEL, 0, -1);
+        SendMessageW(app.max_duration_, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(L"124"));
+        Check(ControlText(app.max_duration_) == L"124", "styled native numeric field retains selection and editing");
+        SendMessageW(app.max_duration_, WM_UNDO, 0, 0);
+        Check(ControlText(app.max_duration_) == L"123", "styled native numeric field retains Undo");
         SetControlText(app.max_duration_, L"2592001");
         std::wstring error;
         Check(!app.ReadControls(error), "custom duration preserves thirty-day validation");
@@ -105,6 +140,19 @@ struct ApplicationStatusTestAccess {
             app.ToggleSection(0);
         }
         if (capture) Check(Capture(window, L"out/expanded.bmp"), "expanded render is captured");
+
+        if (!app.high_contrast_) {
+            const HWND previous_focus = GetFocus();
+            SetChecked(app.lock_pause_, true);
+            SetFocus(app.lock_pause_);
+            Check(GetFocus() == app.lock_pause_, "checked native checkbox accepts keyboard focus");
+            Check(PaintPixel(app.lock_pause_, app.Scale(40), app.Scale(3)) == RGB(0, 91, 211),
+                  "checked checkbox has a distinct blue keyboard focus outline");
+            SetFocus(app.duration_preset_);
+            Check(PaintPixel(app.lock_pause_, app.Scale(40), app.Scale(3)) != RGB(0, 91, 211),
+                  "checked checkbox outline disappears when focus leaves");
+            SetFocus(previous_focus);
+        }
 
         for (UINT test_dpi : {96u, 120u, 144u, 168u, 192u}) {
             RECT suggested{24, 24, 24 + ScaleForDpi(600, test_dpi), 24 + ScaleForDpi(480, test_dpi)};

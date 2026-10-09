@@ -119,14 +119,14 @@ public static class ControlHelpTips {
     // Deliberately reimplements what the app does rather than trusting it: the
     // failure this guards against is the app reserving too little and silently
     // clipping the last line, which reading the text back cannot detect.
-    // Mirrors CreateHintFont in src/app/main.cpp (Segoe UI, 8pt, normal weight).
+    // Mirrors CreateHintFont in src/app/main.cpp (Segoe UI, 9pt, normal weight).
     public static int RequiredTextHeight(string text, int physicalWidth, uint dpi) {
         const int DT_CALCRECT = 0x00000400, DT_WORDBREAK = 0x00000010, DT_NOPREFIX = 0x00000800;
         IntPtr dc = GetDC(IntPtr.Zero);
         if (dc == IntPtr.Zero) {
             return 0;
         }
-        int lfHeight = -(int)((8 * dpi + 36) / 72);
+        int lfHeight = -(int)((9 * dpi + 36) / 72);
         IntPtr font = CreateFont(lfHeight, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI");
         IntPtr previous = font != IntPtr.Zero ? SelectObject(dc, font) : IntPtr.Zero;
         RECT box = new RECT();
