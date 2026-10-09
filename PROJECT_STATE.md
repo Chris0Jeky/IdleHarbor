@@ -11,7 +11,7 @@ numeric caret/Undo, keyboard access and high-contrast fallback remain. See `PROD
 and `DESIGN.md` for the owner priorities and visual/interaction contract.
 
 MSVC 19.29 x64 Release and all seventeen CTest targets pass. The synthetic capture
-run passes 439 checks, including actual painted action/field colours, disabled state,
+initial run passes 439 checks; final focused tests pass 433 checks, including actual painted action/field colours, disabled state,
 numeric editing/Undo and bounded GDI-resource churn. Two visual inspection rounds
 cover compact, custom, expanded and native system-colour fallback renders. The live
 help test passes 31 tooltips and six fitting hints; the live 192-DPI wheel/repaint
@@ -19,7 +19,7 @@ test passes three churn cycles. Actual Windows high-contrast activation, screen-
 speech, physical monitor transitions and ARM64 execution remain unverified.
 
 The tested executable is installed and reopened stopped. Installed SHA-256:
-`8596406dedde7bbaa2050c10def1ce611937b1a995ff9fcdc48d288076fef480`.
+`1f33267a91d72101b0c3190179349b9ec2c32dcbe129b810854b576ed4674895`.
 It matches the source build; saved settings bytes and the existing startup task are
 unchanged. The prior executable, settings, startup XML and synthetic previews are
 retained outside Git at `Documents/Codex/IdleHarbor-premium-ui-2026-10-09`.

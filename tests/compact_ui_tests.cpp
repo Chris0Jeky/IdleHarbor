@@ -141,6 +141,19 @@ struct ApplicationStatusTestAccess {
         }
         if (capture) Check(Capture(window, L"out/expanded.bmp"), "expanded render is captured");
 
+        if (!app.high_contrast_) {
+            const HWND previous_focus = GetFocus();
+            SetChecked(app.lock_pause_, true);
+            SetFocus(app.lock_pause_);
+            Check(GetFocus() == app.lock_pause_, "checked native checkbox accepts keyboard focus");
+            Check(PaintPixel(app.lock_pause_, app.Scale(40), app.Scale(3)) == RGB(0, 91, 211),
+                  "checked checkbox has a distinct blue keyboard focus outline");
+            SetFocus(app.duration_preset_);
+            Check(PaintPixel(app.lock_pause_, app.Scale(40), app.Scale(3)) != RGB(0, 91, 211),
+                  "checked checkbox outline disappears when focus leaves");
+            SetFocus(previous_focus);
+        }
+
         for (UINT test_dpi : {96u, 120u, 144u, 168u, 192u}) {
             RECT suggested{24, 24, 24 + ScaleForDpi(600, test_dpi), 24 + ScaleForDpi(480, test_dpi)};
             app.ApplyDpiChange(test_dpi, suggested);

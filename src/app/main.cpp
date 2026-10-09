@@ -934,9 +934,10 @@ class Application final {
             }
             SelectObject(dc, old); DeleteObject(pen);
         }
-        if (focused && primary && enabled) {
+        if (focused && enabled && (primary || check)) {
             RECT focus = bounds; InflateRect(&focus, -Scale(3), -Scale(3));
-            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), RGB(255, 255, 255));
+            if (check) focus.left = Scale(23);
+            const HPEN pen = CreatePen(PS_SOLID, std::max(Scale(1), 1), check ? kAccent : RGB(255, 255, 255));
             const auto old_pen = SelectObject(dc, pen), old_brush = SelectObject(dc, GetStockObject(NULL_BRUSH));
             RoundRect(dc, focus.left, focus.top, focus.right, focus.bottom, Scale(8), Scale(8));
             SelectObject(dc, old_brush); SelectObject(dc, old_pen); DeleteObject(pen);
