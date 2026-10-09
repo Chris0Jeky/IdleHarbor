@@ -21,6 +21,7 @@ std::vector<DWORD> tray_calls;
 std::wstring last_tooltip;
 std::wstring last_dialog;
 int visibility_requests = 0;
+int hide_requests = 0;
 int failures = 0;
 int assertions = 0;
 idleharbor::platform::windows::SessionSnapshot session_snapshot{};
@@ -53,6 +54,7 @@ int WINAPI TestMessageBox(HWND, LPCWSTR text, LPCWSTR, UINT) {
 }
 BOOL WINAPI TestShowWindow(HWND, int command) {
     if (command == SW_SHOW) ++visibility_requests;
+    if (command == SW_HIDE) ++hide_requests;
     return TRUE;
 }
 BOOL WINAPI TestRegisterSession(HWND window, DWORD flags) {
@@ -126,6 +128,13 @@ struct ApplicationStatusTestAccess {
         app.RefreshControls();
     }
     static void Start(Application& app) { app.StartSession(); }
+    static void PendingCleanup(Application& app, bool pending) { app.power_cleanup_pending_ = pending; }
+    static void EmergencyStop(Application& app) { app.HandleMessage(WM_HOTKEY, kEmergencyHotkeyId, 0); }
+    static void Close(Application& app, bool tray_available) {
+        app.settings_.close_to_tray = true;
+        app.tray_added_ = tray_available;
+        app.HandleMessage(WM_CLOSE, 0, 0);
+    }
 };
 
 std::wstring NativeText(HWND window) {
@@ -199,15 +208,33 @@ void SessionRecoveryContracts(HINSTANCE instance) {
         Expect(!ApplicationStatusTestAccess::Running(app), "Start fails safely while the current session is unreadable");
         Expect(NativeText(GetDlgItem(window, kStatus)) == kSessionStateUnavailableStatus, "failed Start exposes the actual unavailable-state reason");
         session_snapshot = {true, false, false};
+        ApplicationStatusTestAccess::PendingCleanup(app, true);
+        ApplicationStatusTestAccess::Start(app);
+        Expect(!ApplicationStatusTestAccess::Running(app) &&
+                   last_dialog == L"The previous power request could not be released. Press Stop to retry cleanup first.",
+               "pending power cleanup blocks Start and explains the immediate Stop recovery path");
+        ApplicationStatusTestAccess::PendingCleanup(app, false);
         ApplicationStatusTestAccess::Start(app);
         Expect(session_queries == 2 && ApplicationStatusTestAccess::Running(app), "Start retries after unlock even without a notification or process restart");
         const auto recovered_status = NativeText(GetDlgItem(window, kStatus));
         Expect(recovered_status.starts_with(L"Running; no time limit") &&
                    recovered_status == ApplicationStatusTestAccess::Display(app),
                "recovered Start clears the old error and publishes the active session status");
-        ApplicationStatusTestAccess::Stop(app);
-        Expect(!ApplicationStatusTestAccess::Running(app), "Stop remains immediate after recovery");
+        ApplicationStatusTestAccess::EmergencyStop(app);
+        Expect(!ApplicationStatusTestAccess::Running(app) &&
+                   NativeText(GetDlgItem(window, kStatus)) == L"Stopped: emergency hotkey",
+               "the emergency-hotkey message stops the session and publishes its reason");
         Expect(IsWindowVisible(window) == FALSE, "recovery fixture never displays a desktop window");
+    }
+    {
+        Application app(instance);
+        ApplicationStatusTestAccess::Prepare(app, window, status, false, false);
+        const int before_hide = hide_requests;
+        ApplicationStatusTestAccess::Close(app, true);
+        Expect(IsWindow(window) != FALSE && hide_requests == before_hide + 1,
+               "Close requests tray hiding while a working tray keeps the window reachable");
+        ApplicationStatusTestAccess::Close(app, false);
+        Expect(IsWindow(window) == FALSE, "Close destroys the window when no tray icon is available");
     }
     DestroyWindow(window);
 }

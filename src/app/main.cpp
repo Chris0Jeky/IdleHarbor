@@ -670,7 +670,8 @@ class Application final {
         });
         const auto current = std::find(focusable.begin(), focusable.end(), GetFocus());
         const bool reverse = (GetKeyState(VK_SHIFT) & static_cast<SHORT>(0x8000)) != 0;
-        std::size_t index = current == focusable.end() ? 0 : static_cast<std::size_t>(current - focusable.begin());
+        std::size_t index = current == focusable.end() ? (reverse ? 0 : focusable.size() - 1)
+                                                     : static_cast<std::size_t>(current - focusable.begin());
         if (reverse) {
             index = index == 0 ? focusable.size() - 1 : index - 1;
         } else {
@@ -731,6 +732,9 @@ class Application final {
                 return result;
             }
         }
+        if (application != nullptr && message == WM_MOUSELEAVE && application->hovered_control_ == window) {
+            application->hovered_control_ = nullptr;
+        }
         if (application != nullptr && !application->high_contrast_ && application->IsStyledControl(window)) {
             if (message == WM_PAINT || message == WM_PRINTCLIENT) {
                 PAINTSTRUCT paint{};
@@ -740,17 +744,19 @@ class Application final {
                 return 0;
             }
             if (message == WM_ERASEBKGND) return 1;
-            if (message == WM_MOUSEMOVE) {
+            if (message == WM_MOUSEMOVE && application->hovered_control_ != window) {
                 TRACKMOUSEEVENT tracking{sizeof(tracking), TME_LEAVE, window, 0};
-                TrackMouseEvent(&tracking);
+                if (TrackMouseEvent(&tracking) != FALSE) application->hovered_control_ = window;
+                InvalidateRect(window, nullptr, FALSE);
             }
-            if (message == WM_MOUSEMOVE || message == WM_MOUSELEAVE || message == WM_SETFOCUS ||
+            if (message == WM_MOUSELEAVE || message == WM_SETFOCUS ||
                 message == WM_KILLFOCUS || message == WM_ENABLE || message == BM_SETCHECK ||
                 message == CB_SETCURSEL || message == WM_SETTEXT) {
                 InvalidateRect(window, nullptr, FALSE);
             }
         }
         if (message == WM_NCDESTROY) {
+            if (application != nullptr && application->hovered_control_ == window) application->hovered_control_ = nullptr;
             RemoveWindowSubclass(window, ChildWindowProc, subclass_id);
         } else if (application != nullptr && (message == WM_COMMAND || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN ||
                     message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX ||
@@ -2257,11 +2263,13 @@ class Application final {
     [[nodiscard]] std::wstring SectionSummary(const int index) const {
         if (index == 0) {
             const auto motion = ControlText(motion_);
-            if (ComboIndex(motion_) == 0) return L"Motion off";
             const auto interval = ParseUnsigned(ControlText(interval_));
-            return motion + (interval && *interval > 0 && *interval <= 86400
-                ? std::wstring(IsChecked(randomize_) ? L" · Up to " : L" · Every ") +
-                    std::to_wstring(*interval) + L" s" : L" · Review pulse interval");
+            const auto distance = ParseUnsigned(ControlText(distance_));
+            if (!interval || *interval == 0 || *interval > 86400) return L"Review pulse interval";
+            if (!distance || *distance == 0 || *distance > 120) return L"Review motion size";
+            if (ComboIndex(motion_) == 0) return L"Motion off";
+            return motion + std::wstring(IsChecked(randomize_) ? L" · Up to " : L" · Every ") +
+                std::to_wstring(*interval) + L" s";
         }
         if (index == 1) {
             const auto input = ParseUnsigned(ControlText(pause_input_));
@@ -2446,9 +2454,11 @@ class Application final {
         RepaintSettingsViewport();
     }
 
-    bool ReadControls(std::wstring& error) {
+    bool ReadControls(std::wstring& error, HWND* invalid_control = nullptr) {
         error.clear();
-        Settings& session = settings_.session;
+        if (invalid_control != nullptr) *invalid_control = nullptr;
+        auto candidate = settings_;
+        Settings& session = candidate.session;
         const int profile_index = ComboIndex(profile_);
         const int motion_index = ComboIndex(motion_);
         const int power_index = ComboIndex(power_);
@@ -2472,6 +2482,7 @@ class Application final {
         };
         std::uint64_t value = 0;
         if (!read_number(interval_, 24ULL * 60 * 60, value) || value == 0) {
+            if (invalid_control != nullptr) *invalid_control = interval_;
             error = L"Pulse interval must be between 1 and 86400 seconds.";
             return false;
         }
@@ -2480,12 +2491,14 @@ class Application final {
             session.random_minimum = Seconds{1};
         }
         if (!read_number(distance_, 120, value) || value == 0) {
+            if (invalid_control != nullptr) *invalid_control = distance_;
             error = L"Motion size must be between 1 and 120.";
             return false;
         }
         session.distance = static_cast<std::uint32_t>(value);
         session.randomize = IsChecked(randomize_);
         if (!read_number(pause_input_, 24ULL * 60 * 60, value)) {
+            if (invalid_control != nullptr) *invalid_control = pause_input_;
             error = L"Input pause must be between 0 and 86400 seconds.";
             return false;
         }
@@ -2496,6 +2509,7 @@ class Application final {
         session.pause_when_locked = IsChecked(lock_pause_);
         session.pause_when_disconnected = IsChecked(disconnect_pause_);
         if (!read_number(battery_, 100, value)) {
+            if (invalid_control != nullptr) *invalid_control = battery_;
             error = L"Battery threshold must be between 0 and 100.";
             return false;
         }
@@ -2506,23 +2520,42 @@ class Application final {
         session.pause_when_fullscreen = IsChecked(fullscreen_);
         session.pause_on_battery = IsChecked(pause_on_battery_);
         if (!read_number(max_duration_, 30ULL * 24 * 60 * 60, value)) {
+            if (invalid_control != nullptr) *invalid_control = max_duration_;
             error = L"Maximum duration must be between 0 and 2592000 seconds.";
             return false;
         }
         session.max_duration = Seconds{static_cast<std::int64_t>(value)};
-        settings_.start_minimized = IsChecked(start_minimized_);
-        settings_.close_to_tray = IsChecked(close_to_tray_);
-        settings_.show_notifications = IsChecked(notifications_);
-        settings_.emergency_hotkey = IsChecked(emergency_hotkey_);
-        settings_.dark_appearance = IsChecked(dark_appearance_);
-        settings_.soft_backdrop = IsChecked(soft_backdrop_);
+        candidate.start_minimized = IsChecked(start_minimized_);
+        candidate.close_to_tray = IsChecked(close_to_tray_);
+        candidate.show_notifications = IsChecked(notifications_);
+        candidate.emergency_hotkey = IsChecked(emergency_hotkey_);
+        candidate.dark_appearance = IsChecked(dark_appearance_);
+        candidate.soft_backdrop = IsChecked(soft_backdrop_);
 
         const auto validation = idleharbor::core::validate(session);
         if (!validation.valid) {
             error = L"Invalid settings: " + std::wstring(validation.errors.front().begin(), validation.errors.front().end());
             return false;
         }
+        settings_ = candidate;
         return true;
+    }
+
+    void ShowSettingsError(const std::wstring& error, const HWND control) {
+        MessageBoxW(window_, error.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONWARNING);
+        UpdateDirtyStateFromControls();
+        const auto child = std::find_if(child_layouts_.begin(), child_layouts_.end(), [control](const ChildLayout& item) {
+            return item.window == control;
+        });
+        if (child != child_layouts_.end() && child->section > 0 &&
+            child->section <= static_cast<int>(expanded_sections_.size()) && !expanded_sections_[child->section - 1]) {
+            ToggleSection(child->section - 1);
+        }
+        if (control != nullptr) {
+            SetFocus(control);
+            SendMessageW(control, EM_SETSEL, 0, -1);
+            EnsureFocusedControlVisible(FocusRevealTrigger::Keyboard);
+        }
     }
 
     void ApplyCommandLineOptions(const CommandLineOptions& options) {
@@ -2658,6 +2691,7 @@ class Application final {
                                ? std::find(kDurationSeconds.begin(), kDurationSeconds.end(), *value)
                                : kDurationSeconds.end();
         custom_duration_ = found == kDurationSeconds.end();
+        if (!custom_duration_ && GetFocus() == max_duration_) SetFocus(duration_preset_);
         SendMessageW(duration_preset_, CB_SETCURSEL, static_cast<WPARAM>(found - kDurationSeconds.begin()), 0);
         UpdateViewport();
     }
@@ -2762,9 +2796,9 @@ class Application final {
             return;
         }
         std::wstring error;
-        if (!ReadControls(error)) {
-            MessageBoxW(window_, error.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONWARNING);
-            RefreshControls();
+        HWND invalid_control = nullptr;
+        if (!ReadControls(error, &invalid_control)) {
+            ShowSettingsError(error, invalid_control);
             return;
         }
         dirty_ = SettingsNeedSave();
@@ -2977,9 +3011,9 @@ class Application final {
 
     void Save() {
         std::wstring error;
-        if (!ReadControls(error)) {
-            MessageBoxW(window_, error.c_str(), L"IdleHarbor settings", MB_OK | MB_ICONWARNING);
-            RefreshControls();
+        HWND invalid_control = nullptr;
+        if (!ReadControls(error, &invalid_control)) {
+            ShowSettingsError(error, invalid_control);
             return;
         }
         ApplyEmergencyHotkeySetting();
@@ -3372,6 +3406,7 @@ class Application final {
     HWND help_tips_ = nullptr;
     HFONT hint_font_ = nullptr;
     HWND last_focus_ = nullptr;
+    HWND hovered_control_ = nullptr;
     FocusRevealTrigger focus_trigger_ = FocusRevealTrigger::Layout;
     int queued_combo_selection_ = 0;
     int scroll_position_ = 0;

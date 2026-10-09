@@ -7,6 +7,21 @@
 namespace {
 bool nonzero_glass_margins = false;
 int frame_extension_calls = 0;
+int settings_dialogs = 0;
+bool reverse_tab = false;
+HWND measured_hover = nullptr;
+int hover_invalidations = 0;
+BOOL WINAPI RecordInvalidation(HWND window, const RECT* area, BOOL erase) {
+    if (window == measured_hover) ++hover_invalidations;
+    return ::InvalidateRect(window, area, erase);
+}
+SHORT WINAPI FixtureKeyState(int key) {
+    return key == VK_SHIFT ? (reverse_tab ? static_cast<SHORT>(0x8000) : 0) : ::GetKeyState(key);
+}
+int WINAPI RecordSettingsDialog(HWND, LPCWSTR, LPCWSTR, UINT) {
+    ++settings_dialogs;
+    return IDOK;
+}
 HRESULT (WINAPI* real_extend_frame)(HWND, const MARGINS*) = nullptr;
 HRESULT WINAPI RecordFrameExtension(HWND window, const MARGINS* margins) {
     ++frame_extension_calls;
@@ -24,7 +39,13 @@ FARPROC WINAPI RecordMaterialProc(HMODULE module, LPCSTR name) {
 }
 }
 #define GetProcAddress RecordMaterialProc
+#define MessageBoxW RecordSettingsDialog
+#define GetKeyState FixtureKeyState
+#define InvalidateRect RecordInvalidation
 #include "application-under-test.inc"
+#undef InvalidateRect
+#undef GetKeyState
+#undef MessageBoxW
 #undef GetProcAddress
 
 namespace {
@@ -101,6 +122,77 @@ struct ApplicationStatusTestAccess {
         GetWindowRect(app.duration_preset_, &duration_rect); GetWindowRect(app.profile_, &profile_rect);
         Check(duration_rect.top < profile_rect.top, "session duration is the first routine choice");
         const auto original_settings = app.settings_;
+        for (const bool start : {false, true}) {
+            for (const auto control : {app.interval_, app.distance_, app.pause_input_, app.battery_, app.max_duration_}) {
+                app.settings_ = original_settings; app.RefreshControls();
+                for (int section = 0; section < 3; ++section) {
+                    if (app.expanded_sections_[section]) app.ToggleSection(section);
+                }
+                SendMessageW(app.duration_preset_, CB_SETCURSEL, 6, 0);
+                app.QueueComboBoxSelection(kDurationPreset, CBN_SELCHANGE);
+                SetControlText(app.max_duration_, L"123");
+                SetControlText(control, L""); app.UpdateDirtyStateFromControls();
+                const auto before = app.settings_;
+                const auto before_sections = app.expanded_sections_;
+                const int dialogs_before = settings_dialogs;
+                if (start) app.StartSession(); else app.Save();
+                Check(settings_dialogs == dialogs_before + 1 && !app.session_active_,
+                      "invalid Start and Save report the problem without starting a session");
+                Check(ControlText(control).empty() && app.dirty_, "validation preserves the unfinished edit");
+                Check(AppSettingsEqual(before, app.settings_), "rejected settings leave the last valid configuration intact");
+                Check(Shown(control) && GetFocus() == control, "validation reveals and focuses the field to correct");
+                if (control == app.max_duration_) Check(app.expanded_sections_ == before_sections && app.custom_duration_,
+                      "custom-duration errors preserve all three disclosure states and their separate visibility group");
+                if (control != app.max_duration_) Check(ControlText(app.max_duration_) == L"123",
+                      "validation preserves other unfinished form edits");
+            }
+        }
+        app.settings_ = original_settings; app.RefreshControls();
+        for (int section = 0; section < 3; ++section) {
+            if (app.expanded_sections_[section]) app.ToggleSection(section);
+        }
+        app.suppress_dirty_tracking_ = true;
+        SetControlText(app.interval_, L"45"); SetControlText(app.distance_, L"");
+        app.suppress_dirty_tracking_ = false;
+        std::wstring rejected_error;
+        Check(!app.ReadControls(rejected_error) && AppSettingsEqual(original_settings, app.settings_),
+              "a late validation failure cannot commit earlier valid fields");
+        app.RefreshControls();
+        ShowWindow(window, SW_SHOWNOACTIVATE);
+        MSG entry_tab{}; entry_tab.hwnd = window; entry_tab.message = WM_KEYDOWN; entry_tab.wParam = VK_TAB;
+        SetFocus(window);
+        Check(app.HandleTabNavigation(entry_tab) && GetFocus() == app.duration_preset_,
+              "Tab from outside the tab order reaches session duration first");
+        SetFocus(window); reverse_tab = true;
+        Check(app.HandleTabNavigation(entry_tab) && GetFocus() == (IsWindowEnabled(app.save_) ? app.save_ : app.start_),
+              "Shift Tab from outside the tab order reaches the last enabled action");
+        reverse_tab = false;
+        SendMessageW(app.duration_preset_, CB_SETCURSEL, 6, 0);
+        app.QueueComboBoxSelection(kDurationPreset, CBN_SELCHANGE);
+        SetControlText(app.max_duration_, L"3600"); SetFocus(app.max_duration_);
+        app.SyncDurationPreset();
+        Check(!Shown(app.max_duration_) && GetFocus() == app.duration_preset_,
+              "hiding a preset-matching custom duration restores focus to the duration selector");
+        app.settings_ = original_settings; app.RefreshControls();
+        if (!capture) ShowWindow(window, SW_HIDE);
+        if (capture) {
+            SetControlText(app.distance_, L""); app.UpdateDirtyStateFromControls();
+            Check(capture_window(L"out/validation.bmp"), "collapsed unfinished-edit feedback is captured");
+            app.RefreshControls();
+        }
+        if (!app.high_contrast_) {
+            SendMessageW(app.start_, WM_MOUSELEAVE, 0, 0);
+            measured_hover = app.start_; hover_invalidations = 0;
+            for (int move = 0; move < 100; ++move) SendMessageW(app.start_, WM_MOUSEMOVE, 0, MAKELPARAM(10, 10));
+            std::cout << "Hover invalidations per 100 moves: " << hover_invalidations << '\n';
+            Check(hover_invalidations == 1, "pointer motion within one control repaints only its hover transition");
+            SendMessageW(app.start_, WM_MOUSELEAVE, 0, 0);
+            SendMessageW(app.start_, WM_MOUSEMOVE, 0, MAKELPARAM(10, 10));
+            Check(hover_invalidations == 3, "leaving and reentering a control each repaint the changed hover state");
+            SendMessageW(app.start_, WM_ENABLE, TRUE, 0);
+            Check(hover_invalidations == 4, "enable changes retain their independent repaint");
+            measured_hover = nullptr;
+        }
         SendMessageW(app.motion_, CB_SETCURSEL, 2, 0);
         SetControlText(app.interval_, L"120"); SetChecked(app.randomize_, false);
         app.UpdateDirtyStateFromControls();
@@ -112,6 +204,23 @@ struct ApplicationStatusTestAccess {
         SetControlText(app.interval_, L""); app.UpdateDirtyStateFromControls();
         Check(ControlText(app.section_buttons_[0]).find(L"Review pulse interval") != std::wstring::npos &&
               ControlText(app.interval_).empty(), "summary preserves and identifies incomplete edits");
+        for (const int mode : {0, 2, 3}) {
+            SendMessageW(app.motion_, CB_SETCURSEL, mode, 0);
+            for (const auto invalid : {L"", L"0", L"86401"}) {
+                SetControlText(app.interval_, invalid); app.UpdateDirtyStateFromControls();
+                Check(ControlText(app.section_buttons_[0]).find(L"Review pulse interval") != std::wstring::npos &&
+                      ControlText(app.interval_) == invalid,
+                      "all motion modes expose invalid interval edits without replacing them");
+            }
+            SetControlText(app.interval_, L"120");
+            for (const auto invalid : {L"", L"0", L"121"}) {
+                SetControlText(app.distance_, invalid); app.UpdateDirtyStateFromControls();
+                Check(ControlText(app.section_buttons_[0]).find(L"Review motion size") != std::wstring::npos &&
+                      ControlText(app.distance_) == invalid,
+                      "all motion modes expose invalid size edits without replacing them");
+            }
+            SetControlText(app.distance_, L"1");
+        }
         SendMessageW(app.motion_, CB_SETCURSEL, 0, 0); app.QueueComboBoxSelection(kMotion, CBN_SELCHANGE);
         Check(ControlText(app.section_buttons_[0]).find(L"Motion off") != std::wstring::npos,
               "Off motion summary does not imply pulses");

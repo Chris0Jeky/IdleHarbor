@@ -34,6 +34,13 @@ where practical.
 
 ### Fixed
 
+- Invalid Start or Save keeps unfinished entries, opens their settings section and
+  focuses the field to correct. Collapsed motion summaries flag invalid size and
+  interval values even with motion off; rejected edits never partially apply.
+- Keyboard entry starts at Session duration, and hiding a preset-matching custom
+  duration returns focus to its selector. Pointer movement within a control now
+  repaints only the hover transition instead of every move.
+
 - Full-window glass could hide native controls until a capture overlay changed
   composition. The optional material now stays in the title bar, while the whole
   control area remains opaque. Capture tests no longer bypass the material path.
