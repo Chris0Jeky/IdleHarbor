@@ -1,234 +1,83 @@
-# IdleHarbor — Lightweight Windows Mouse Jiggler and Keep-Awake Utility
+# IdleHarbor
 
-> A small, native Windows mouse jiggler and keep-awake utility for authorized work sessions,
-> presentations, installations, and long-running local tasks.
+A native Windows utility that keeps a session awake with bounded pointer motion, a Windows power request, or both, and always leaves the status and the stop path visible.
 
 [![CI](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/codeql.yml)
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
+[![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white)](CMakeLists.txt)
 
-**[Project site &rarr;](https://chris0jeky.github.io/IdleHarbor/)** &middot;
-**[Download v0.2.0 &rarr;](https://github.com/Chris0Jeky/IdleHarbor/releases/latest)**
+**[Project site](https://chris0jeky.github.io/IdleHarbor/)** ·
+**[v0.2.0 release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0)**
 
 ![IdleHarbor social preview](docs/assets/idleharbor-social.png)
 
-## Genuine UI
+## What it is
+
+IdleHarbor is a small C++20/Win32 program for work sessions that legitimately need the machine to stay available: a long local install, a presentation, a transfer you are watching. Motion and power are separate choices. You can jiggle, ask Windows to hold the system or the display, do both, or refuse the one combination that does neither.
+
+It is not a hidden presence tool. The window, tray icon, status reason, and Stop control stay available. Injected input is tagged so IdleHarbor's own hooks ignore it; other software can still detect, block, log, or ignore it. The desktop app has no network client and no telemetry. The public website is a separate static site and is the only place the Pulseboard SDK runs.
+
+The screenshots below are captures of the published `v0.2.0` x64 binary at 200% display scaling, checked by [`docs/assets/capture-manifest.json`](docs/assets/capture-manifest.json). They are not mocks. `main` has since moved to a compact, duration-first window (see [Status and roadmap](#status-and-roadmap)); those source changes are not in the published archives or in these images.
 
 <p align="center">
   <img src="docs/assets/idleharbor-window.png"
-       alt="IdleHarbor stopped settings window showing the profile, motion, and keep-awake fields with a printed explanation under each, its status card, and fixed Start, Stop, and Save actions at 200 percent Windows display scaling"
+       alt="Published v0.2.0 settings window, stopped, with profile, motion, and keep-awake fields, a status card, and fixed Start, Stop, and Save actions"
        width="594">
 </p>
 
-This is a real capture of the public `v0.2.0` x64 release at 200% Windows display scaling, not a
-mock-up. Each field carries its own printed explanation, and every control describes itself in more
-detail on hover.
-
-| Running | Intelligently paused |
+| Running | Paused |
 | --- | --- |
-| <img src="docs/assets/idleharbor-running.png" alt="IdleHarbor running a motion-free Windows keep-awake session" width="594"> | <img src="docs/assets/idleharbor-paused.png" alt="IdleHarbor paused because the current time is outside configured active hours" width="594"> |
+| <img src="docs/assets/idleharbor-running.png" alt="Published v0.2.0 running a motion-free Windows keep-awake session" width="594"> | <img src="docs/assets/idleharbor-paused.png" alt="Published v0.2.0 paused because the current time is outside configured active hours" width="594"> |
 
 <p align="center">
   <img src="docs/assets/idleharbor-viewport.png"
-       alt="IdleHarbor safeguards and notification settings reached with its native vertical scrollbar"
+       alt="Published v0.2.0 safeguards and notification settings reached with the native vertical scrollbar"
        width="600">
 </p>
 
-The scrolled safeguards view shows the same native window and its fixed action footer. Wheel,
-scrollbar, resize, and keyboard-focus paths keep every control reachable without stale pixels.
-
 <p align="center">
   <img src="docs/assets/idleharbor-tray-menu.png"
-       alt="IdleHarbor notification-area menu with Show, Stop, and Exit commands"
+       alt="Published v0.2.0 notification-area menu with Show, Stop, and Exit"
        width="219">
 </p>
 
-The repository includes a deterministic capture tool and a hash/dimension manifest for all five
-images in [`docs/assets/capture-manifest.json`](docs/assets/capture-manifest.json).
+The published tray menu is Show, Stop, and Exit. On current `main`, the same menu also offers Start for, Pause or Resume, Snooze for, and Add 15 minutes or Add 1 hour. That menu is unreleased.
 
-IdleHarbor is an open-source, lightweight alternative to bulky mouse-jiggler applications. It is an
-independent C++20/Win32 utility with no separately installed application runtime: optional motion
-input and Windows power requests can be configured independently, while visible controls,
-conservative safeguards, and an immediate stop path keep the session understandable and user
-controlled. It does not provide concealment, monitoring bypasses, or claims of undetectability.
+## Features
 
-## Status
+All of this is in the tree today. Items marked unreleased are on `main` and still versioned `0.2.0`; they are not in the GitHub release assets.
 
-Version `0.2.0` is the current stable release. Its canonical download and verification page is
-[`v0.2.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0). The visible runtime, policy
-core, settings store, CLI, portable packages, per-user installer, startup choices, CI, CodeQL,
-SBOMs, checksums, and GitHub provenance attestations are implemented and published.
+- **Independent mechanisms.** Motion is Off, Normal, Zen, Circle, or Linear. Power is None, System (`ES_CONTINUOUS | ES_SYSTEM_REQUIRED`), or Display (those flags plus `ES_DISPLAY_REQUIRED`). Off together with None is rejected: it would not keep anything awake.
+- **Seven profiles.** Named presets in `settings_for_profile`. Changing profile resets session settings and leaves window and notification preferences alone.
+- **Safeguards, one decision point.** `PolicyEngine::evaluate` maps genuine input, lock, disconnect, battery, fullscreen, active hours, and maximum duration onto Run, Pause, or Stop, each with a reason. Manual pause and snooze are reasons too.
+- **Bounded motion.** Size is a 1–120 scale, not a pixel radius. Visible plans stay around a safe anchor and return the cursor to the captured origin. The pulse is skipped if real movement has already moved that origin. Zen sends a marked virtual move intended not to shift the visible pointer.
+- **Visible session control.** Start, Stop, and Save stay outside the scrolling settings body. The tray and `Ctrl+Alt+Shift+F12` (on by default, saved as `emergency_hotkey`) stop a session. A second process forwards one command to the owner through a size-limited `WM_COPYDATA` payload; the owner holds `Local\IdleHarbor.Singleton.v1`.
+- **Session timers on `main` (unreleased).** Tray **Start for** 15, 30, 60, or 120 minutes, plus Pause, Resume, Snooze for 5, 15, or 30 minutes, and Add 15 minutes or Add 1 hour. The same actions exist as `--start-for`, `--pause`, `--resume`, `--snooze`, and `--extend`. They do not write the INI. Snooze is at most 24 hours. A timed session is at most 30 days. Extend does not revive an expired session or add a limit to an unlimited one. Pause and snooze keep the overall clock running; Resume rechecks every safeguard. If releasing the power request fails, automatic activity stops, Stop stays available to retry, and a new session is blocked until cleanup succeeds.
+- **Local settings only.** Validated INI, atomic temp-file-then-replace save. Portable mode writes `IdleHarbor.ini` beside the executable. Otherwise the file is `%LOCALAPPDATA%\IdleHarbor\settings.ini`. `--config PATH` is resolved by the owning instance. Unknown keys are ignored; invalid values fall back conservatively.
+- **Compact window on `main` (unreleased).** Session duration leads: Until stopped, 15 minutes, 30 minutes, 1 hour, 2 hours, 4 hours, or an exact custom seconds field. Motion & timing, Safety pauses, and Window & notifications start collapsed, with a second line that summarises the current values. Dark appearance and an optional title-bar Mica backdrop are saved (`dark_appearance`, `soft_backdrop`, both default on). The control surface stays opaque. High contrast keeps native rendering. The published screenshots above are the earlier field-by-field layout.
+- **Per-monitor DPI.** The manifest asks for PerMonitorV2. Layout, scrolling, and focus reveal are pure geometry in `window_layout` and are tested without a live pointer.
+- **Opt-in persistence.** The portable ZIP does not create a startup entry. `install.ps1` can add a per-user Start Menu launcher and, only when you ask, a logon task. No elevation, no service, no hidden process.
 
-`0.2.0` is a settings-window release. Every control now explains itself: each field carries a short
-printed explanation beneath it, and every control describes itself in more detail on hover. Picking a
-profile, motion mode, or keep-awake mode updates the field immediately and works on the first click.
-Four labels were renamed for what they do rather than how. See
-[`CHANGELOG.md`](CHANGELOG.md) for the full list.
-
-| Area | Available now | Notes |
-| --- | --- | --- |
-| Runtime | Native Win32 window and notification-area controls | Windows-only |
-| Modes | Off, Normal, Zen, Circle, Linear | Behavior remains subject to application and Windows compatibility |
-| Safeguards | Genuine-input pause, lock/disconnect, battery, fullscreen, active hours, max duration | Users must verify behavior in their own session |
-| Configuration | Validated local INI settings and profiles | No cloud sync or telemetry |
-| Distribution | Architecture-labelled portable archives and an optional per-user installer | [Canonical `v0.2.0` release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0) |
-| Trust evidence | GPL-3.0-only, CI, CodeQL, SHA-256, SPDX SBOM, and GitHub attestations | `v0.2.0` is unsigned |
-
-Read [`PROJECT_STATE.md`](PROJECT_STATE.md) for the current milestone and proving commands.
-
-## Why IdleHarbor?
-
-- **Native footprint:** C++20 and Windows system libraries, without bundling an application runtime.
-- **Visible by design:** the window, tray state, status reason, settings, and stop controls remain
-  available to the user.
-- **Viewport-safe:** per-monitor DPI scaling, resize, native scrolling, and focus reveal keep every
-  control reachable on compact or highly scaled displays.
-- **Two complementary mechanisms:** motion modes address applications that observe input; power
-  requests address Windows idle transitions. They can be configured independently.
-- **Conservative automation:** the per-user Start Menu launcher is ownership-safe by default;
-  automatic startup remains opt-in, least-privilege, and paired with an ownership-aware uninstall path.
-- **Evidence-led delivery:** builds, tests, CodeQL, checksums, SBOMs, and attestations are part of
-  the release workflow rather than marketing claims.
-
-The published `v0.2.0` x64 executable is 544,256 bytes (531.5 KiB) with SHA-256
-`bbada75845a1832aa5907e81003ebfd52761cbc7cac1c234d61263be7baf5e5a`. Across three repetitions of a
-60-second stopped window and a 60-second active window, it held a 13.7 MiB working set stopped and
-15.1 MiB while running a keep-awake session, at effectively zero CPU. That baseline, the exact
-method, and its limitations are recorded in [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
-
-## Build and test from source
-
-Use a Windows developer PowerShell with Visual Studio 2019 or newer and CMake. This machine's
-validated Visual Studio 2019 Build Tools command is:
-
-```powershell
-cmake -S . -B build/x64 -G "Visual Studio 16 2019" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
-cmake --build build/x64 --config Release --parallel
-ctest --test-dir build/x64 -C Release --output-on-failure
-```
-
-With Visual Studio 2022, use generator `Visual Studio 17 2022` instead.
-
-The project is Windows-only. CI also builds ARM64 and Win32; release packaging currently produces
-x64 and ARM64 archives. The packaging parser and ownership tests can be run independently:
-
-```powershell
-.\packaging\Test-Packaging.ps1
-```
-
-## Runtime at a glance
-
-1. Launch IdleHarbor and confirm the visible state is **Stopped**.
-2. Choose a profile, what to keep awake, and a session duration. Common durations
-   are one selection away; **Custom duration** exposes an exact seconds field.
-   Expand **Motion & timing**, **Safety pauses**, or **Window & notifications**
-   to adjust the remaining settings. Profile changes reset session settings,
-   including duration, while leaving window and notification preferences alone.
-3. Press **Start** for the specific session that needs idle prevention.
-4. Watch the status reason; genuine input, lock/session changes, battery policy, fullscreen policy,
-   active hours, and maximum duration can pause or stop the session.
-5. Press **Stop**, use the tray menu, or use the emergency hotkey when finished.
-
-IdleHarbor stores local settings only. The app has no network service or telemetry path and sends
-nothing anywhere.
-
-The window title shows the executable's version. The compact window uses a light,
-restrained design with rounded controls, quiet disclosures and a blue primary action.
-Dark appearance is the default. **Window & notifications** contains **Dark appearance**
-and **Soft title-bar backdrop**; Save keeps these choices. The backdrop uses native
-Mica in the title bar where supported; the entire control area stays opaque. Appearance can
-change during a session; Save remains unavailable until Stop.
-It is currently an unreleased source change; the screenshots above show the
-published v0.2.0 layout. Windows high-contrast mode retains native control rendering.
-
-The project website (<https://chris0jeky.github.io/IdleHarbor/>) is separate from the app: it runs
-the Pulseboard beta SDK. A **Beta** bar offers three categories: **Usage counts** (daily aggregate
-counts of page views and of release or source link clicks), **Diagnostics** (page timings,
-JavaScript error summaries, visible time and scroll depth), and **Journeys and product data** (a
-random per-tab session id with ordered page events, including which of those links was chosen). In
-the EEA, or while the region is unknown, only usage counts run until the visitor presses **OK**;
-elsewhere all three start on and **Choose** turns any of them off. Global Privacy Control or Do Not
-Track turns everything off with no bar and no request. No names, e-mail addresses, IP addresses,
-cookies or page URLs are stored; detailed data is kept 90 days and aggregate counts currently 14
-days. See `observatory/README.md`.
-
-## Modes and profiles
-
-Motion modes are selectable independently of power requests:
-
-| Motion | Behavior |
+| Motion | What it does |
 | --- | --- |
-| Off | No pointer/input pulse; useful with a power request |
-| Normal | Small visible diagonal path, scaled by the motion size |
-| Zen | Virtual mouse input intended not to move the visible pointer |
-| Circle | Bounded circular path, scaled by the motion size |
-| Linear | Horizontal back-and-forth path, scaled by the motion size |
-
-The motion size (`--distance`) is a scale from **1** to **120**, not a raw pixel radius. Visible motion
-uses independently designed IdleHarbor paths that remain bounded around a safe anchor and return
-the cursor to its captured position. Project provenance is recorded in
-[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
-
-Profiles provide named starting points and can be refined before saving:
+| Off | No pointer pulse. Useful with a power request. |
+| Normal | Small visible diagonal path. CLI name: `diagonal`. |
+| Zen | Marked virtual input, intended not to move the visible pointer. |
+| Circle | Bounded circular path. |
+| Linear | Horizontal back-and-forth path. |
 
 | Profile | Starting point |
 | --- | --- |
-| Balanced | Zen input, system power request, 60-second interval, user/lock/disconnect/low-battery safeguards |
-| Long task | No motion, system power request, 120-second interval, four-hour maximum duration |
-| Presentation | No motion, display-and-system power request, no pause on genuine input |
-| Compatibility | Visible Normal input, no power request, 60-second interval |
-| Visible | Circle input, no power request |
-| Battery saver | Zen input, no power request, randomized 30–120-second interval, 30% low-battery threshold |
-| Custom | Balanced starting values for explicit user overrides |
+| Balanced | Zen, system power, 60 s interval, pause on genuine input, lock, disconnect, and battery at or below 20%. |
+| Long task | Motion off, system power, 120 s interval, 4 hour maximum. The Balanced safeguards stay on. |
+| Presentation | Motion off, display power (system plus display), no pause on genuine input. |
+| Compatibility | Visible Normal motion, no power request, 60 s interval. |
+| Visible | Circle motion, no power request. |
+| Battery saver | Zen, no power request, randomized 30–120 s interval, low-battery pause at 30%. |
+| Custom | The Balanced values, marked as the override profile. |
 
-Power modes are `none`, `system`, and `display`. A power request is not input simulation: it asks
-Windows to keep the system or display available while the session is active.
-
-## Command line
-
-The GUI executable accepts one command and validated options. `--help` and `--version` open visible
-information dialogs; `--status` opens a visible status dialog rather than writing to a console.
-
-```text
-Commands: --start (-j, --jiggle), --stop, --toggle, --status,
-          --show (--settings, -g), --exit
-Session:  --start-for DURATION, --pause, --resume,
-          --snooze DURATION, --extend DURATION
-
-Profiles: --profile balanced|long-task|presentation|compatibility|visible|battery-saver|custom
-Motion:   --motion off|zen|diagonal|linear|circle
-Power:    --power none|system|display
-Timing:   --interval DURATION, --random, --no-random, --pause-on-input DURATION,
-          --stop-after DURATION
-Safety:   --distance SIZE (1..120), --battery-threshold 0..100,
-          --pause-on-fullscreen, --no-pause-on-fullscreen
-Window:   --minimized, --close-to-tray, --no-close-to-tray
-Storage:  --portable, --config PATH
-```
-
-Durations accept seconds by default or `s`, `m`, and `h` suffixes. Storage-path options apply when
-the owning instance is launched; an already-running instance remains bound to its existing settings
-path. Profile and settings overrides affect the current owner instance without silently changing the
-INI file; use the visible **Save** action if those values should persist. The complete help text in
-the shipped executable is authoritative.
-
-The tray's **Start for** menu starts a 15, 30, 60 or 120-minute session without changing the saved
-duration. While active, use **Pause**, **Resume**, **Snooze for** (5, 15 or 30 minutes), or add 15
-minutes or one hour. Status and the tray tooltip show the remaining session budget. Pause and
-snooze keep the overall clock running; Resume and snooze expiry recheck every safeguard.
-`--start-for 30m`, `--snooze 5m` and `--extend 1h` provide the same controls. Snooze is bounded to
-24 hours and the total timed session to 30 days. Extend cannot revive an expired session or add
-a limit to an unlimited session. Pause/Resume/Snooze/Extend reject settings and storage options.
-If releasing a Windows power request fails, automatic activity stops and **Stop** remains
-available to retry; starting a new session is blocked until cleanup succeeds.
-
-## Advanced INI settings
-
-The settings store is a local, validated INI-style file. Portable mode places it beside the
-executable; normal mode uses the user's local application-data directory; `--config PATH` selects an
-explicit file. Unknown keys are ignored and invalid values fall back conservatively.
-
-Active-hours controls are intentionally advanced and use minutes from midnight:
+Active hours are minutes from midnight. An end earlier than the start is an overnight window.
 
 ```ini
 active_hours_enabled=true
@@ -236,129 +85,159 @@ active_hours_start_minute=540
 active_hours_end_minute=1080
 ```
 
-An end earlier than the start represents an overnight window. The complete key names are documented
-in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
+The key list is in [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md).
 
-## Download, install, and trust
+## Architecture
 
-Download the architecture-labelled portable archives from the canonical
-[`v0.2.0` release page](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0), not an
-unverified mirror. The release contains these exact asset names:
+Three static libraries and one `WIN32` executable. Policy and geometry stay testable without a window or a real pointer.
 
-- [`IdleHarbor-0.2.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip) for most Windows PCs;
-- [`IdleHarbor-0.2.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-arm64-portable.zip) for Windows on Arm.
+```mermaid
+flowchart TD
+  EXE["IdleHarbor.exe<br/>Application in src/app/main.cpp"]
+  CLI["command_line"]
+  STORE["settings_store"]
+  LAYOUT["window_layout"]
+  CORE["idleharbor_core<br/>validate, profiles, MotionPlan, IntervalSampler"]
+  POLICY["PolicyEngine::evaluate"]
+  HOOKS["input_monitor"]
+  EMIT["motion_emitter<br/>SendInput"]
+  POWER["power_request<br/>SetThreadExecutionState"]
+  SNAP["system_snapshot"]
 
-It also publishes:
+  EXE --> CLI
+  EXE --> STORE
+  EXE --> LAYOUT
+  EXE --> POLICY
+  CLI --> CORE
+  STORE --> CORE
+  POLICY --> CORE
+  HOOKS --> EXE
+  SNAP --> POLICY
+  POLICY --> EMIT
+  POLICY --> POWER
+```
 
-- `SHA256SUMS.txt` checksum manifest;
-- SPDX 2.3 SBOM JSON for each executable;
-- GitHub artifact attestations;
-- package manifest with source revision and architecture.
+`idleharbor_app_support` is the CLI parser, the INI store, and the layout math. `idleharbor_windows` is the only place that talks to hooks, `SendInput`, power requests, and the battery/fullscreen/session snapshot. A one-second `WM_TIMER` builds a `PolicyInput` and applies the decision: run the selected power request and the next motion plan, or clear the request on pause or stop. Hooks ignore input whose `dwExtraInfo` is `kIdleHarborInputMarker` (`"IDHBPLSE"`).
 
-The optional per-user installer, Start Menu launcher, and startup helpers are documented in
-[`packaging/README.md`](packaging/README.md). `v0.2.0` is explicitly unsigned, so Windows may show a
-publisher warning. Use the published SHA-256 checksums, SPDX SBOMs, and GitHub attestations to verify
-its artifacts. Startup is always an explicit choice and is not enabled by the portable archive alone.
+The flow, viewport contract, and release path are drawn in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-Package-manager availability is deliberately reported rather than implied:
+## Quickstart
 
-- [WinGet PR #421663](https://github.com/microsoft/winget-pkgs/pull/421663) is submitted for upstream
-  validation and moderation; the package is not available through the public WinGet source until
-  that PR is accepted.
-- Reproducible Chocolatey package source is included in
-  [`packaging/chocolatey`](packaging/chocolatey); community publication still requires the owner's
-  Chocolatey account/API key and moderation.
-- Scoop Extras is not yet eligible for a package request because its current request template asks
-  new projects for popularity evidence that IdleHarbor does not yet have.
+Windows only. Visual Studio 2022 is what CI uses (`windows-2022`, generator `Visual Studio 17 2022`). CMake 3.21 or newer. From a developer PowerShell:
 
-Until a package-manager submission is accepted, the GitHub release page remains the supported
-installation source.
+```powershell
+cmake -S . -B build/x64 -G "Visual Studio 17 2022" -A x64 -DIDLEHARBOR_BUILD_TESTS=ON
+cmake --build build/x64 --config Release --parallel
+ctest --test-dir build/x64 -C Release --output-on-failure
+```
 
-The recommended archive workflow is deliberately simple:
+CI builds x64, ARM64, and Win32, and runs CTest for x64 and Win32. ARM64 is compile-only. A Ninja configure is in [`AGENTS.md`](AGENTS.md):
 
-1. Download the ZIP matching the PC architecture (`x64` for most PCs, `ARM64` for Windows on Arm).
-2. Verify the ZIP against `SHA256SUMS.txt`, then extract it.
-3. Run `IdleHarbor.exe` directly for portable use, or run `install.ps1 -Startup None` for a per-user
-   Start Menu installation with no automatic startup.
-4. If automatic startup is genuinely wanted and permitted, preview
-   `install.ps1 -Startup TaskScheduler -WhatIf`, then run it without `-WhatIf`.
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
-Portable use does not configure persistence. On a managed laptop, do not configure Task Scheduler,
-the Startup folder, or the Run key unless policy permits both IdleHarbor and that persistence
-mechanism. Do not disable or independently whitelist around endpoint protection to make it run.
+Packaging checks, from the repo root:
 
-## Frequently asked questions
+```powershell
+.\packaging\Test-Packaging.ps1
+```
 
-### Is IdleHarbor a mouse jiggler?
+CMake registers seventeen CTest targets (`core`, `core_contracts`, `power_request`, `input_monitor_lifecycle`, `command_line`, `command_line_values`, `settings_store`, `window_layout`, `motion_math`, `system_snapshot`, `foundation`, `session_controls`, `session_commands`, `session_toolkit`, `session_menu_race`, `application_status`, `compact_ui`). Each test is a `main()` with a local `CHECK` macro. There is no test framework.
 
-Yes. It can send bounded, configurable input patterns for applications that legitimately need
-input activity, or it can run with motion **Off** and use only a Windows power request. It is a
-transparent utility, not an invisible or undetectable mouse jiggler.
+To run a published build instead of compiling:
 
-### Will it stop Windows from sleeping?
+1. Download the ZIP that matches the PC from the [v0.2.0 release](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0): [`IdleHarbor-0.2.0-windows-x64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-x64-portable.zip) or [`IdleHarbor-0.2.0-windows-arm64-portable.zip`](https://github.com/Chris0Jeky/IdleHarbor/releases/download/v0.2.0/IdleHarbor-0.2.0-windows-arm64-portable.zip).
+2. Check the ZIP against `SHA256SUMS.txt` on that release, then extract it.
+3. Run `IdleHarbor.exe`. Confirm the status says Stopped, pick a profile and a duration, then press Start.
+4. Stop with the button, the tray menu, or Ctrl+Alt+Shift+F12.
 
-The **System** and **Display** power modes request that Windows keep the selected power state
-available while a session is active. Whether that request is honored can depend on Windows policy,
-hardware, lock state, battery settings, or a managed-device policy. Motion and power are separate,
-so neither mechanism should be treated as a universal sleep-prevention guarantee.
+`install.ps1 -Startup None` adds a per-user Start Menu launcher and does not start at logon. Automatic startup is a separate, explicit step (`install.ps1 -Startup TaskScheduler`), and only where policy allows it. Details are in [`packaging/README.md`](packaging/README.md).
 
-### Does it move the visible pointer?
+### Command line
 
-That depends on the selected motion mode. **Normal**, **Circle**, and **Linear** are bounded visible
-patterns; **Zen** requests virtual input intended not to move the visible pointer; **Off** emits no
-motion. Applications can detect, block, log, or ignore simulated input.
+`--help` and `--version` open dialogs. `--status` opens a status dialog. Nothing in the GUI executable writes a console. The strings below match `CommandLineHelp()` in `src/app/command_line.cpp`. The parser also accepts `--jiggle` as `--start` and `--seconds` as `--interval`; those two names are not in the help text.
 
-### Does it need .NET, Electron, or another runtime?
+```text
+Commands: --start (-j), --start-for DURATION, --pause, --resume,
+          --snooze DURATION, --extend DURATION, --stop, --toggle,
+          --status, --show (--settings, -g), --exit
+Session:  --profile balanced|long-task|presentation|compatibility|visible|battery-saver|custom
+          --motion off|zen|diagonal|linear|circle   (also --mode, -o)
+          --power none|system|display
+          --interval DURATION (-s), --random (-r), --no-random,
+          --pause-on-input DURATION, --stop-after DURATION,
+          --distance N (-d), --battery-threshold 0..100,
+          --pause-on-fullscreen, --no-pause-on-fullscreen,
+          --close-to-tray, --no-close-to-tray
+Launch:   --minimized (-m), --portable, --config PATH, --version, --help
+```
 
-No separately installed application runtime is required. IdleHarbor is a native C++20/Win32 Windows
-program built against Windows system libraries. The release notes and benchmark evidence describe
-the exact build and its measured footprint.
+Durations are seconds unless suffixed with `s`, `m`, or `h`. `--interval` is 1s to 24h. `--stop-after` and `--extend` allow up to 720h. `--pause-on-input 0` turns that safeguard off. Profile and settings overrides apply to the running owner and do not rewrite the INI; Save does. Pause, Resume, Snooze, and Extend reject settings and storage options. A storage path applies only when that process is the owner.
 
-### How do I stop it immediately?
+## Tech stack
 
-Use the visible **Stop** button, the notification-area menu, or the configured emergency hotkey.
-The session also pauses or stops for safeguards such as genuine input, lock or disconnect, battery
-policy, fullscreen policy, active hours, and maximum duration when enabled.
+- C++20, Unicode, `/W4 /WX /permissive-` on MSVC. Static MSVC runtime (`MultiThreaded`).
+- Win32 only: `User32`, `Comctl32`, `Shell32`, `Ole32`, `Wtsapi32`, `Gdi32`, `Kernel32`. No .NET, Qt, Electron, or separately shipped C runtime.
+- CMake 3.21+. CI and the release workflow use Visual Studio 2022 on `windows-2022`.
+- Resources: per-monitor-DPI manifest, icon, and version resource. The version string is `0.2.0` in `CMakeLists.txt`, `include/idleharbor/version.hpp`, `resources/IdleHarbor.rc`, and `resources/app.manifest`.
+- PowerShell for packaging, install, and regression scripts. Node for the website release contracts, the WinGet manifest contract, and `observatory/check.mjs`.
+- GitHub Actions: [CI](.github/workflows/ci.yml), [CodeQL](.github/workflows/codeql.yml) (manual C/C++ build on pull requests, `main`, and weekly), [Release](.github/workflows/release.yml) on stable `vX.Y.Z` tags, [WinGet contracts](.github/workflows/winget-contract.yml), and [published checksums](.github/workflows/published-checksum.yml). Actions are pinned by commit SHA.
+- Licence `GPL-3.0-only`. Releases are unsigned on purpose.
 
-### Is it appropriate for a managed work laptop?
+The published `v0.2.0` x64 executable is 544,256 bytes. On one Windows 11 x64 machine, three 60-second samples put the working set at 13.7 MiB stopped and 15.1 MiB during a motion-off system power session, with effectively zero CPU. That is a measurement of that binary, not a budget. Method and limits: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
-Only if the device, account, and workplace rules allow it. Read [`docs/SAFETY.md`](docs/SAFETY.md)
-and obtain any required approval first. IdleHarbor does not bypass monitoring or make activity
-claims on a user's behalf; installing it and configuring automatic startup may be separate policy
-decisions.
+## Status and roadmap
 
-### Is IdleHarbor code-signed?
+Published release: **v0.2.0**. Canonical page: [`v0.2.0`](https://github.com/Chris0Jeky/IdleHarbor/releases/tag/v0.2.0). It ships x64 and ARM64 portable ZIPs, `SHA256SUMS.txt`, SPDX 2.3 SBOMs, and GitHub artifact attestations. It is unsigned. Windows will show a publisher warning; the checksums, SBOMs, and attestations are the verification path. Signing waits on an identity that is not in this repo ([`HUMAN_TODO.md`](HUMAN_TODO.md) q-2).
 
-No. `v0.2.0`, like `v0.1.0`, is intentionally unsigned because no signing identity has been
-provided. Checksums, an SPDX SBOM, and GitHub provenance attestations provide release evidence, but
-they do not remove Windows' unsigned-publisher warning. Signing can be added in a later release.
+`main` still reports version `0.2.0`. The [unreleased changelog](CHANGELOG.md) is real code: compact duration-first settings, dark appearance, optional title-bar Mica, proportional scrolling, and the session timer/pause/snooze/extend controls. It is not a new GitHub release. Published archives, the website screenshots, and the Chocolatey pin still name `v0.2.0`.
 
-### Which license does IdleHarbor use?
+| Channel | State |
+| --- | --- |
+| GitHub release | Supported install source for `0.2.0`. |
+| WinGet | `Chris0Jeky.IdleHarbor` **0.1.0** is in [winget-pkgs](https://github.com/microsoft/winget-pkgs/tree/master/manifests/c/Chris0Jeky/IdleHarbor/0.1.0) ([PR 421663](https://github.com/microsoft/winget-pkgs/pull/421663), merged 2026-09-24). The `0.2.0` manifests in [`packaging/winget/0.2.0`](packaging/winget/0.2.0) are prepared and not submitted. `winget install` of the public package is the 0.1.0 package, not this release. |
+| Chocolatey | Package source is in [`packaging/chocolatey`](packaging/chocolatey). Publication needs the owner's Chocolatey API key (q-3). The key does not belong in the repo. |
+| Scoop | No Scoop package is maintained here. |
 
-The source and release artifacts use the GNU General Public License version 3 only
-([`GPL-3.0-only`](LICENSE)). The repository and portable archives include the complete license text.
+The website at <https://chris0jeky.github.io/IdleHarbor/> loads Pulseboard SDK **3.3.1** (`observatory.lock.json`, header of `docs/pulseboard.js`). A Beta bar offers usage counts, diagnostics, and journeys. In the EEA, or while the region is unknown, only usage counts run until the visitor presses OK. Global Privacy Control or Do Not Track sends nothing. The app does not. Consent details: [`observatory/README.md`](observatory/README.md).
 
-## Safety boundary
+Open follow-ups, from the issue tracker:
 
-IdleHarbor is not an employee-monitoring bypass and must not be used to misrepresent presence or
-evade a device policy. Simulated input may be detected, blocked, logged, or ignored. Check the rules
-for a managed device before installing or running it. See [`docs/SAFETY.md`](docs/SAFETY.md).
+- [#123](https://github.com/Chris0Jeky/IdleHarbor/issues/123) — do not treat an unreadable existing settings file as a first run.
+- [#122](https://github.com/Chris0Jeky/IdleHarbor/issues/122) — reject stale genuine-input messages from an earlier process.
+- [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) — focus changes that bypass the message loop.
+- [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51) — Chocolatey install, upgrade, and uninstall on a real isolated Windows machine.
+- [#49](https://github.com/Chris0Jeky/IdleHarbor/issues/49), [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50), [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59) — capture portability, screenshot corners, and shared native-test setup.
+- [#37](https://github.com/Chris0Jeky/IdleHarbor/issues/37) — Start Menu known-folder relocation.
+- [#6](https://github.com/Chris0Jeky/IdleHarbor/issues/6) — upload the GitHub social preview. Owner account work, with Search Console (q-4).
+
+Physical high-contrast, screen-reader speech, multi-monitor moves, and Windows 10/ARM64 execution are called out as unverified in [`PROJECT_STATE.md`](PROJECT_STATE.md). Do not read a green local CTest run as those checks.
+
+## Safety
+
+Use it where you are allowed to keep a machine awake. Do not use it to fake presence or to get around device policy. A managed laptop can forbid the program, the startup task, or both. Do not disable endpoint protection to make it run.
+
+Simulated input may be detected. A power request is a request: lock state, battery policy, and organisation policy can ignore it. Read [`docs/SAFETY.md`](docs/SAFETY.md) before installing it at work.
+
+Report vulnerabilities privately: [`SECURITY.md`](SECURITY.md).
 
 ## Documentation
 
-- [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — controls, profiles, CLI, INI, and startup workflows.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — landed runtime boundaries and release flow.
-- [`docs/SAFETY.md`](docs/SAFETY.md) — acceptable use, privacy, and trust assumptions.
-- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — build, runtime, install, and verification diagnosis.
-- [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) — reproducible footprint and idle-cost methodology.
-- [`packaging/README.md`](packaging/README.md) — portable archives, installation, and startup choices.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — development and review expectations.
-- [`SECURITY.md`](SECURITY.md) — private vulnerability reporting.
-- [`CHANGELOG.md`](CHANGELOG.md) — versioned user-visible changes.
-- [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) — implementation provenance and attribution.
+- [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — controls, profiles, CLI, INI, startup.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — runtime boundaries and release flow.
+- [`docs/SAFETY.md`](docs/SAFETY.md) — acceptable use and trust assumptions.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — build, runtime, install, verification.
+- [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) — footprint method for the published binary.
+- [`DESIGN.md`](DESIGN.md) and [`PRODUCT.md`](PRODUCT.md) — current window and interaction contract.
+- [`packaging/README.md`](packaging/README.md) — archives, per-user install, startup choices.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to build, test, and review.
+- [`CHANGELOG.md`](CHANGELOG.md) — released and unreleased user-visible changes.
+- [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) — provenance.
+- [`PROJECT_STATE.md`](PROJECT_STATE.md) — milestone and what was actually executed.
 
 ## Licence
 
-IdleHarbor is free software licensed under the
-[GNU General Public License version 3 only](LICENSE) (`GPL-3.0-only`). Source distributions and
-portable release archives include the complete licence text.
+[GNU General Public License version 3 only](LICENSE) (`GPL-3.0-only`). Source checkouts and the portable archives include the full licence text.
