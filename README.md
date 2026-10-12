@@ -1,5 +1,7 @@
 # IdleHarbor
 
+<p align="center"><img src="docs/assets/idleharbor-loop.svg" alt="IdleHarbor workflow, animated" width="100%"></p>
+
 A native Windows utility that keeps a session awake with bounded pointer motion, a Windows power request, or both, and always leaves the status and the stop path visible.
 
 [![CI](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml/badge.svg)](https://github.com/Chris0Jeky/IdleHarbor/actions/workflows/ci.yml)
