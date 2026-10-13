@@ -23,6 +23,21 @@ void test_window_is_clamped_inside_inset_work_area() {
     CHECK(result.bottom == 1024);
 }
 
+void test_window_slides_into_a_moved_work_area() {
+    using idleharbor::app::ClampWindowRect;
+    const auto moved = ClampWindowRect({1900, 180, 2200, 480}, {1920, 200, 3000, 1080}, 16);
+    CHECK(moved.left == 1936);
+    CHECK(moved.top == 216);
+    CHECK(moved.right == 2236);
+    CHECK(moved.bottom == 516);
+
+    const auto slid = ClampWindowRect({1800, 100, 2100, 400}, {0, 0, 1920, 1040}, 16);
+    CHECK(slid.left == 1604);
+    CHECK(slid.top == 100);
+    CHECK(slid.right == 1904);
+    CHECK(slid.bottom == 400);
+}
+
 void test_oversized_window_uses_available_work_area() {
     using idleharbor::app::ClampWindowRect;
     const auto result = ClampWindowRect({-400, -300, 2400, 1700}, {0, 0, 1280, 720}, 12);
@@ -137,6 +152,12 @@ void test_layout_change_reveals_only_when_focused_control_is_clipped() {
     CHECK(ScrollPositionToReveal(300, 520, 560, 1200, 200) == 360);
 }
 
+void test_reveal_follows_the_clipped_edge() {
+    using idleharbor::app::ScrollPositionToReveal;
+    CHECK(ScrollPositionToReveal(100, 550, 610, 1330, 500) == 110);
+    CHECK(ScrollPositionToReveal(100, 50, 700, 1330, 500) == 50);
+}
+
 void test_narrow_work_areas_reflow_settings_and_actions() {
     using idleharbor::app::ActionLayoutMode;
     using idleharbor::app::DetermineActionLayout;
@@ -145,8 +166,25 @@ void test_narrow_work_areas_reflow_settings_and_actions() {
     CHECK(DetermineSettingsLayout(600, 96) == SettingsLayoutMode::Columns);
     CHECK(DetermineSettingsLayout(420, 96) == SettingsLayoutMode::Stacked);
     CHECK(DetermineActionLayout(600, 96) == ActionLayoutMode::Wide);
+    CHECK(DetermineActionLayout(380, 96) == ActionLayoutMode::Wide);
+    CHECK(DetermineActionLayout(379, 96) == ActionLayoutMode::Wrapped);
     CHECK(DetermineActionLayout(320, 96) == ActionLayoutMode::Wrapped);
+    CHECK(DetermineActionLayout(245, 96) == ActionLayoutMode::Wrapped);
+    CHECK(DetermineActionLayout(244, 96) == ActionLayoutMode::Stacked);
     CHECK(DetermineActionLayout(220, 96) == ActionLayoutMode::Stacked);
+}
+
+void test_wide_footer_actions_share_one_row() {
+    using idleharbor::app::ComputeActionButtonRects;
+    using idleharbor::app::ComputeSafetyRegions;
+    const auto regions = ComputeSafetyRegions(600, 700, 96);
+    CHECK(regions.actions.top == 648);
+    const auto buttons = ComputeActionButtonRects(600, 700, 96);
+    CHECK(buttons.start.top == 658);
+    CHECK(buttons.start.top == buttons.stop.top);
+    CHECK(buttons.stop.top == buttons.save.top);
+    CHECK(buttons.start.right <= buttons.stop.left);
+    CHECK(buttons.stop.right <= buttons.save.left);
 }
 
 void test_wrapped_footer_actions_do_not_overlap() {
@@ -323,6 +361,7 @@ void test_open_popup_freezes_every_reveal_trigger() {
 
 int main() {
     test_window_is_clamped_inside_inset_work_area();
+    test_window_slides_into_a_moved_work_area();
     test_oversized_window_uses_available_work_area();
     test_scroll_range_and_clamping();
     test_focus_reveal_scrolls_only_when_needed();
@@ -333,7 +372,9 @@ int main() {
     test_focus_reveal_is_gated_by_actual_focus_change();
     test_tab_order_keeps_fixed_actions_after_the_settings_body();
     test_layout_change_reveals_only_when_focused_control_is_clipped();
+    test_reveal_follows_the_clipped_edge();
     test_narrow_work_areas_reflow_settings_and_actions();
+    test_wide_footer_actions_share_one_row();
     test_wrapped_footer_actions_do_not_overlap();
     test_fractional_dpi_layout_uses_true_logical_widths();
     test_settings_layout_uses_the_viewport_client_width();
