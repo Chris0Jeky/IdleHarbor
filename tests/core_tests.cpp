@@ -113,6 +113,35 @@ bool test_interval_sampler_is_seeded_and_bounded() {
     return true;
 }
 
+bool test_interval_sampler_draws_depend_on_the_seed() {
+    IntervalSampler first(1, 1s, 10s, true);
+    IntervalSampler second(2, 1s, 10s, true);
+    bool differed = false;
+    for (int i = 0; i < 16; ++i) {
+        if (first.next() != second.next()) {
+            differed = true;
+        }
+    }
+    CHECK(differed);
+
+    IntervalSampler seeded(42, 1s, 10s, true);
+    Seconds lowest = 10s;
+    Seconds highest = 1s;
+    for (int i = 0; i < 256; ++i) {
+        const auto sample = seeded.next();
+        CHECK(sample >= 1s && sample <= 10s);
+        if (sample < lowest) {
+            lowest = sample;
+        }
+        if (sample > highest) {
+            highest = sample;
+        }
+    }
+    CHECK(lowest == 1s);
+    CHECK(highest == 10s);
+    return true;
+}
+
 bool test_profile_defaults_are_named_and_safe() {
     const auto balanced = idleharbor::core::settings_for_profile(ProfileKind::Balanced);
     CHECK(balanced.profile == ProfileKind::Balanced);
@@ -357,6 +386,7 @@ int main() {
         test_invalid_settings_report_errors(),
         test_motion_plans_are_deterministic_and_return_home(),
         test_interval_sampler_is_seeded_and_bounded(),
+        test_interval_sampler_draws_depend_on_the_seed(),
         test_profile_defaults_are_named_and_safe(),
         test_active_hours_support_disabled_normal_and_cross_midnight(),
         test_policy_starts_and_stops_explicitly(),
