@@ -356,7 +356,15 @@ closeup ordering with hidden-native regression tests. #55's focus-origin edge ca
 remains open and needs sent-focus/modal-loop interaction proof.
 
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
-capture quoting, corner privacy and harness cleanup. #70's serialization issue is
+capture quoting, corner privacy and harness cleanup. The two native scripts now
+remove their temp directory through `tests/Remove-IdleHarborScopedTemp.ps1`.
+The helper refuses paths outside the user temp directory or with the wrong leaf,
+and it returns that refusal instead of throwing. Each script throws the refusal
+only after its `try` completes, so a failed test is no longer replaced by the
+path check or by a locked `settings.ini` removal error. Launch, `--exit`, and
+the help script's hung-process kill stay in each script.
+`tools/Capture-IdleHarborScreenshots.ps1` still has its own copy. The regression
+does not launch IdleHarbor. #70's serialization issue is
 addressed by #113, without claiming the other native capture gates are complete.
 The #49 portability slice quotes owner configuration paths, reuses the loaded capture helper
 and disables the capture-only emergency hotkey. Thirty executable checks pass in each of Windows

@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Remove-IdleHarborScopedTemp.ps1')
 
 if (@(Get-Process -Name IdleHarbor -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Close every running IdleHarbor instance before the control help test.'
@@ -243,6 +244,7 @@ $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-help-tips-$([Guid]:
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 $configPath = Join-Path $tempRoot 'settings.ini'
 $process = $null
+$cleanupRefusal = $null
 
 try {
     $process = Start-Process -FilePath $executablePath -ArgumentList @('--show', '--config', $configPath) -PassThru
@@ -337,13 +339,8 @@ finally {
             }
         }
     }
-    $temporaryPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
-    $resolvedTempRoot = [IO.Path]::GetFullPath($tempRoot)
-    if ($resolvedTempRoot.StartsWith($temporaryPrefix, [StringComparison]::OrdinalIgnoreCase) -and
-        (Split-Path -Leaf $resolvedTempRoot) -like 'IdleHarbor-help-tips-*') {
-        Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force
-    }
-    else {
-        throw "Refusing to remove an unexpected help-tip test directory: $resolvedTempRoot"
-    }
+    $cleanupRefusal = Remove-IdleHarborScopedTemp -Path $tempRoot -LeafPattern 'IdleHarbor-help-tips-*' -RefusalNoun 'help-tip test directory'
+}
+if ($cleanupRefusal) {
+    throw $cleanupRefusal
 }

@@ -11,6 +11,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Remove-IdleHarborScopedTemp.ps1')
 
 if (@(Get-Process -Name IdleHarbor -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Close every running IdleHarbor instance before the native repaint test.'
@@ -403,6 +404,7 @@ else {
 $configPath = Join-Path $tempRoot 'settings.ini'
 $process = $null
 $window = [IntPtr]::Zero
+$cleanupRefusal = $null
 
 try {
     [void][IdleHarbor.NativeViewportRepaint]::SetThreadDpiAwarenessContext([IntPtr](-4))
@@ -654,13 +656,8 @@ finally {
             $process.WaitForExit(5000) | Out-Null
         }
     }
-    $temporaryPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
-    $resolvedTempRoot = [IO.Path]::GetFullPath($tempRoot)
-    if ($resolvedTempRoot.StartsWith($temporaryPrefix, [StringComparison]::OrdinalIgnoreCase) -and
-        (Split-Path -Leaf $resolvedTempRoot) -like 'IdleHarbor-native-repaint-*') {
-        Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force
-    }
-    else {
-        throw "Refusing to remove an unexpected native-test directory: $resolvedTempRoot"
-    }
+    $cleanupRefusal = Remove-IdleHarborScopedTemp -Path $tempRoot -LeafPattern 'IdleHarbor-native-repaint-*' -RefusalNoun 'native-test directory'
+}
+if ($cleanupRefusal) {
+    throw $cleanupRefusal
 }
