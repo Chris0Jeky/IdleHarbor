@@ -23,9 +23,9 @@ earlier session does not pause the session that replaced it. They are conservati
 features, not security guarantees; test them in the actual Windows session where the utility will run.
 
 If settings recovery warnings appear, treat the session as **Stopped** until the displayed fallback
-values have been reviewed and saved. Automatic starts are blocked after recovery so a malformed or
-mutually invalid file cannot silently select a different behavior; an explicit Start action remains
-visible and user-controlled.
+values have been reviewed and saved. Automatic starts are blocked after recovery so a repeated key,
+a non-numeric value, or a malformed or mutually invalid file cannot silently select a different
+behavior; an explicit Start action remains visible and user-controlled.
 
 ## Managed devices
 

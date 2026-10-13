@@ -10,6 +10,9 @@ where practical.
 
 - A genuine-input notification from an earlier session no longer pauses the session
   that replaced it. Input from the current session still starts the cooldown.
+- A repeated settings key now warns and keeps the later value. A value that is not an
+  integer warns as non-numeric instead of out of range. Either warning keeps automatic
+  start stopped until the settings are reviewed and saved.
 
 ### Changed
 
