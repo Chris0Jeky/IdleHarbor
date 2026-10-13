@@ -121,6 +121,32 @@ int main() {
     Expect(ContainsWarning(out_of_range, "max_duration_seconds"), "duration range warning is preserved");
     Expect(idleharbor::core::validate(out_of_range.settings.session).valid, "out-of-range file returns valid settings");
 
+    const auto non_numeric_path = test_root / L"non-numeric.ini";
+    {
+        std::ofstream non_numeric(non_numeric_path, std::ios::binary);
+        non_numeric << "profile=balanced\ndistance=abc\n";
+    }
+    const auto non_numeric = idleharbor::app::LoadSettings(non_numeric_path);
+    Expect(non_numeric.warnings.size() == 1, "a non-numeric integer produces one warning");
+    Expect(ContainsWarning(non_numeric, "non-numeric integer for 'distance'"), "non-numeric warning names the key");
+    Expect(!ContainsWarning(non_numeric, "out-of-range"), "a non-numeric value is not reported as out of range");
+    Expect(
+        non_numeric.settings.session.distance ==
+            idleharbor::core::settings_for_profile(ProfileKind::Balanced).distance,
+        "a non-numeric distance keeps the profile default");
+
+    const auto duplicate_path = test_root / L"duplicate.ini";
+    {
+        std::ofstream duplicate(duplicate_path, std::ios::binary);
+        duplicate << "profile=balanced\nDistance=10\ndistance=20\n";
+    }
+    const auto duplicate = idleharbor::app::LoadSettings(duplicate_path);
+    Expect(duplicate.warnings.size() == 1, "one repeated key produces one warning");
+    Expect(
+        ContainsWarning(duplicate, "Duplicate settings key 'distance'; the later value is used."),
+        "duplicate warning names the lower-case key");
+    Expect(duplicate.settings.session.distance == std::uint32_t{20}, "the later duplicate value is used");
+
     const auto cross_field_path = test_root / L"cross-field.ini";
     {
         std::ofstream cross_field(cross_field_path, std::ios::binary);

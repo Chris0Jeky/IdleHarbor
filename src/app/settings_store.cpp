@@ -144,7 +144,11 @@ void ApplyNumber(
         return;
     }
     const auto parsed = ParseUnsigned(Trim(found->second));
-    if (!parsed.has_value() || *parsed < minimum || *parsed > maximum) {
+    if (!parsed.has_value()) {
+        Warn(result, "Ignoring non-numeric integer for '" + std::string(key) + "'.");
+        return;
+    }
+    if (*parsed < minimum || *parsed > maximum) {
         Warn(
             result,
             "Ignoring out-of-range integer for '" + std::string(key) + "' (expected " +
@@ -260,6 +264,9 @@ SettingsLoadResult LoadSettings(const std::filesystem::path& path) {
         if (key.empty()) {
             Warn(result, "Ignoring settings line " + std::to_string(line_number) + " with an empty key.");
             continue;
+        }
+        if (values.find(key) != values.end()) {
+            Warn(result, "Duplicate settings key '" + key + "'; the later value is used.");
         }
         values[std::move(key)] = std::move(value);
     }
