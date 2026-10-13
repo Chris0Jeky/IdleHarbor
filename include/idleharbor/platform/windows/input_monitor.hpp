@@ -4,6 +4,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 
 namespace idleharbor::platform::windows {
 
@@ -30,7 +31,12 @@ class InputMonitor final {
     // Lifecycle methods and destruction run on the installing thread.
     // Start requires a non-null notification window and a nonzero notification
     // message. Null/zero arguments install no hooks and return no capabilities.
-    [[nodiscard]] InputMonitorCapabilities Start(HWND notification_window, UINT notification_message) noexcept;
+    // notification_generation is copied into each posted message so the window
+    // can ignore a notification from an earlier session.
+    [[nodiscard]] InputMonitorCapabilities Start(
+        HWND notification_window,
+        UINT notification_message,
+        std::uint64_t notification_generation = 0) noexcept;
     // Reinstall both low-level hooks so silent OS removal is detected within one
     // application timer interval. A failed refresh is a capability loss.
     [[nodiscard]] InputMonitorCapabilities Refresh() noexcept;
@@ -59,6 +65,7 @@ class InputMonitor final {
     HHOOK retired_keyboard_ = nullptr;
     HWND notification_window_ = nullptr;
     UINT notification_message_ = 0;
+    std::atomic<std::uint64_t> notification_generation_{0};
     std::atomic<bool> notification_pending_{false};
 };
 

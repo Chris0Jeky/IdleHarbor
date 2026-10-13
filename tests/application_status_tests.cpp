@@ -128,6 +128,25 @@ struct ApplicationStatusTestAccess {
         app.RefreshControls();
     }
     static void Start(Application& app) { app.StartSession(); }
+    static void ConfigureGenuineInputFixture(Application& app) {
+        app.settings_.session.pause_on_user_activity = true;
+        app.settings_.session.pause_when_locked = false;
+        app.settings_.session.pause_when_disconnected = false;
+        app.settings_.session.pause_when_fullscreen = false;
+        app.settings_.session.pause_on_low_battery = false;
+        app.settings_.session.motion = MotionMode::Zen;
+        app.settings_.session.power = PowerMode::None;
+        app.settings_.session.user_activity_cooldown = Seconds{5};
+        app.settings_.show_notifications = false;
+        app.settings_.emergency_hotkey = false;
+        app.saved_settings_ = app.settings_;
+        app.install_input_hooks_ = false;
+        app.RefreshControls();
+    }
+    static std::uint64_t Generation(const Application& app) { return app.session_generation_; }
+    static void DeliverGenuineInput(Application& app, const std::uint64_t generation) {
+        app.HandleMessage(kGenuineInputMessage, static_cast<WPARAM>(generation), 0);
+    }
     static void PendingCleanup(Application& app, bool pending) { app.power_cleanup_pending_ = pending; }
     static void EmergencyStop(Application& app) { app.HandleMessage(WM_HOTKEY, kEmergencyHotkeyId, 0); }
     static void Close(Application& app, bool tray_available) {
@@ -267,10 +286,50 @@ void HelperContracts() {
 }
 }
 
+void StaleGenuineInput(const HINSTANCE instance) {
+    const HWND window = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 640, 800, nullptr, nullptr, instance, nullptr);
+    const HWND status = CreateWindowExW(0, L"STATIC", L"", WS_CHILD, 0, 0, 400, 100, window, nullptr, instance, nullptr);
+    Expect(window != nullptr && status != nullptr, "stale-input fixture creates hidden controls");
+    if (window == nullptr || status == nullptr) {
+        if (window != nullptr) DestroyWindow(window);
+        return;
+    }
+    Application app(instance);
+    ApplicationStatusTestAccess::PrepareSession(app, window, status, false);
+    ApplicationStatusTestAccess::PrepareStartControls(app);
+    ApplicationStatusTestAccess::ConfigureGenuineInputFixture(app);
+    ApplicationStatusTestAccess::Start(app);
+    Expect(ApplicationStatusTestAccess::Running(app), "the genuine-input fixture starts without installing hooks");
+    const auto first = ApplicationStatusTestAccess::Generation(app);
+    Expect(first != 0, "the running session has a generation");
+    Expect(NativeText(GetDlgItem(window, kStatus)).starts_with(L"Running"), "the session is running before genuine input");
+    ApplicationStatusTestAccess::DeliverGenuineInput(app, first);
+    Expect(
+        NativeText(GetDlgItem(window, kStatus)).find(L"Paused: user activity cooldown (5s remaining)") != std::wstring::npos,
+        "input from this session pauses it");
+    ApplicationStatusTestAccess::Stop(app);
+    Expect(!ApplicationStatusTestAccess::Running(app), "stop ends the first session");
+    ApplicationStatusTestAccess::Start(app);
+    Expect(ApplicationStatusTestAccess::Running(app), "the replacement session starts");
+    const auto second = ApplicationStatusTestAccess::Generation(app);
+    Expect(second != first, "the replacement session has a new generation");
+    ApplicationStatusTestAccess::DeliverGenuineInput(app, first);
+    Expect(
+        NativeText(GetDlgItem(window, kStatus)).starts_with(L"Running"),
+        "a notification from the previous session does not pause the replacement");
+    ApplicationStatusTestAccess::DeliverGenuineInput(app, second);
+    Expect(
+        NativeText(GetDlgItem(window, kStatus)).find(L"Paused: user activity cooldown (5s remaining)") != std::wstring::npos,
+        "genuine input from the replacement session still pauses it");
+    ApplicationStatusTestAccess::Stop(app);
+    DestroyWindow(window);
+}
+
 int main() {
     HelperContracts();
     const HINSTANCE instance = GetModuleHandleW(nullptr);
     SessionRecoveryContracts(instance);
+    StaleGenuineInput(instance);
     const HWND window = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 400, 100, nullptr, nullptr, instance, nullptr);
     const HWND status = CreateWindowExW(0, L"STATIC", L"", WS_CHILD, 0, 0, 400, 100, window, nullptr, instance, nullptr);
     if (window == nullptr || status == nullptr) {

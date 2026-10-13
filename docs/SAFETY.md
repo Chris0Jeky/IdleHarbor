@@ -18,8 +18,9 @@ window, and immediate Stop actions. The emergency hotkey is an additional escape
 the notification area is a visibility choice, not concealment.
 
 Safeguards include genuine-input cooldown, lock/session pause, low-battery and battery policy,
-fullscreen policy, active hours, and maximum duration. They are conservative compatibility features,
-not security guarantees; test them in the actual Windows session where the utility will run.
+fullscreen policy, active hours, and maximum duration. A genuine-input notification from an
+earlier session does not pause the session that replaced it. They are conservative compatibility
+features, not security guarantees; test them in the actual Windows session where the utility will run.
 
 If settings recovery warnings appear, treat the session as **Stopped** until the displayed fallback
 values have been reviewed and saved. Automatic starts are blocked after recovery so a repeated key,

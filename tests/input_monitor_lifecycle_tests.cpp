@@ -16,6 +16,7 @@ std::set<HHOOK> refuse_release;
 std::set<int> refuse_install;
 std::vector<HHOOK> release_calls;
 std::vector<HWND> notifications;
+std::vector<WPARAM> posted_generations;
 std::uintptr_t sequence = 1;
 std::size_t installs = 0;
 DWORD last_error = 0;
@@ -31,7 +32,8 @@ void Check(bool passed, std::string_view label) {
 }
 void Reset() {
     hooks.clear(); refuse_release.clear(); refuse_install.clear(); release_calls.clear();
-    notifications.clear(); installs = 0; post_succeeds = true; refuse_all_releases = false; last_error = 0; ++cases;
+    notifications.clear(); posted_generations.clear();
+    installs = 0; post_succeeds = true; refuse_all_releases = false; last_error = 0; ++cases;
 }
 HHOOK Find(int kind) {
     for (const auto& [handle, hook] : hooks) if (hook.kind == kind) return handle;
@@ -92,10 +94,11 @@ BOOL UnhookWindowsHookEx(HHOOK handle) {
 }
 DWORD GetLastError() { return last_error; }
 LRESULT CallNextHookEx(HHOOK, int, WPARAM, LPARAM) { return 73; }
-BOOL PostMessageW(HWND target, UINT msg, WPARAM, LPARAM) {
+BOOL PostMessageW(HWND target, UINT msg, WPARAM generation, LPARAM) {
     Check(msg == message, "notifications retain their registered message");
     if (!post_succeeds) return FALSE;
     notifications.push_back(target);
+    posted_generations.push_back(generation);
     return TRUE;
 }
 
@@ -127,6 +130,7 @@ int main() {
         const auto keyboard = hooks.at(Find(WH_KEYBOARD_LL)).callback;
         Emit(mouse, WH_MOUSE_LL); Emit(keyboard, WH_KEYBOARD_LL);
         Check(notifications == std::vector<HWND>{window}, "real input notifications are coalesced");
+        Check(posted_generations.size() == 1 && posted_generations[0] == 0, "an unspecified generation is posted as zero");
         monitor.AcknowledgeNotification();
         post_succeeds = false; Emit(mouse, WH_MOUSE_LL);
         post_succeeds = true; Emit(keyboard, WH_KEYBOARD_LL);
@@ -137,6 +141,15 @@ int main() {
         Check(monitor.capabilities().any() && hooks.size() == 2, "rejected owner cannot stop the first monitor");
     }
     Check(hooks.empty(), "healthy destruction releases all hooks");
+
+    Reset();
+    {
+        InputMonitor monitor;
+        Check(monitor.Start(window, message, 9).any(), "a session generation is accepted");
+        Emit(hooks.at(Find(WH_MOUSE_LL)).callback, WH_MOUSE_LL);
+        Check(posted_generations.size() == 1 && posted_generations[0] == 9, "genuine input carries the session generation");
+        monitor.Stop();
+    }
 
     StopRetry(WH_MOUSE_LL);
     StopRetry(WH_KEYBOARD_LL);
