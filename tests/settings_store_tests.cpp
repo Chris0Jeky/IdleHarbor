@@ -200,7 +200,18 @@ int main() {
 
     const auto missing = idleharbor::app::LoadSettings(test_root / L"missing.ini");
     Expect(!missing.file_found, "missing file is not reported as loaded");
+    Expect(missing.warnings.empty(), "a missing file produces no recovery warning");
     Expect(idleharbor::core::validate(missing.settings.session).valid, "missing file returns valid defaults");
+
+    const auto directory_path = test_root / L"directory-settings.ini";
+    std::error_code directory_error;
+    fs::create_directory(directory_path, directory_error);
+    Expect(!directory_error, "unreadable-path fixture creates a directory");
+    const auto directory = idleharbor::app::LoadSettings(directory_path);
+    Expect(directory.file_found, "a directory path is not treated as a missing file");
+    Expect(directory.warnings.size() == 1, "an unreadable settings path produces one warning");
+    Expect(ContainsWarning(directory, "could not be opened"), "an unreadable settings path is reported");
+    Expect(idleharbor::core::validate(directory.settings.session).valid, "an unreadable path returns valid defaults");
 
     std::error_code cleanup_error;
     fs::remove_all(test_root, cleanup_error);

@@ -193,7 +193,8 @@ If a settings key is repeated, IdleHarbor keeps the later value and shows a reco
 A non-numeric integer, or a malformed, out-of-range, unsupported, or mutually invalid value,
 keeps the safe profile default for that field and shows every recovery warning. The settings
 window stays visible and **Stopped**, and automatic `--start` or stopped `--toggle` commands are
-blocked until the values have been reviewed. Correct the fields and press **Save** before relying
+blocked until the values have been reviewed. A settings path that exists but cannot be opened
+is the same kind of recovery, not a first run. Correct the fields and press **Save** before relying
 on automatic startup; an explicit Start action remains user-controlled.
 
 The active-hours keys use minutes from midnight and support an overnight window when the end is
