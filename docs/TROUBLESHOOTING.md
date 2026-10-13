@@ -94,9 +94,9 @@ Settings are validated, unknown keys are ignored, and writes use a temporary fil
 atomic replacement. If an INI value is repeated, not an integer, malformed, out of range,
 unsupported, or conflicts with another value, IdleHarbor shows every recovery warning, keeps the
 settings window visible and Stopped, and blocks automatic `--start` or stopped `--toggle`
-commands. Review the fallback values,
-correct the offending key, and press **Save** before relying on automatic startup. An explicit Start
-action remains user-controlled.
+commands. A settings path that exists but cannot be opened is reported the same way, rather
+than treated as a first run. Review the fallback values, correct the offending key, and press
+**Save** before relying on automatic startup. An explicit Start action remains user-controlled.
 
 For active hours, use minutes from midnight:
 

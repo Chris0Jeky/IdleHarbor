@@ -380,8 +380,10 @@ source check or a passing headless build.
 
 A repeated settings key keeps the later value and adds one recovery warning. A field that is
 not an integer warns as non-numeric rather than out of range. Both warnings use the existing
-recovery path, so automatic start stays stopped until the file is reviewed and saved. An
-existing file that cannot be opened is still reported as missing; that distinction remains #123.
+recovery path, so automatic start stays stopped until the file is reviewed and saved. A
+settings path that exists or cannot be inspected is a recovery warning, not a first run. A
+path that is not there still returns defaults with no warning. Access-denied and sharing
+failures use that same open-failure path and are not separately provoked here.
 
 Owner-only work remains unchanged: Chocolatey account/API-key publication,
 Google Search Console operations and the social-preview Settings upload (#6).

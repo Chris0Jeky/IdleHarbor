@@ -13,6 +13,8 @@ where practical.
 - A repeated settings key now warns and keeps the later value. A value that is not an
   integer warns as non-numeric instead of out of range. Either warning keeps automatic
   start stopped until the settings are reviewed and saved.
+- A settings path that exists but cannot be opened, including a directory, is now a
+  recovery warning instead of a missing file. A path that is not there is still a first run.
 
 ### Changed
 

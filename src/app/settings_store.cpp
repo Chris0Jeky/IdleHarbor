@@ -236,6 +236,16 @@ SettingsLoadResult LoadSettings(const std::filesystem::path& path) {
     SettingsLoadResult result;
     std::ifstream input(path, std::ios::binary);
     if (!input) {
+        std::error_code status_error;
+        const auto status = std::filesystem::status(path, status_error);
+        // MSVC sets no_such_file_or_directory when it reports not_found, so a clear
+        // error_code is not evidence that the path is present.
+        if (status.type() == std::filesystem::file_type::not_found
+            || status_error == std::errc::no_such_file_or_directory) {
+            return result;
+        }
+        result.file_found = true;
+        Warn(result, "The settings file could not be opened; safe defaults were retained.");
         return result;
     }
     result.file_found = true;

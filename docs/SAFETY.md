@@ -24,8 +24,8 @@ features, not security guarantees; test them in the actual Windows session where
 
 If settings recovery warnings appear, treat the session as **Stopped** until the displayed fallback
 values have been reviewed and saved. Automatic starts are blocked after recovery so a repeated key,
-a non-numeric value, or a malformed or mutually invalid file cannot silently select a different
-behavior; an explicit Start action remains visible and user-controlled.
+a non-numeric value, a file that cannot be opened, or a malformed or mutually invalid file cannot
+silently select a different behavior; an explicit Start action remains visible and user-controlled.
 
 ## Managed devices
 
