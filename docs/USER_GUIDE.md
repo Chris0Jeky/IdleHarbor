@@ -189,8 +189,9 @@ Settings are validated and written atomically. Portable mode stores `IdleHarbor.
 executable. Normal mode stores `settings.ini` below the user's local application-data directory.
 An explicit `--config PATH` takes precedence over both.
 
-If an existing settings file contains malformed, out-of-range, unsupported, or mutually invalid
-values, IdleHarbor keeps safe profile defaults and shows every recovery warning. The settings
+If a settings key is repeated, IdleHarbor keeps the later value and shows a recovery warning.
+A non-numeric integer, or a malformed, out-of-range, unsupported, or mutually invalid value,
+keeps the safe profile default for that field and shows every recovery warning. The settings
 window stays visible and **Stopped**, and automatic `--start` or stopped `--toggle` commands are
 blocked until the values have been reviewed. Correct the fields and press **Save** before relying
 on automatic startup; an explicit Start action remains user-controlled.
