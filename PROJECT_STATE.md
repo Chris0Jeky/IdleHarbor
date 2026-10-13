@@ -353,7 +353,11 @@ boundary. #118 supplies visible, retryable cleanup-failure presentation, allowin
 #86's original tracker claims to close. #56 is also closed: #118 commits pending
 combo selections before forwarded overrides and protects ordinary/early synchronous
 closeup ordering with hidden-native regression tests. #55's focus-origin edge case
-remains open and needs sent-focus/modal-loop interaction proof.
+remains open and needs sent-focus/modal-loop interaction proof. A genuine-input
+notification carries the session generation that posted it. The window ignores a
+message from an earlier session, so Stop then Start does not pause the replacement
+unless that session receives its own genuine input. The hidden fixture does not
+install low-level hooks.
 
 #37 concerns ownership across known-folder relocation. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. The two native scripts now

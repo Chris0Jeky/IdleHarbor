@@ -31,7 +31,8 @@ bool InputMonitor::HasHooks() const noexcept {
 
 InputMonitorCapabilities InputMonitor::Start(
     const HWND notification_window,
-    const UINT notification_message) noexcept {
+    const UINT notification_message,
+    const std::uint64_t notification_generation) noexcept {
     Stop();
     if (HasHooks()) {
         return {};
@@ -57,6 +58,7 @@ InputMonitorCapabilities InputMonitor::Start(
     }
     notification_window_ = notification_window;
     notification_message_ = notification_message;
+    notification_generation_.store(notification_generation, std::memory_order_release);
     notification_pending_.store(false, std::memory_order_relaxed);
 
     if (!Refresh().any()) {
@@ -153,7 +155,8 @@ LRESULT CALLBACK InputMonitor::KeyboardHook(const int code, const WPARAM event, 
 void InputMonitor::RecordGenuineInput() noexcept {
     if (notification_window_ != nullptr && notification_message_ != 0 &&
         !notification_pending_.exchange(true, std::memory_order_acq_rel)) {
-        if (PostMessageW(notification_window_, notification_message_, 0, 0) == FALSE) {
+        const auto generation = notification_generation_.load(std::memory_order_acquire);
+        if (PostMessageW(notification_window_, notification_message_, static_cast<WPARAM>(generation), 0) == FALSE) {
             notification_pending_.store(false, std::memory_order_release);
         }
     }

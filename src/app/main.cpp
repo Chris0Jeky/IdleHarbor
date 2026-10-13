@@ -2962,24 +2962,32 @@ class Application final {
             return;
         }
         input_observer_requested_ = runtime_settings_.pause_on_user_activity;
+        const auto generation = session_generation_ + 1;
+        session_generation_ = generation;
         if (input_observer_requested_) {
-            const auto capabilities = input_monitor_.Start(window_, kGenuineInputMessage);
-            input_observer_available_ = capabilities.any();
-            input_observer_complete_ = capabilities.mouse && capabilities.keyboard;
-            if (!input_observer_complete_) {
-                input_monitor_.Stop();
-                input_observer_requested_ = false;
-                input_observer_available_ = false;
-                SetStatus(L"Stopped: genuine-input observer unavailable");
-                MessageBoxW(
-                    window_,
-                    L"IdleHarbor could not observe both mouse and keyboard activity. Set the genuine-input "
-                    L"pause to 0 explicitly or resolve the Windows hook error before starting.",
-                    L"IdleHarbor safeguard",
-                    MB_OK | MB_ICONWARNING);
-                return;
+            if (!install_input_hooks_) {
+                input_observer_available_ = true;
+                input_observer_complete_ = true;
+                next_input_hook_refresh_tick_ = ~ULONGLONG{0};
+            } else {
+                const auto capabilities = input_monitor_.Start(window_, kGenuineInputMessage, generation);
+                input_observer_available_ = capabilities.any();
+                input_observer_complete_ = capabilities.mouse && capabilities.keyboard;
+                if (!input_observer_complete_) {
+                    input_monitor_.Stop();
+                    input_observer_requested_ = false;
+                    input_observer_available_ = false;
+                    SetStatus(L"Stopped: genuine-input observer unavailable");
+                    MessageBoxW(
+                        window_,
+                        L"IdleHarbor could not observe both mouse and keyboard activity. Set the genuine-input "
+                        L"pause to 0 explicitly or resolve the Windows hook error before starting.",
+                        L"IdleHarbor safeguard",
+                        MB_OK | MB_ICONWARNING);
+                    return;
+                }
+                next_input_hook_refresh_tick_ = GetTickCount64() + kInputHookRefreshIntervalMs;
             }
-            next_input_hook_refresh_tick_ = GetTickCount64() + kInputHookRefreshIntervalMs;
         }
         policy_ = std::make_unique<PolicyEngine>(runtime_settings_);
         policy_->start(NowSeconds());
@@ -2990,7 +2998,6 @@ class Application final {
             runtime_settings_.randomize);
         next_pulse_tick_ = GetTickCount64() + static_cast<ULONGLONG>(sampler_->next().count()) * 1000ULL;
         session_active_ = true;
-        ++session_generation_;
         if (SetTimer(window_, kTimerId, 1000, nullptr) == 0) {
             FailSession(L"session timer could not start (" + WindowsErrorText(GetLastError()) + L")");
             return;
@@ -3352,7 +3359,9 @@ class Application final {
             return 0;
         case kGenuineInputMessage:
             input_monitor_.AcknowledgeNotification();
-            Evaluate(true);
+            if (session_active_ && static_cast<std::uint64_t>(w_param) == session_generation_) {
+                Evaluate(true);
+            }
             return 0;
         case kDeferredCommandMessage:
             ProcessDeferredCommand();
@@ -3532,6 +3541,9 @@ class Application final {
     bool tray_unavailable_ = false;
     bool power_cleanup_pending_ = false;
     std::uint64_t session_generation_ = 0;
+    // The hidden application fixture sets this false so a session can exercise
+    // genuine-input policy without installing low-level hooks.
+    bool install_input_hooks_ = true;
     bool hotkey_registered_ = false;
     bool session_notifications_available_ = false;
     bool session_state_available_ = false;

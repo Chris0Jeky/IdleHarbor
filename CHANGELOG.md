@@ -6,6 +6,11 @@ where practical.
 
 ## [Unreleased]
 
+### Fixed
+
+- A genuine-input notification from an earlier session no longer pauses the session
+  that replaced it. Input from the current session still starts the cooldown.
+
 ### Changed
 
 - Settings scrolling responds proportionally to small wheel movements; wheel notches
