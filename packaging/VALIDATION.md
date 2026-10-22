@@ -21,6 +21,15 @@ edition from PSHOME, without profiles, interactive prompts or a policy override.
 It propagates a failed child exit. Do not call Invoke-PackagingFixtureTests.ps1
 directly to test caller isolation. See [test isolation](TEST-ISOLATION.md).
 
+`tests/Test-StartMenuRelocation.ps1` is registered in the script regression runner.
+It executes install/update/uninstall bodies with injected Programs/Startup paths,
+empty Run discovery and process discovery, and a task double. Real Windows shortcut
+bytes, hashes, hard links and junctions stay inside unique temporary fixture roots.
+It covers intact migration/removal, changed bytes and foreign launcher properties,
+invalid/partial boundary evidence, legacy markers at current and former paths,
+unowned leaves, unsafe paths, `-StartMenu None`, previews and injected rollback.
+The packaging fixture also checks that rollback preserves a byte-modified launcher.
+
 The following commands deliberately require network access. They download/hash
 published archives without extraction, execution, installation or publication:
 

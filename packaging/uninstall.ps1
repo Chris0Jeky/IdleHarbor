@@ -21,6 +21,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
 
 namespace IdleHarbor.Packaging
@@ -46,6 +47,62 @@ namespace IdleHarbor.Packaging
         private static extern bool GetFileInformationByHandle(
             SafeFileHandle file,
             out ByHandleFileInformation information);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, IntPtr security,
+            uint disposition, uint flags, IntPtr template);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileDispositionInformation
+        {
+            public byte DeleteFile;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetFileInformationByHandle(
+            SafeFileHandle file, int informationClass,
+            ref FileDispositionInformation information, uint size);
+
+        public static void DeleteValidated(string path, FileStream validated)
+        {
+            ByHandleFileInformation expected;
+            if (!GetFileInformationByHandle(validated.SafeFileHandle, out expected))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            byte[] digest;
+            validated.Position = 0;
+            using (SHA256 hash = SHA256.Create()) { digest = hash.ComputeHash(validated); }
+
+            // The validation handle denies writes/deletes and permits the shell's
+            // read-only property inspection. Reopen with DELETE access, then
+            // compare identity AND bytes across this unavoidable sharing-mode gap.
+            validated.Dispose();
+            using (SafeFileHandle handle = CreateFile(path,
+                0x80000000 | 0x00010000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero))
+            {
+                if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+                ByHandleFileInformation actual;
+                if (!GetFileInformationByHandle(handle, out actual))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (actual.VolumeSerialNumber != expected.VolumeSerialNumber ||
+                    actual.FileIndexHigh != expected.FileIndexHigh ||
+                    actual.FileIndexLow != expected.FileIndexLow ||
+                    actual.NumberOfLinks != 1 || (actual.FileAttributes & 0x410) != 0)
+                    throw new IOException("Shortcut identity or safe-file properties changed after validation.");
+                using (FileStream stream = new FileStream(handle, FileAccess.Read))
+                using (SHA256 hash = SHA256.Create())
+                {
+                    if (Convert.ToBase64String(digest) != Convert.ToBase64String(hash.ComputeHash(stream)))
+                        throw new IOException("Shortcut bytes changed after validation.");
+                    // Share-read only prevents writes/renames until this same
+                    // object is marked for deletion; never delete by pathname.
+                    FileDispositionInformation disposition = new FileDispositionInformation { DeleteFile = 1 };
+                    if (!SetFileInformationByHandle(handle, 4, ref disposition,
+                        (uint)Marshal.SizeOf(typeof(FileDispositionInformation))))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+            }
+        }
 
         public static uint GetLinkCount(string path)
         {
@@ -168,6 +225,15 @@ function Get-StartMenuLinkPath() {
 }
 
 function Assert-SafeShortcutFile([string]$Path) {
+    # Check every ancestor, including a missing leaf's existing parents.
+    $component = Get-FullPath $Path
+    while (-not [string]::IsNullOrEmpty($component)) {
+        $ancestor = Get-Item -LiteralPath $component -Force -ErrorAction SilentlyContinue
+        if ($null -ne $ancestor -and ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Managed shortcut path may not cross a junction or symbolic link: $component"
+        }
+        $component = Split-Path -Parent $component
+    }
     $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     if ($null -eq $item) { return }
     if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -264,6 +330,67 @@ function Test-StartMenuShortcutOwned([object]$Shortcut, [string]$Executable) {
         ([string]$Shortcut.Description -ceq 'Shows IdleHarbor settings.') -and
         ([string]$Shortcut.IconLocation -ieq ('{0},0' -f $Executable))
     )
+}
+
+function Get-MarkerStartMenuLink([object]$Marker, [string]$Executable) {
+    $properties = @($Marker.PSObject.Properties.Name)
+    if ($properties -notcontains 'startMenuLinkOwned' -or
+        $properties -notcontains 'startMenuLinkPath' -or $Marker.startMenuLinkOwned -ne $true) { return $null }
+    $link = [string]$Marker.startMenuLinkPath
+    try {
+        $hasBoundary = $properties -contains 'startMenuProgramsPath'
+        $hasHash = $properties -contains 'startMenuLinkSha256'
+        if (-not $hasBoundary -and -not $hasHash) {
+            # Legacy markers prove ownership only at today's known-folder path.
+            if (-not (Test-SamePath $link (Get-StartMenuLinkPath))) {
+                throw 'Legacy marker does not prove the former Programs boundary.'
+            }
+        }
+        else {
+            if (-not $hasBoundary -or -not $hasHash -or
+                [string]$Marker.startMenuLinkSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+                -not [IO.Path]::IsPathRooted($link) -or
+                -not [IO.Path]::IsPathRooted([string]$Marker.startMenuProgramsPath) -or
+                -not (Test-SamePath $link (Join-Path ([string]$Marker.startMenuProgramsPath) 'IdleHarbor.lnk'))) {
+                throw 'Marker shortcut is outside its recorded Programs boundary or has incomplete evidence.'
+            }
+        }
+        Assert-SafeShortcutFile $link
+        if (-not (Test-Path -LiteralPath $link -PathType Leaf)) { return $null }
+        if ($hasHash -and (Get-FileHash -LiteralPath $link -Algorithm SHA256).Hash -ine [string]$Marker.startMenuLinkSha256) {
+            throw 'Shortcut bytes no longer match the installer hash.'
+        }
+        $shell = New-Object -ComObject WScript.Shell
+        if (-not (Test-StartMenuShortcutOwned ($shell.CreateShortcut($link)) $Executable)) {
+            throw 'Shortcut no longer matches the installed executable and launcher settings.'
+        }
+        return $link
+    }
+    catch {
+        Write-Warning "Preserving unverified marker Start Menu shortcut: $link ($($_.Exception.Message))"
+        return $null
+    }
+}
+
+function Remove-MarkerStartMenu {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([object]$Marker, [string]$Executable)
+
+    $link = Get-MarkerStartMenuLink $Marker $Executable
+    if ($null -ne $link -and $PSCmdlet.ShouldProcess($link, 'Remove installer-owned Start Menu shortcut')) {
+        $validated = $null
+        try {
+            # Confirmation can take arbitrarily long. Lock the leaf against
+            # writes/deletes while repeating every ownership check after approval.
+            $validated = [IO.File]::Open($link, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            if ($null -eq (Get-MarkerStartMenuLink $Marker $Executable)) { return }
+            [IdleHarbor.Packaging.FileIdentity]::DeleteValidated($link, $validated)
+        }
+        catch {
+            Write-Warning "Preserving unverified marker Start Menu shortcut: $link ($($_.Exception.Message))"
+        }
+        finally { if ($null -ne $validated) { $validated.Dispose() } }
+    }
 }
 
 function Assert-StartMenuPreflight {
@@ -409,17 +536,14 @@ $executable = Get-FullPath ([string]$marker.executable)
 if (-not (Test-SamePath (Split-Path -Parent $executable) $safeRoot)) {
     throw "Ownership marker points outside the installation directory; refusing to continue."
 }
-$startMenuLinkOwned = (
-    @($marker.PSObject.Properties.Name) -contains 'startMenuLinkOwned' -and
-    @($marker.PSObject.Properties.Name) -contains 'startMenuLinkPath' -and
-    $marker.startMenuLinkOwned -eq $true -and
-    (Test-SamePath ([string]$marker.startMenuLinkPath) (Get-StartMenuLinkPath))
-)
+$ownedStartMenuLink = Get-MarkerStartMenuLink $marker $executable
+$startMenuLinkOwned = ($null -ne $ownedStartMenuLink -and
+    (Test-SamePath $ownedStartMenuLink (Get-StartMenuLinkPath)))
 
 Assert-StartMenuPreflight -Executable $executable -MarkerOwned $startMenuLinkOwned
 Stop-OwnedApplicationIfRunning $executable
 Remove-OwnedStartup $executable
-Remove-OwnedStartMenu -Executable $executable -MarkerOwned $startMenuLinkOwned
+Remove-MarkerStartMenu -Marker $marker -Executable $executable
 if ($taskFolderOwned) {
     $folderRemoved = Remove-EmptyOwnedTaskFolder -Owned $true
     if (-not $WhatIfPreference -and -not $folderRemoved -and (Test-TaskFolderExists)) {
