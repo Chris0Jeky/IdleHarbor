@@ -1,6 +1,28 @@
 # Project state
 
-Last updated: 2026-10-09
+Last updated: 2026-10-22
+
+## Chocolatey native architecture guard (PR #144 / issue #51)
+
+The x64-only package now reads the machine-wide `PROCESSOR_ARCHITECTURE` value from
+`HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment` before downloading.
+Only native `AMD64` is accepted. Per-process architecture values cannot override it;
+missing, unknown or unreadable registry values fail closed, even with W6432=AMD64.
+This corrects the prior guard's acceptance of Prism's AMD64 process without W6432
+on native ARM64. The pure decision and installer tests inject native/process values
+and registry read failures without changing the registry or downloading an archive.
+
+Windows PowerShell 5.1 passes `packaging/Test-ChocolateyPackage.ps1` (17 native/process
+cases through both the pure function and installer), `tests/Test-RegressionScripts.ps1`
+and `packaging/Test-Packaging.ps1`. Test temp/profile paths are confined to this worktree.
+The Prism rejection assertion fails against commit `28c1d42`'s extracted guard because
+it accepts that case. A real registry read on this host also passes through the installer
+with only the ZIP helper doubled; no archive is downloaded or installed.
+
+Real ARM64/Prism behaviour and registry contents under emulation remain unobserved
+on hardware. PowerShell 7 and hosted CI are not verified locally for this change.
+No Chocolatey install, account operation or publication is part of this repair;
+issue #51 and the owner gates in `HUMAN_TODO.md` remain open.
 
 ## Smooth native navigation (2026-10-09)
 
