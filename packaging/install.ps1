@@ -251,6 +251,15 @@ function Assert-SafeManagedFile([string]$Path) {
 }
 
 function Assert-SafeShortcutFile([string]$Path) {
+    # Check every ancestor, including a missing leaf's existing parents.
+    $component = Get-FullPath $Path
+    while (-not [string]::IsNullOrEmpty($component)) {
+        $ancestor = Get-Item -LiteralPath $component -Force -ErrorAction SilentlyContinue
+        if ($null -ne $ancestor -and ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Managed shortcut path may not cross a junction or symbolic link: $component"
+        }
+        $component = Split-Path -Parent $component
+    }
     $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     if ($null -eq $item) { return }
     if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -358,6 +367,57 @@ function Test-ByteArraysEqual([byte[]]$Left, [byte[]]$Right) {
     return $true
 }
 
+function Get-MarkerStartMenuLink([object]$Marker, [string]$Executable) {
+    $properties = @($Marker.PSObject.Properties.Name)
+    if ($properties -notcontains 'startMenuLinkOwned' -or
+        $properties -notcontains 'startMenuLinkPath' -or $Marker.startMenuLinkOwned -ne $true) { return $null }
+    $link = [string]$Marker.startMenuLinkPath
+    try {
+        $hasBoundary = $properties -contains 'startMenuProgramsPath'
+        $hasHash = $properties -contains 'startMenuLinkSha256'
+        if (-not $hasBoundary -and -not $hasHash) {
+            # Legacy markers prove ownership only at today's known-folder path.
+            if (-not (Test-SamePath $link (Get-StartMenuLinkPath))) {
+                throw 'Legacy marker does not prove the former Programs boundary.'
+            }
+        }
+        else {
+            if (-not $hasBoundary -or -not $hasHash -or
+                [string]$Marker.startMenuLinkSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+                -not [IO.Path]::IsPathRooted($link) -or
+                -not [IO.Path]::IsPathRooted([string]$Marker.startMenuProgramsPath) -or
+                -not (Test-SamePath $link (Join-Path ([string]$Marker.startMenuProgramsPath) 'IdleHarbor.lnk'))) {
+                throw 'Marker shortcut is outside its recorded Programs boundary or has incomplete evidence.'
+            }
+        }
+        Assert-SafeShortcutFile $link
+        if (-not (Test-Path -LiteralPath $link -PathType Leaf)) { return $null }
+        if ($hasHash -and (Get-FileHash -LiteralPath $link -Algorithm SHA256).Hash -ine [string]$Marker.startMenuLinkSha256) {
+            throw 'Shortcut bytes no longer match the installer hash.'
+        }
+        $shell = New-Object -ComObject WScript.Shell
+        if (-not (Test-StartMenuShortcutOwned ($shell.CreateShortcut($link)) $Executable)) {
+            throw 'Shortcut no longer matches the installed executable and launcher settings.'
+        }
+        return $link
+    }
+    catch {
+        Write-Warning "Preserving unverified marker Start Menu shortcut: $link ($($_.Exception.Message))"
+        return $null
+    }
+}
+
+function Remove-MarkerStartMenu {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([object]$Marker, [string]$Executable)
+
+    # Revalidate immediately before deletion; preflight is not deletion authority.
+    $link = Get-MarkerStartMenuLink $Marker $Executable
+    if ($null -ne $link -and $PSCmdlet.ShouldProcess($link, 'Remove installer-owned Start Menu shortcut')) {
+        Remove-Item -LiteralPath $link -Force
+    }
+}
+
 function Assert-StartMenuPreflight {
     param(
         [Parameter(Mandatory)]
@@ -373,9 +433,9 @@ function Assert-StartMenuPreflight {
     )
 
     if ($Mode -eq 'None' -and -not $PreviouslyOwned) { return }
+    Assert-SafeShortcutFile $link
     $linkItem = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
     if ($null -eq $linkItem) { return }
-    Assert-SafeShortcutFile $link
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($link)
     $exact = Test-StartMenuShortcutOwned -Shortcut $shortcut -Executable $Executable
@@ -430,6 +490,7 @@ function Set-StartMenu {
         return $PreviouslyOwned
     }
 
+    Assert-SafeShortcutFile $link
     if ($PSCmdlet.ShouldProcess($link, 'Create Start Menu shortcut')) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $link) -Force | Out-Null
         $shell = New-Object -ComObject WScript.Shell
@@ -457,13 +518,24 @@ function Restore-StartMenuSnapshot {
         [AllowNull()]
         [byte[]]$Bytes,
 
+        [AllowNull()]
+        [byte[]]$ExpectedBytes,
+
         [Parameter(Mandatory)]
         [string]$Executable,
 
         [string]$Link = (Get-StartMenuLinkPath)
     )
 
+    Assert-SafeShortcutFile $Link
     $linkItem = Get-Item -LiteralPath $Link -Force -ErrorAction SilentlyContinue
+    if ($null -ne $linkItem) {
+        $currentBytes = [IO.File]::ReadAllBytes($Link)
+        if (-not (Test-ByteArraysEqual $currentBytes $Bytes) -and
+            -not (Test-ByteArraysEqual $currentBytes $ExpectedBytes)) {
+            throw "Rollback found a changed or foreign Start Menu shortcut: $Link"
+        }
+    }
     if ($null -ne $Bytes) {
         if ($null -ne $linkItem) {
             Assert-SafeShortcutFile $Link
@@ -749,6 +821,7 @@ function Get-StartupSnapshot {
         shortcutBytes = $shortcutBytes
         startMenuCaptured = $CaptureStartMenu
         startMenuLinkBytes = $startMenuLinkBytes
+        startMenuWrittenBytes = $null
         runCommand = $runCommand
         runKind = $runKind
     }
@@ -778,6 +851,7 @@ function Restore-StartupSnapshot {
     if ($Snapshot.startMenuCaptured) {
         Restore-StartMenuSnapshot `
             -Bytes $Snapshot.startMenuLinkBytes `
+            -ExpectedBytes $Snapshot.startMenuWrittenBytes `
             -Executable $Executable
     }
     if ($null -ne $Snapshot.runCommand) {
@@ -811,18 +885,18 @@ $installSnapshot = $null
 $startupSnapshot = $null
 $previousTaskFolderOwned = $false
 $previousStartMenuOwned = $false
+$previousStartMenuLink = $null
+$existingMarker = $null
+$markerWritten = $false
 $retainTransactionBackup = $false
 if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
     $existingMarker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
     if (@($existingMarker.PSObject.Properties.Name) -contains 'taskFolderOwned') {
         $previousTaskFolderOwned = ($existingMarker.taskFolderOwned -eq $true)
     }
-    if (@($existingMarker.PSObject.Properties.Name) -contains 'startMenuLinkOwned' -and
-        @($existingMarker.PSObject.Properties.Name) -contains 'startMenuLinkPath' -and
-        $existingMarker.startMenuLinkOwned -eq $true -and
-        (Test-SamePath ([string]$existingMarker.startMenuLinkPath) (Get-StartMenuLinkPath))) {
-        $previousStartMenuOwned = $true
-    }
+    $previousStartMenuLink = Get-MarkerStartMenuLink $existingMarker $destinationExecutable
+    $previousStartMenuOwned = ($null -ne $previousStartMenuLink -and
+        (Test-SamePath $previousStartMenuLink (Get-StartMenuLinkPath)))
 }
 
 Assert-StartMenuPreflight -Executable $destinationExecutable -Mode $StartMenu -PreviouslyOwned $previousStartMenuOwned
@@ -867,6 +941,14 @@ try {
         -Mode $StartMenu `
         -PreviouslyOwned $previousStartMenuOwned
 
+    if (-not $WhatIfPreference -and $startupSnapshot.startMenuCaptured) {
+        $startupSnapshot.startMenuWrittenBytes = Get-StartMenuSnapshot
+    }
+    if (-not $WhatIfPreference -and $null -ne $previousStartMenuLink -and
+        $StartMenu -eq 'Create' -and -not (Test-Path -LiteralPath (Get-StartMenuLinkPath) -PathType Leaf)) {
+        throw 'Start Menu creation was declined; refusing to relinquish the former launcher.'
+    }
+
     $taskFolderOwned = $previousTaskFolderOwned
     if (-not $WhatIfPreference) {
         if ($Startup -eq 'TaskScheduler' -and -not $startupSnapshot.taskFolderExisted) {
@@ -890,10 +972,22 @@ try {
             taskFolderOwned = $taskFolderOwned
             startMenuLinkPath = Get-StartMenuLinkPath
             startMenuLinkOwned = $startMenuLinkOwned
+            startMenuProgramsPath = Split-Path -Parent (Get-StartMenuLinkPath)
+            startMenuLinkSha256 = $(if ($startMenuLinkOwned) {
+                Assert-SafeShortcutFile (Get-StartMenuLinkPath)
+                (Get-FileHash -LiteralPath (Get-StartMenuLinkPath) -Algorithm SHA256).Hash
+            } else { $null })
             installedAtUtc = [DateTime]::UtcNow.ToString('o')
         }
         $marker | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $markerPath -Encoding UTF8
+        $markerWritten = $true
         Invoke-InjectedFailure 'AfterMarker'
+    }
+    # Commit the new launcher and marker before touching the former location.
+    # Keep cleanup last so earlier failures leave the former launcher intact.
+    if (($WhatIfPreference -or $markerWritten) -and $null -ne $previousStartMenuLink -and
+        -not (Test-SamePath $previousStartMenuLink (Get-StartMenuLinkPath))) {
+        Remove-MarkerStartMenu -Marker $existingMarker -Executable $destinationExecutable
     }
 }
 catch {

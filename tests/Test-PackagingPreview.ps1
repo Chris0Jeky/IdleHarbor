@@ -8,6 +8,9 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('IdleHarbor-preview-test-' + [Guid
 $source = Join-Path $root 'source with spaces'
 $target = Join-Path $root 'IdleHarbor'
 $failures = New-Object 'Collections.Generic.List[string]'
+. (Join-Path $PSScriptRoot 'Get-IsolatedPackagingScript.ps1')
+$isolatedInstall = Get-IsolatedPackagingScript (Join-Path $packaging 'install.ps1') $root (Join-Path $root 'Programs')
+$isolatedUninstall = Get-IsolatedPackagingScript (Join-Path $packaging 'uninstall.ps1') $root (Join-Path $root 'Programs')
 
 # Keep discovery isolated in child scripts without replacing global commands.
 # This fixture uses Startup None and StartMenu None and never runs a real app.
@@ -49,20 +52,20 @@ try {
     $parameters = @{ SourcePath = $source; InstallRoot = $target; Startup = 'None'; StartMenu = 'None'; NoLaunch = $true; Confirm = $false }
     $sourceBefore = Snapshot $source
 
-    $output = @(& (Join-Path $packaging 'install.ps1') @parameters -WhatIf 3>&1 6>$null)
+    $output = @(& $isolatedInstall @parameters -WhatIf 3>&1 6>$null)
     Check-Preview $output 'Fresh install'
     Check (-not (Test-Path -LiteralPath $target)) 'Fresh preview creates no target directory'
     Check ((Snapshot $source) -ceq $sourceBefore) 'Fresh preview preserves every source byte'
 
-    $output = @(& (Join-Path $packaging 'install.ps1') @parameters 3>&1 6>$null)
+    $output = @(& $isolatedInstall @parameters 3>&1 6>$null)
     Check ((Text $output) -match '(?m)^Installed IdleHarbor to ') 'Real install keeps completed summary'
     Check (Test-Path -LiteralPath (Join-Path $target '.idleharbor-managed.json') -PathType Leaf) 'Real install creates ownership marker'
     $before = Snapshot $target
-    $output = @(& (Join-Path $packaging 'install.ps1') @parameters -WhatIf 3>&1 6>$null)
+    $output = @(& $isolatedInstall @parameters -WhatIf 3>&1 6>$null)
     Check-Preview $output 'Update'
     Check ((Snapshot $target) -ceq $before) 'Update preview preserves managed files and marker bytes'
 
-    $output = @(& (Join-Path $packaging 'uninstall.ps1') -InstallRoot $target -WhatIf -Confirm:$false 3>&1 6>$null)
+    $output = @(& $isolatedUninstall -InstallRoot $target -WhatIf -Confirm:$false 3>&1 6>$null)
     Check-Preview $output 'Clean uninstall'
     Check ((Snapshot $target) -ceq $before) 'Clean uninstall preview preserves the complete target'
     Check ((Text $output) -notmatch 'unexpected files') 'Retained managed files are not reported as unexpected in preview'
@@ -70,14 +73,14 @@ try {
     $foreign = Join-Path $target 'user-note.txt'
     Set-Content -LiteralPath $foreign -Value 'unowned data' -Encoding ASCII
     $before = Snapshot $target
-    $output = @(& (Join-Path $packaging 'uninstall.ps1') -InstallRoot $target -WhatIf -Confirm:$false 3>&1 6>$null)
+    $output = @(& $isolatedUninstall -InstallRoot $target -WhatIf -Confirm:$false 3>&1 6>$null)
     Check-Preview $output 'Uninstall with foreign file'
     Check ((Snapshot $target) -ceq $before) 'Foreign-file preview preserves all bytes'
     $warnings = Text @($output | Where-Object { $_ -is [Management.Automation.WarningRecord] })
     Check ($warnings -match 'user-note.txt') 'Preview still warns about unowned files'
     Check ($warnings -notmatch 'IdleHarbor.exe|\.idleharbor-managed.json|README.md') 'Preview warning excludes simulated managed removals'
 
-    $output = @(& (Join-Path $packaging 'uninstall.ps1') -InstallRoot $target -Confirm:$false 3>&1 6>$null)
+    $output = @(& $isolatedUninstall -InstallRoot $target -Confirm:$false 3>&1 6>$null)
     Check ((Text $output) -match '(?m)^Uninstalled IdleHarbor from ') 'Real uninstall keeps completed summary'
     Check ((Get-Content -Raw -LiteralPath $foreign).Trim() -ceq 'unowned data') 'Real uninstall preserves unowned data'
     Check (-not (Test-Path -LiteralPath (Join-Path $target 'IdleHarbor.exe'))) 'Real uninstall removes the owned executable'

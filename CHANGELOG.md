@@ -8,6 +8,10 @@ where practical.
 
 ### Fixed
 
+- Per-user update and uninstall validate install-time Programs boundary and shortcut
+  bytes before removing a launcher after Start Menu known-folder relocation. Changed,
+  foreign, unsafe and hard-linked paths are preserved; legacy markers remain limited
+  to the current Programs path.
 - The Chocolatey x64 guard uses the machine-wide native architecture registry value,
   refusing ARM64/Prism and unreadable or unknown native values before downloading.
   Process architecture variables cannot override the decision; hardware validation remains pending.

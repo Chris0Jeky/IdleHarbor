@@ -82,11 +82,20 @@ before any installation mutation: directories, reparse points, multiply-linked f
 shortcuts are rejected when creation is requested. An exact shortcut found without a prior installer
 ownership claim is never claimed by the marker. `-StartMenu None` removes only a marker-claimed
 shortcut that is still an exact match; changed or foreign shortcuts are preserved with a warning.
+New markers also record the install-time Programs known-folder directory and the SHA-256 of the
+shortcut bytes written. After known-folder relocation, update removes the former launcher only
+after committing the current launcher and marker; uninstall removes the former launcher directly.
+Both require the recorded path to be exactly `IdleHarbor.lnk` in the recorded Programs directory,
+the original hash and launcher properties to match, a single hard link, and no reparse point in
+the leaf or any ancestor. Modified, unsafe or out-of-boundary paths are preserved and reported.
+Markers without either new evidence field retain current-known-folder-only ownership; partially
+populated evidence fails closed. An existing exact launcher without marker ownership is preserved
+without being claimed. Rollback also preserves a launcher whose bytes changed during installation.
 A first install invoked with the
 source and destination set to the same directory also requires an already-valid IdleHarbor ownership
 marker; this prevents a marker from claiming unrelated files in an extracted directory. Once that
 marker exists, a same-directory reinstall remains supported. The installer writes an ownership marker
-including the Start Menu path and ownership bit, and can be run repeatedly from Windows PowerShell
+including the Start Menu path, ownership bit, Programs boundary and shortcut hash, and can be run repeatedly from Windows PowerShell
 5.1 or PowerShell 7. Install and update operations snapshot managed files and owned startup state,
 including exact Start Menu shortcut bytes, then restore them after a caught failure. A complete
 rollback or successful commit removes the temporary transaction directory. If managed-file restoration
