@@ -2,6 +2,28 @@
 
 Last updated: 2026-10-22
 
+## Rounded documentation capture corners (#50)
+
+The capture tool now clears alpha and RGB outside rounded corners before each PNG
+save, for both full windows and notification-area popups. The pure System.Drawing
+helper uses capture radii of 8 DIPs for windows and 4 DIPs for popups, scaled using
+the captured window's own DPI. Pixels crossed by the curve are cleared too, so
+partially covered desktop pixels are not retained as hidden RGB.
+
+The offline Windows PowerShell 5.1 regression passes 14 cases / 72,614 checks,
+covering six DPIs, small-image bounds and an in-memory PNG round-trip. It verifies
+3,180 cleared exterior pixels and 14,960 byte-identical interior pixels. The same
+assertions fail against a helper-disabled mutation. All 13 registered suites in
+`tests/Test-RegressionScripts.ps1` pass, ending with "All registered script
+regressions passed." The separate offline capture-manifest/evidence suites and
+the 30-check capture portability suite also pass in Windows PowerShell 5.1.
+Test temp/profile paths are confined to this worktree.
+
+No live desktop capture or visual inspection is performed for this change.
+Committed PNG assets and `docs/assets/capture-manifest.json` remain unchanged;
+the next real capture applies the helper. Existing owner-account actions in
+`HUMAN_TODO.md` remain open.
+
 ## Chocolatey native architecture guard (PR #144 / issue #51)
 
 The x64-only package now reads the machine-wide `PROCESSOR_ARCHITECTURE` value from
