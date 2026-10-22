@@ -88,6 +88,12 @@ after committing the current launcher and marker; uninstall removes the former l
 Both require the recorded path to be exactly `IdleHarbor.lnk` in the recorded Programs directory,
 the original hash and launcher properties to match, a single hard link, and no reparse point in
 the leaf or any ancestor. Modified, unsafe or out-of-boundary paths are preserved and reported.
+Removal repeats these checks after confirmation while a read handle denies writes and leaf
+replacement. To obtain DELETE access, it reopens the file, checks the volume/file ID and bytes
+against the validated handle, and deletes through that same new handle. A changed identity or
+content, or a sharing/access failure, preserves the leaf with a warning. Ancestors are not locked:
+a concurrent redirect to a different file is rejected by the identity comparison, and a redirect
+after the final open cannot redirect handle-based deletion to another file.
 Markers without either new evidence field retain current-known-folder-only ownership; partially
 populated evidence fails closed. An existing exact launcher without marker ownership is preserved
 without being claimed. Rollback also preserves a launcher whose bytes changed during installation.

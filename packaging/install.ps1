@@ -46,6 +46,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
 
 namespace IdleHarbor.Packaging
@@ -71,6 +72,62 @@ namespace IdleHarbor.Packaging
         private static extern bool GetFileInformationByHandle(
             SafeFileHandle file,
             out ByHandleFileInformation information);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, IntPtr security,
+            uint disposition, uint flags, IntPtr template);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileDispositionInformation
+        {
+            public byte DeleteFile;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetFileInformationByHandle(
+            SafeFileHandle file, int informationClass,
+            ref FileDispositionInformation information, uint size);
+
+        public static void DeleteValidated(string path, FileStream validated)
+        {
+            ByHandleFileInformation expected;
+            if (!GetFileInformationByHandle(validated.SafeFileHandle, out expected))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            byte[] digest;
+            validated.Position = 0;
+            using (SHA256 hash = SHA256.Create()) { digest = hash.ComputeHash(validated); }
+
+            // The validation handle denies writes/deletes and permits the shell's
+            // read-only property inspection. Reopen with DELETE access, then
+            // compare identity AND bytes across this unavoidable sharing-mode gap.
+            validated.Dispose();
+            using (SafeFileHandle handle = CreateFile(path,
+                0x80000000 | 0x00010000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero))
+            {
+                if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+                ByHandleFileInformation actual;
+                if (!GetFileInformationByHandle(handle, out actual))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (actual.VolumeSerialNumber != expected.VolumeSerialNumber ||
+                    actual.FileIndexHigh != expected.FileIndexHigh ||
+                    actual.FileIndexLow != expected.FileIndexLow ||
+                    actual.NumberOfLinks != 1 || (actual.FileAttributes & 0x410) != 0)
+                    throw new IOException("Shortcut identity or safe-file properties changed after validation.");
+                using (FileStream stream = new FileStream(handle, FileAccess.Read))
+                using (SHA256 hash = SHA256.Create())
+                {
+                    if (Convert.ToBase64String(digest) != Convert.ToBase64String(hash.ComputeHash(stream)))
+                        throw new IOException("Shortcut bytes changed after validation.");
+                    // Share-read only prevents writes/renames until this same
+                    // object is marked for deletion; never delete by pathname.
+                    FileDispositionInformation disposition = new FileDispositionInformation { DeleteFile = 1 };
+                    if (!SetFileInformationByHandle(handle, 4, ref disposition,
+                        (uint)Marshal.SizeOf(typeof(FileDispositionInformation))))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+            }
+        }
 
         public static uint GetLinkCount(string path)
         {
@@ -411,10 +468,20 @@ function Remove-MarkerStartMenu {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param([object]$Marker, [string]$Executable)
 
-    # Revalidate immediately before deletion; preflight is not deletion authority.
     $link = Get-MarkerStartMenuLink $Marker $Executable
     if ($null -ne $link -and $PSCmdlet.ShouldProcess($link, 'Remove installer-owned Start Menu shortcut')) {
-        Remove-Item -LiteralPath $link -Force
+        $validated = $null
+        try {
+            # Confirmation can take arbitrarily long. Lock the leaf against
+            # writes/deletes while repeating every ownership check after approval.
+            $validated = [IO.File]::Open($link, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            if ($null -eq (Get-MarkerStartMenuLink $Marker $Executable)) { return }
+            [IdleHarbor.Packaging.FileIdentity]::DeleteValidated($link, $validated)
+        }
+        catch {
+            Write-Warning "Preserving unverified marker Start Menu shortcut: $link ($($_.Exception.Message))"
+        }
+        finally { if ($null -ne $validated) { $validated.Dispose() } }
     }
 }
 

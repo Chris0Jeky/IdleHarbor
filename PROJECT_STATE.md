@@ -14,6 +14,27 @@ transaction step, after the current launcher and marker commit; earlier failures
 leave the old launcher intact and restore the current path. Rollback refuses to
 overwrite byte changes made after the installer wrote its launcher.
 
+PR #146's confirmation race is repaired in both marker-removal functions: full
+ownership validation now repeats after approval under a read handle that denies
+writes and leaf replacement. Deletion reopens with DELETE access, compares the
+volume/file ID, single-link/regular-file properties and bytes, and marks that
+same handle for deletion. Sharing/access failures preserve the leaf with a warning.
+Ancestor directories are not locked; identity comparison rejects redirection to
+a different file during the reopen gap, and handle deletion cannot follow a later
+path redirect. Crafted-marker behavior is unchanged.
+
+Six fixture races replace a shortcut or swap its Programs ancestor for a junction
+at the true return from ShouldProcess during update, update-without-launcher and
+uninstall. Before the repair they fail 18 preservation assertions. Separate checks
+exercise write/rename denial and rejection of a different file ID with identical bytes.
+Windows PowerShell 5.1.26100.9711 passes all 226 relocation assertions, all 13
+registered regression suites, and both packaging entry points. Disabling only the
+new post-confirmation revalidation (retaining native identity-bound deletion)
+reproduces all 18 failures across the six races. The public packaging check's
+first concurrent run detects another suite's temporary transaction directory;
+rerunning with its own worktree-local temp root passes. No production scripts
+are modified for this mutation check, and no commit or push is performed.
+
 The initial Windows PowerShell 5.1 relocation regression failed both intact
 update/uninstall removal assertions while current-path creation passed. The
 expanded lifecycle regression and packaging fixtures exercise real temporary
