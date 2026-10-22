@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Documentation captures clear alpha and RGB outside rounded window and notification-area
+  popup corners before saving. Existing screenshot assets and manifest hashes are unchanged;
+  the next real capture applies the sanitization.
 - The Chocolatey x64 guard uses the machine-wide native architecture registry value,
   refusing ARM64/Prism and unreadable or unknown native values before downloading.
   Process architecture variables cannot override the decision; hardware validation remains pending.

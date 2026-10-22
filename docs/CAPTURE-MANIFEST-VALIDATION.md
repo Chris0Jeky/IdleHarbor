@@ -20,8 +20,43 @@ promotion and cleanup remain unchanged.
 
 The continuation handoff records the original worker contribution in PR #113;
 that PR's final description records reconciliation and both-edition CI evidence.
-Issue #70 concerns serialization. Native capture portability, corner privacy and
-harness refactoring remain separately tracked under #49, #50 and #59.
+Issue #70 concerns serialization. Native capture portability and harness refactoring
+remain separately tracked under #49 and #59; corner sanitization is described below.
+
+## Rounded-corner sanitization (#50)
+
+Every full-window and notification-area popup bitmap passes through the pure
+`Clear-CaptureRoundedCorners` helper after `CopyFromScreen` and before PNG save.
+Capture uses explicit 32-bit ARGB bitmaps. The Windows 11 capture radii are 8 DIPs
+for windows and 4 DIPs for popups, scaled to physical pixels using each captured
+window's DPI (16 and 8 pixels respectively at the default 192 DPI). Radii round up
+to whole pixels and clamp to half the shorter bitmap dimension.
+
+The helper overwrites **both RGB and alpha with zero** outside the rounded region,
+including pixels whose square crosses the curve. It does not blend with desktop
+pixels or leave recoverable RGB under transparent alpha. Pixels wholly inside
+the region remain byte-identical. Only the four corner squares are examined;
+window content, image dimensions and the rounded silhouette are retained.
+
+Run the offline regression in Windows PowerShell 5.1:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-CaptureRoundedCorners.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-RegressionScripts.ps1
+```
+
+The corner suite synthesizes high-contrast bitmaps with opaque, translucent and
+transparent pattern pixels. Fourteen cases cover both surfaces at 96/120/144/168/
+192/480 DPI and tiny bitmaps. It checks all four raw BGRA bytes per pixel before
+and after an in-memory PNG round-trip: 3,180 exterior pixels are zero and 14,960
+interior pixels are unchanged (72,614 checks). Running the same suite with
+`-CaptureScript` pointing to a copy whose helper body is disabled fails at the
+first exterior pattern pixel. No live window or desktop access is needed.
+
+The committed PNGs and manifest hashes are deliberately unchanged. This change
+does not sanitize historical evidence or claim a new Windows 11 visual capture.
+The next real capture will apply the helper to every window and popup before
+saving and recording the resulting hashes. Live appearance remains unverified.
 
 ## Capture portability regression (#49)
 
