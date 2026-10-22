@@ -60,6 +60,32 @@ layout. Keep upstream WinGet schema validation as a separate release step.
 Metadata agreement cannot substitute for published-byte verification, and neither
 can substitute for actual Chocolatey/WinGet installation and cleanup evidence.
 
+## Chocolatey (issue #51): source level versus environment level
+
+Covered at source level by `packaging/Test-ChocolateyPackage.ps1` and
+`tests/Test-ChocolateyShutdown.ps1` (both run in CI under both PowerShell editions, with
+doubled commands and no real process, install or machine change):
+
+- Native architecture guard: `chocolateyInstall.ps1` reads `PROCESSOR_ARCHITECTURE` from
+  `HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment`, avoiding the process
+  environment's WOW64/emulation rewriting. Injected `AMD64` native values are accepted regardless
+  of process flavour; x86, ARM64, missing, unknown and unreadable native values are refused before
+  the ZIP helper can download anything. Tests include Prism (native ARM64, process AMD64, no
+  W6432) and a throwing registry read. There is no process-variable fallback, even for
+  `PROCESSOR_ARCHITEW6432=AMD64`.
+- A failed CIM process query fails the uninstall and before-modify hooks (`-ErrorAction Stop`).
+- A package-owned process in another Windows session fails promptly with a session message.
+- No running package-owned process: the hooks return without launching `--exit`.
+- Install script does not start IdleHarbor or configure startup (static text check only).
+
+Still environment-level, needing an isolated elevated Windows VM and not proven by these checks:
+`choco install`/`uninstall` of the local package, the command shim resolving to the nested
+`IdleHarbor.exe`, no scheduled task, startup entry or running process after a real install,
+graceful removal of a really running executable, a real cross-session process, the machine
+returning to its pre-install state, the ARM64 Chocolatey strategy, and the owner-only account/API
+key step. Real ARM64/Prism behaviour, including the machine-wide registry value under emulation,
+has not yet been observed on hardware. Issue #51 stays open for those.
+
 Current implementation, exact-head evidence and unverified native/owner gates are
 summarized in [PROJECT_STATE](../PROJECT_STATE.md). Re-run the relevant gates after
 changing a head; a prior revision's log does not qualify a later revision.

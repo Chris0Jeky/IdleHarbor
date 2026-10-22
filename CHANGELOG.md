@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- The Chocolatey x64 guard uses the machine-wide native architecture registry value,
+  refusing ARM64/Prism and unreadable or unknown native values before downloading.
+  Process architecture variables cannot override the decision; hardware validation remains pending.
 - A genuine-input notification from an earlier session no longer pauses the session
   that replaced it. Input from the current session still starts the cooldown.
 - A repeated settings key now warns and keeps the later value. A value that is not an

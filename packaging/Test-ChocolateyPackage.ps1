@@ -107,6 +107,102 @@ Assert-True ($install -match 'Install-ChocolateyZipPackage') 'Chocolatey install
 Assert-True ($install -notmatch '(?i)Register-ScheduledTask|CurrentVersion\\Run|StartupFolder|Start-Process') `
     'Chocolatey installation must not launch IdleHarbor or configure startup.'
 
+# Architecture guard (issue #51). The decision is a pure function over the native
+# registry value and process variables; extract it from the installer so the test
+# runs the shipped text, with injected values and no machine changes.
+$installAst = [Management.Automation.Language.Parser]::ParseInput($install, [ref]$null, [ref]$null)
+$guardAst = $installAst.Find({
+        param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Assert-IdleHarborX64Os'
+    }, $false)
+Assert-True ($null -ne $guardAst) 'Chocolatey installer lacks the Assert-IdleHarborX64Os architecture guard.'
+. ([scriptblock]::Create($guardAst.Extent.Text))
+
+# The native value wins regardless of the process flavour, including Prism.
+$architectureCases = @(
+    @{ Name = '64-bit PowerShell on x64'; Native = 'AMD64'; Arch = 'AMD64'; Wow = ''; Accepted = $true },
+    @{ Name = '32-bit PowerShell on x64'; Native = 'AMD64'; Arch = 'x86'; Wow = 'AMD64'; Accepted = $true },
+    @{ Name = 'missing process values on x64'; Native = 'AMD64'; Arch = ''; Wow = ''; Accepted = $true },
+    @{ Name = 'conflicting process values on x64'; Native = 'AMD64'; Arch = 'ARM64'; Wow = 'ARM64'; Accepted = $true },
+    @{ Name = 'case-insensitive native x64'; Native = 'amd64'; Arch = 'x86'; Wow = ''; Accepted = $true },
+    @{ Name = 'Prism x64 process on ARM64 without W6432'; Native = 'ARM64'; Arch = 'AMD64'; Wow = ''; Accepted = $false },
+    @{ Name = 'x64-emulated process on ARM64 with W6432'; Native = 'ARM64'; Arch = 'AMD64'; Wow = 'ARM64'; Accepted = $false },
+    @{ Name = '32-bit PowerShell on ARM64'; Native = 'ARM64'; Arch = 'x86'; Wow = 'ARM64'; Accepted = $false },
+    @{ Name = 'native ARM64 PowerShell'; Native = 'ARM64'; Arch = 'ARM64'; Wow = ''; Accepted = $false },
+    @{ Name = 'conflicting W6432 on ARM64'; Native = 'ARM64'; Arch = 'x86'; Wow = 'AMD64'; Accepted = $false },
+    @{ Name = 'x86 Windows'; Native = 'x86'; Arch = 'x86'; Wow = ''; Accepted = $false },
+    @{ Name = 'x86 with misleading AMD64 process values'; Native = 'x86'; Arch = 'AMD64'; Wow = 'AMD64'; Accepted = $false },
+    @{ Name = 'unknown native architecture'; Native = 'unknown'; Arch = 'AMD64'; Wow = ''; Accepted = $false },
+    @{ Name = 'missing native registry value'; Native = ''; Arch = 'AMD64'; Wow = ''; Accepted = $false },
+    @{ Name = 'blank native value with W6432 AMD64'; Native = ' '; Arch = 'x86'; Wow = 'AMD64'; Accepted = $false },
+    @{ Name = 'unreadable native registry'; Native = $null; Arch = 'AMD64'; Wow = ''; Accepted = $false; ReadFails = $true },
+    @{ Name = 'unreadable native registry with W6432 AMD64'; Native = $null; Arch = 'x86'; Wow = 'AMD64'; Accepted = $false; ReadFails = $true }
+)
+foreach ($case in $architectureCases) {
+    $failure = $null
+    try { Assert-IdleHarborX64Os -NativeArchitecture $case.Native -ProcessorArchitecture $case.Arch -ProcessorArchitectureW6432 $case.Wow }
+    catch { $failure = $_.Exception.Message }
+    if ($case.Accepted) { Assert-True ($null -eq $failure) "Architecture guard rejected $($case.Name): $failure" }
+    else { Assert-True ($failure -match 'x64 build only') "Architecture guard did not reject $($case.Name) clearly: $failure" }
+}
+
+# The guard has to run, and fail, before the ZIP helper can download anything.
+# Run the installer with the registry read and helper doubled and process values
+# restored below; no registry is read/changed and nothing is downloaded/unpacked.
+$installerState = @{ Downloads = 0 }
+function Get-ItemPropertyValue {
+    [CmdletBinding()]
+    param([string]$LiteralPath, [string]$Name)
+    Assert-True ($LiteralPath -ceq 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment') `
+        'Installer must read the machine-wide environment key.'
+    Assert-True ($Name -ceq 'PROCESSOR_ARCHITECTURE') 'Installer must read the native architecture value.'
+    $installerState.Reads++
+    if ($case.ContainsKey('ReadFails') -and $case.ReadFails) { throw 'Synthetic registry access denied.' }
+    return $case.Native
+}
+function Install-ChocolateyZipPackage {
+    [CmdletBinding()]
+    param($packageName, $unzipLocation, $url64bit, $checksum64, $checksumType64)
+    $installerState.Downloads++
+}
+$savedArchitecture = [Environment]::GetEnvironmentVariable('PROCESSOR_ARCHITECTURE', 'Process')
+$savedWow = [Environment]::GetEnvironmentVariable('PROCESSOR_ARCHITEW6432', 'Process')
+try {
+    foreach ($case in $architectureCases) {
+        [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITECTURE', $case.Arch, 'Process')
+        [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITEW6432', $case.Wow, 'Process')
+        $installerState.Downloads = 0
+        $installerState.Reads = 0
+        $failure = $null
+        try { & $installPath | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        Assert-True ($installerState.Reads -eq 1) "Installer did not read the native registry value on $($case.Name)."
+        if ($case.Accepted) {
+            Assert-True ($null -eq $failure -and $installerState.Downloads -eq 1) "Installer did not proceed on $($case.Name): $failure"
+        }
+        else {
+            Assert-True ($installerState.Downloads -eq 0) "Installer reached the download on $($case.Name)."
+            Assert-True ($failure -match 'x64 build only') "Installer did not fail clearly on $($case.Name): $failure"
+            Assert-True ($failure -match 'unsupported or unreadable machine-wide architecture') `
+                "Installer did not explain the native architecture refusal on $($case.Name): $failure"
+        }
+    }
+}
+finally {
+    [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITECTURE', $savedArchitecture, 'Process')
+    [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITEW6432', $savedWow, 'Process')
+}
+Write-Output "Chocolatey native architecture guard passed ($($architectureCases.Count) cases, pure decision and installer before download)."
+
+# Process-query failure, another-session and no-process outcomes of the shutdown
+# path are executed by tests/Test-ChocolateyShutdown.ps1, registered in
+# tests/Test-RegressionScripts.ps1; the contract is pinned here so it cannot
+# be dropped from the helper without this check noticing.
+$stopHelperText = Get-Content -Raw -LiteralPath $stopHelperPath
+Assert-True ($stopHelperText -match 'Get-CimInstance\s+Win32_Process[^\r\n]*-ErrorAction\s+Stop') `
+    'Shared shutdown helper must treat a process-query failure as an error (Get-CimInstance -ErrorAction Stop).'
+Assert-True ($stopHelperText -match '\.SessionId') 'Shared shutdown helper must compare the Windows session of a running process.'
+
 $uninstall = Get-Content -Raw -LiteralPath $uninstallPath
 Assert-True ($uninstall -match "IdleHarbor-$([regex]::Escape($version))-windows-x64-portable") `
     'Chocolatey uninstaller does not target the versioned package executable.'
