@@ -1,9 +1,10 @@
 # Chocolatey package
 
 This directory is the reproducible source for the `idleharbor` Chocolatey community package. It
-intentionally ships the x64 portable release only, so `choco install idleharbor` has no download URL
-on a 32-bit Windows install; the native ARM64 archive remains available from GitHub while
-Chocolatey's architecture-selection behavior is validated separately (issue #51).
+intentionally ships the x64 portable release only. `chocolateyInstall.ps1` checks the OS architecture
+first and fails with a clear message, before any download, on x86 and ARM64 Windows (including a
+32-bit or x64-emulated PowerShell on ARM64). The native ARM64 archive remains available from GitHub;
+a Chocolatey ARM64 strategy is assessed separately (issue #51).
 
 The package does not enable startup, create a scheduled task, or launch IdleHarbor during install.
 Chocolatey creates the command shim; use `idleharbor --show` to open the settings window.

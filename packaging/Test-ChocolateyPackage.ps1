@@ -107,6 +107,77 @@ Assert-True ($install -match 'Install-ChocolateyZipPackage') 'Chocolatey install
 Assert-True ($install -notmatch '(?i)Register-ScheduledTask|CurrentVersion\\Run|StartupFolder|Start-Process') `
     'Chocolatey installation must not launch IdleHarbor or configure startup.'
 
+# Architecture guard (issue #51). The decision is a pure function over the two
+# processor-architecture variables; extract it from the installer so the test
+# runs the shipped text, with injected values and no machine changes.
+$installAst = [Management.Automation.Language.Parser]::ParseInput($install, [ref]$null, [ref]$null)
+$guardAst = $installAst.Find({
+        param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Assert-IdleHarborX64Os'
+    }, $false)
+Assert-True ($null -ne $guardAst) 'Chocolatey installer lacks the Assert-IdleHarborX64Os architecture guard.'
+. ([scriptblock]::Create($guardAst.Extent.Text))
+
+# ProcessorArchitecture and ProcessorArchitectureW6432 as a process reports them.
+$architectureCases = @(
+    @{ Name = '64-bit PowerShell on x64'; Arch = 'AMD64'; Wow = ''; Accepted = $true },
+    @{ Name = '32-bit PowerShell on x64'; Arch = 'x86'; Wow = 'AMD64'; Accepted = $true },
+    @{ Name = 'x64-emulated process on ARM64'; Arch = 'AMD64'; Wow = 'ARM64'; Accepted = $false },
+    @{ Name = '32-bit PowerShell on ARM64'; Arch = 'x86'; Wow = 'ARM64'; Accepted = $false },
+    @{ Name = 'native ARM64 PowerShell'; Arch = 'ARM64'; Wow = ''; Accepted = $false },
+    @{ Name = 'x86 Windows'; Arch = 'x86'; Wow = ''; Accepted = $false },
+    @{ Name = 'unknown architecture'; Arch = ''; Wow = ''; Accepted = $false }
+)
+foreach ($case in $architectureCases) {
+    $failure = $null
+    try { Assert-IdleHarborX64Os -ProcessorArchitecture $case.Arch -ProcessorArchitectureW6432 $case.Wow }
+    catch { $failure = $_.Exception.Message }
+    if ($case.Accepted) { Assert-True ($null -eq $failure) "Architecture guard rejected $($case.Name): $failure" }
+    else { Assert-True ($failure -match 'x64 build only') "Architecture guard did not reject $($case.Name) clearly: $failure" }
+}
+
+# The guard has to run, and fail, before the ZIP helper can download anything.
+# Run the installer text with the helper doubled and the two variables set for
+# this process only (restored below); nothing is downloaded or unpacked.
+$installerState = @{ Downloads = 0 }
+function Install-ChocolateyZipPackage {
+    [CmdletBinding()]
+    param($packageName, $unzipLocation, $url64bit, $checksum64, $checksumType64)
+    $installerState.Downloads++
+}
+$savedArchitecture = [Environment]::GetEnvironmentVariable('PROCESSOR_ARCHITECTURE', 'Process')
+$savedWow = [Environment]::GetEnvironmentVariable('PROCESSOR_ARCHITEW6432', 'Process')
+try {
+    foreach ($case in $architectureCases) {
+        [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITECTURE', $case.Arch, 'Process')
+        [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITEW6432', $case.Wow, 'Process')
+        $installerState.Downloads = 0
+        $failure = $null
+        try { & $installPath | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        if ($case.Accepted) {
+            Assert-True ($null -eq $failure -and $installerState.Downloads -eq 1) "Installer did not proceed on $($case.Name): $failure"
+        }
+        else {
+            Assert-True ($installerState.Downloads -eq 0) "Installer reached the download on $($case.Name)."
+            Assert-True ($failure -match 'x64 build only') "Installer did not fail clearly on $($case.Name): $failure"
+        }
+    }
+}
+finally {
+    [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITECTURE', $savedArchitecture, 'Process')
+    [Environment]::SetEnvironmentVariable('PROCESSOR_ARCHITEW6432', $savedWow, 'Process')
+}
+
+# Process-query failure, another-session and no-process outcomes of the shutdown
+# path are executed by tests/Test-ChocolateyShutdown.ps1, registered in
+# tests/Test-RegressionScripts.ps1; the contract is pinned here so it cannot
+# be dropped from the helper without this check noticing.
+$stopHelperText = Get-Content -Raw -LiteralPath $stopHelperPath
+Assert-True ($stopHelperText -match 'Get-CimInstance\s+Win32_Process[^\r\n]*-ErrorAction\s+Stop') `
+    'Shared shutdown helper must treat a process-query failure as an error (Get-CimInstance -ErrorAction Stop).'
+Assert-True ($stopHelperText -match '\.SessionId') 'Shared shutdown helper must compare the Windows session of a running process.'
+
 $uninstall = Get-Content -Raw -LiteralPath $uninstallPath
 Assert-True ($uninstall -match "IdleHarbor-$([regex]::Escape($version))-windows-x64-portable") `
     'Chocolatey uninstaller does not target the versioned package executable.'

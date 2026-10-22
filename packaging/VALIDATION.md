@@ -60,6 +60,27 @@ layout. Keep upstream WinGet schema validation as a separate release step.
 Metadata agreement cannot substitute for published-byte verification, and neither
 can substitute for actual Chocolatey/WinGet installation and cleanup evidence.
 
+## Chocolatey (issue #51): source level versus environment level
+
+Covered at source level by `packaging/Test-ChocolateyPackage.ps1` and
+`tests/Test-ChocolateyShutdown.ps1` (both run in CI under both PowerShell editions, with
+doubled commands and no real process, install or machine change):
+
+- 64-bit guard: `chocolateyInstall.ps1` accepts x64 (including a 32-bit PowerShell on x64) and
+  rejects x86 and ARM64 (including 32-bit and x64-emulated PowerShell on ARM64) before the ZIP
+  helper can download anything.
+- A failed CIM process query fails the uninstall and before-modify hooks (`-ErrorAction Stop`).
+- A package-owned process in another Windows session fails promptly with a session message.
+- No running package-owned process: the hooks return without launching `--exit`.
+- Install script does not start IdleHarbor or configure startup (static text check only).
+
+Still environment-level, needing an isolated elevated Windows VM and not proven by these checks:
+`choco install`/`uninstall` of the local package, the command shim resolving to the nested
+`IdleHarbor.exe`, no scheduled task, startup entry or running process after a real install,
+graceful removal of a really running executable, a real cross-session process, the machine
+returning to its pre-install state, the ARM64 Chocolatey strategy, and the owner-only account/API
+key step. Issue #51 stays open for those.
+
 Current implementation, exact-head evidence and unverified native/owner gates are
 summarized in [PROJECT_STATE](../PROJECT_STATE.md). Re-run the relevant gates after
 changing a head; a prior revision's log does not qualify a later revision.
