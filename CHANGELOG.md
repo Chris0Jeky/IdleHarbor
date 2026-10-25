@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Per-user update and uninstall remove unchanged installer-owned Start Menu shortcuts
+  even when read-only. Cleanup failures now retain the original ownership marker for
+  retry: update rolls back, and uninstall stops before deleting installed files.
 - Documentation captures clear alpha and RGB outside rounded window and notification-area
   popup corners before saving, unless DWM keeps square corners (Windows 10, or a
   DWMWCP_DONOTROUND preference), when the genuine corner pixels are kept. Existing

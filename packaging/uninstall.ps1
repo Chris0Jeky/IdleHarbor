@@ -59,6 +59,18 @@ namespace IdleHarbor.Packaging
             public byte DeleteFile;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileBasicInformation
+        {
+            public long CreationTime, LastAccessTime, LastWriteTime, ChangeTime;
+            public uint FileAttributes;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "SetFileInformationByHandle")]
+        private static extern bool SetBasicInformation(
+            SafeFileHandle file, int informationClass,
+            ref FileBasicInformation information, uint size);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool SetFileInformationByHandle(
             SafeFileHandle file, int informationClass,
@@ -78,7 +90,8 @@ namespace IdleHarbor.Packaging
             // compare identity AND bytes across this unavoidable sharing-mode gap.
             validated.Dispose();
             using (SafeFileHandle handle = CreateFile(path,
-                0x80000000 | 0x00010000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero))
+                0x80000000 | 0x00010000 | ((expected.FileAttributes & 1) != 0 ? 0x100u : 0),
+                1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero))
             {
                 if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
                 ByHandleFileInformation actual;
@@ -94,12 +107,28 @@ namespace IdleHarbor.Packaging
                 {
                     if (Convert.ToBase64String(digest) != Convert.ToBase64String(hash.ComputeHash(stream)))
                         throw new IOException("Shortcut bytes changed after validation.");
+                    // Clear ReadOnly only on the identity- and byte-verified handle.
+                    bool readOnly = (actual.FileAttributes & 1) != 0;
+                    FileBasicInformation basic = new FileBasicInformation {
+                        FileAttributes = actual.FileAttributes & ~1u
+                    };
+                    if (basic.FileAttributes == 0) basic.FileAttributes = 0x80; // NORMAL, not "leave unchanged".
+                    uint basicSize = (uint)Marshal.SizeOf(typeof(FileBasicInformation));
+                    if (readOnly && !SetBasicInformation(handle, 0, ref basic, basicSize))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
                     // Share-read only prevents writes/renames until this same
                     // object is marked for deletion; never delete by pathname.
                     FileDispositionInformation disposition = new FileDispositionInformation { DeleteFile = 1 };
                     if (!SetFileInformationByHandle(handle, 4, ref disposition,
                         (uint)Marshal.SizeOf(typeof(FileDispositionInformation))))
-                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                    {
+                        int error = Marshal.GetLastWin32Error();
+                        basic.FileAttributes = actual.FileAttributes;
+                        if (readOnly && !SetBasicInformation(handle, 0, ref basic, basicSize))
+                            throw new IOException("Shortcut deletion failed and attributes could not be restored.",
+                                new Win32Exception(error));
+                        throw new Win32Exception(error);
+                    }
                 }
             }
         }
@@ -388,6 +417,7 @@ function Remove-MarkerStartMenu {
         }
         catch {
             Write-Warning "Preserving unverified marker Start Menu shortcut: $link ($($_.Exception.Message))"
+            throw
         }
         finally { if ($null -ne $validated) { $validated.Dispose() } }
     }

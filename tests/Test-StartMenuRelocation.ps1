@@ -110,8 +110,51 @@ try {
     }
     finally { $validated.Dispose() }
 
+    # Compile the production helper with test-only faults at the actual reopen
+    # gap and native deletion call. Real handles/files still enforce sharing.
+    $nativePattern = "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@"
+    $installNative = [regex]::Match((Get-Content -Raw (Join-Path $repository 'packaging/install.ps1')), $nativePattern).Groups[1].Value
+    $uninstallNative = [regex]::Match((Get-Content -Raw (Join-Path $repository 'packaging/uninstall.ps1')), $nativePattern).Groups[1].Value
+    Check ($installNative.Length -gt 0 -and $installNative -ceq $uninstallNative) 'install and uninstall use identical native deletion helpers'
+    $gapNative = $installNative.Replace('namespace IdleHarbor.Packaging', 'namespace IdleHarbor.Packaging.ReopenGap')
+    $gapNative = $gapNative.Replace('validated.Dispose();', @'
+validated.Dispose();
+            File.Move(path, path + ".validated");
+            File.Copy(path + ".validated", path);
+            File.SetAttributes(path, FileAttributes.ReadOnly | FileAttributes.Hidden);
+'@)
+    Add-Type -TypeDefinition $gapNative
+    $gapPath = Join-Path $identityRoot 'gap.lnk'
+    [IO.File]::WriteAllBytes($gapPath, $race.Replacement)
+    $validated = [IO.File]::Open($gapPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $identityDenied = $false
+    try { [IdleHarbor.Packaging.ReopenGap.FileIdentity]::DeleteValidated($gapPath, $validated) }
+    catch { $identityDenied = $_.Exception.Message -like '*identity*changed*' }
+    finally { $validated.Dispose() }
+    Check $identityDenied 'actual reopen-gap replacement with identical bytes is rejected'
+    Check ((Test-Path -LiteralPath $gapPath) -and (Test-Path -LiteralPath ($gapPath + '.validated'))) 'reopen-gap race preserves both files'
+    Check (([IO.File]::GetAttributes($gapPath) -band ([IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Hidden)) -eq
+        ([IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Hidden)) 'reopen-gap replacement retains read-only and hidden attributes'
+
+    $failureNative = $installNative.Replace('namespace IdleHarbor.Packaging', 'namespace IdleHarbor.Packaging.DeleteFailure')
+    $failureNative = $failureNative.Replace('SetFileInformationByHandle(handle, 4,', 'SetFileInformationByHandle(handle, -1,')
+    Add-Type -TypeDefinition $failureNative
+    $failedPath = Join-Path $identityRoot 'failed-delete.lnk'
+    [IO.File]::WriteAllBytes($failedPath, $race.Replacement)
+    [IO.File]::SetAttributes($failedPath, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Hidden)
+    $attributes = [IO.File]::GetAttributes($failedPath)
+    $failedHash = (Get-FileHash -LiteralPath $failedPath -Algorithm SHA256).Hash
+    $validated = [IO.File]::Open($failedPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $deletionFailed = $false
+    try { [IdleHarbor.Packaging.DeleteFailure.FileIdentity]::DeleteValidated($failedPath, $validated) }
+    catch { $deletionFailed = $true }
+    finally { $validated.Dispose() }
+    Check $deletionFailed 'native disposition failure is reported'
+    Check ([IO.File]::GetAttributes($failedPath) -eq $attributes) 'native deletion failure restores original attributes'
+    Check ((Get-FileHash -LiteralPath $failedPath -Algorithm SHA256).Hash -eq $failedHash) 'native deletion failure preserves shortcut bytes'
+
     foreach ($operation in @('update', 'update-none', 'uninstall')) {
-      foreach ($scenario in @('intact', 'bytes-modified', 'bytes-current', 'foreign', 'outside-boundary', 'sibling-boundary',
+      foreach ($scenario in @('intact', 'read-only', 'read-only-hidden', 'bytes-modified', 'bytes-current', 'foreign', 'outside-boundary', 'sibling-boundary',
           'bad-hash', 'partial-evidence', 'legacy-relocated', 'legacy-current', 'unowned', 'hardlink', 'junction', 'directory')) {
         $caseRoot = Join-Path $root "$operation-$scenario"
         $source = Join-Path $caseRoot 'source'
@@ -128,6 +171,8 @@ try {
         Check (($marker.startMenuProgramsPath -eq $programs) -and
             ($marker.startMenuLinkSha256 -eq (Get-FileHash -LiteralPath $oldLink -Algorithm SHA256).Hash)) "$operation/$scenario records install-time boundary and actual shortcut hash"
         switch ($scenario) {
+            'read-only' { [IO.File]::SetAttributes($oldLink, [IO.FileAttributes]::ReadOnly) }
+            'read-only-hidden' { [IO.File]::SetAttributes($oldLink, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Hidden) }
             { $_ -in @('bytes-modified', 'bytes-current') } {
                 $shell = New-Object -ComObject WScript.Shell
                 $link = $shell.CreateShortcut($oldLink); $link.Hotkey = 'CTRL+ALT+I'; $link.Save()
@@ -167,7 +212,7 @@ try {
         if ($operation -eq 'update-none') { $parameters.StartMenu = 'None' }
         $records = $(if ($operation -like 'update*') { @(& $install @parameters 3>&1) }
             else { @(& $uninstall -InstallRoot $target -Confirm:$false 3>&1) })
-        $shouldRemove = ($scenario -eq 'intact' -or ($scenario -eq 'legacy-current' -and $operation -ne 'update'))
+        $shouldRemove = ($scenario -in @('intact', 'read-only', 'read-only-hidden') -or ($scenario -eq 'legacy-current' -and $operation -ne 'update'))
         if ($shouldRemove) {
             Check (-not (Test-Path -LiteralPath $oldLink)) "$operation/$scenario removes owned shortcut"
         }
@@ -186,6 +231,45 @@ try {
             Check ($updatedMarker.startMenuLinkOwned -eq ($scenario -ne 'bytes-current')) "$operation/$scenario records current launcher ownership"
         }
       }
+    }
+    foreach ($operation in @('update', 'update-none', 'uninstall')) {
+        $caseRoot = Join-Path $root "deletion-failure-$operation"
+        $source = Join-Path $caseRoot 'source'
+        $target = Join-Path $caseRoot 'IdleHarbor'
+        $programs = Join-Path $caseRoot 'old Programs'
+        New-Item -ItemType Directory -Path $source -Force | Out-Null
+        [IO.File]::WriteAllBytes((Join-Path $source 'IdleHarbor.exe'), [byte[]](0x4d, 0x5a, 0, 1))
+        $parameters = @{ SourcePath = $source; InstallRoot = $target; Startup = 'None'; NoLaunch = $true; Confirm = $false }
+        & (Get-IsolatedScript 'install') @parameters | Out-Null
+        $oldLink = Join-Path $programs 'IdleHarbor.lnk'
+        $markerPath = Join-Path $target '.idleharbor-managed.json'
+        $markerHash = (Get-FileHash -LiteralPath $markerPath -Algorithm SHA256).Hash
+        $oldHash = (Get-FileHash -LiteralPath $oldLink -Algorithm SHA256).Hash
+        $exeHash = (Get-FileHash -LiteralPath (Join-Path $target 'IdleHarbor.exe') -Algorithm SHA256).Hash
+        [IO.File]::WriteAllBytes((Join-Path $source 'IdleHarbor.exe'), [byte[]](0x4d, 0x5a, 0, 2))
+        $programs = Join-Path $caseRoot 'new Programs'
+        if ($operation -eq 'update-none') { $parameters.StartMenu = 'None' }
+        $scriptName = $(if ($operation -eq 'uninstall') { 'uninstall' } else { 'install' })
+        $normal = Get-IsolatedScript $scriptName
+        $arguments = $(if ($operation -eq 'uninstall') { @{ InstallRoot = $target; Confirm = $false } } else { $parameters })
+        # A real second reader permits validation but denies the DELETE reopen.
+        $blocker = [IO.File]::Open($oldLink, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        $message = ''
+        try { & $normal @arguments 3>$null | Out-Null } catch { $message = $_.Exception.Message }
+        finally { $blocker.Dispose() }
+        Check ($message.Length -gt 0) "$operation reports cleanup failure as terminating"
+        Check ((Test-Path -LiteralPath $markerPath) -and (Get-FileHash -LiteralPath $markerPath -Algorithm SHA256).Hash -eq $markerHash) `
+            "$operation retains exact ownership evidence for retry"
+        Check ((Test-Path -LiteralPath $oldLink) -and (Get-FileHash -LiteralPath $oldLink -Algorithm SHA256).Hash -eq $oldHash) `
+            "$operation preserves former shortcut on cleanup failure"
+        Check ((Test-Path -LiteralPath (Join-Path $target 'IdleHarbor.exe')) -and
+            (Get-FileHash -LiteralPath (Join-Path $target 'IdleHarbor.exe') -Algorithm SHA256).Hash -eq $exeHash) `
+            "$operation preserves installed executable on cleanup failure"
+        Check (-not (Test-Path -LiteralPath (Join-Path $programs 'IdleHarbor.lnk'))) "$operation leaves no untracked current launcher"
+        if ($message.Length -gt 0) {
+            & $normal @arguments | Out-Null
+            Check (-not (Test-Path -LiteralPath $oldLink)) "$operation retry removes former owned shortcut"
+        }
     }
     foreach ($fault in @('AfterCopy', 'AfterStartupRemoval', 'AfterStartup', 'AfterMarker', 'Preview')) {
         $caseRoot = Join-Path $root "transaction-$fault"
