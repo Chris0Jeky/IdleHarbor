@@ -27,10 +27,11 @@ remain separately tracked under #49 and #59; corner sanitization is described be
 
 Every full-window and notification-area popup bitmap passes through the pure
 `Clear-CaptureRoundedCorners` helper after `CopyFromScreen` and before PNG save.
-Capture uses explicit 32-bit ARGB bitmaps. The Windows 11 capture radii are 8 DIPs
-for windows and 4 DIPs for popups, scaled to physical pixels using each captured
-window's DPI (16 and 8 pixels respectively at the default 192 DPI). Radii round up
-to whole pixels and clamp to half the shorter bitmap dimension.
+Capture uses explicit 32-bit ARGB bitmaps. The radius follows DWM's corner preference
+for the captured window or popup menu: `DWMWCP_ROUNDSMALL` (3) is 4 DIPs, while
+`DWMWCP_DEFAULT` (0) and `DWMWCP_ROUND` (2) are 8 DIPs. Each DIP radius is scaled to
+physical pixels using that window's DPI (8 and 16 pixels respectively at the default
+192 DPI). Radii round up to whole pixels and clamp to half the shorter bitmap dimension.
 
 The helper overwrites **both RGB and alpha with zero** outside the rounded region,
 including pixels whose square crosses the curve. It does not blend with desktop
@@ -40,10 +41,10 @@ window content, image dimensions and the rounded silhouette are retained.
 
 Masking applies only when DWM actually rounds the captured surface. Before each save the
 tool reads `DWMWA_WINDOW_CORNER_PREFERENCE` for the window or popup menu; a failed read
-(attribute unsupported, so Windows 10 or older) or `DWMWCP_DONOTROUND` keeps the square
-corner pixels untouched. Capture restores and positions its own window, so maximized or
-snapped square corners do not arise. The pure decision `Test-CaptureCornersRounded` is
-covered offline; the live DWM read is not.
+(attribute unsupported, so Windows 10 or older) or `DWMWCP_DONOTROUND` selects a radius of
+0 and keeps the square corner pixels untouched. Capture restores and positions its own window,
+so maximized or snapped square corners do not arise. The pure mapping
+`Get-CaptureCornerRadiusDip` is covered offline; the live DWM read is not.
 
 Run the offline regression in Windows PowerShell 5.1:
 
@@ -53,10 +54,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-RegressionScripts
 ```
 
 The corner suite synthesizes high-contrast bitmaps with opaque, translucent and
-transparent pattern pixels. Fourteen cases cover both surfaces at 96/120/144/168/
-192/480 DPI and tiny bitmaps. It checks all four raw BGRA bytes per pixel before
-and after an in-memory PNG round-trip: 3,180 exterior pixels are zero and 14,960
-interior pixels are unchanged (72,614 checks). Running the same suite with
+transparent pattern pixels. Fifteen cases cover 4 and 8 DIP radii at 96/120/144/168/
+192/480 DPI, tiny bitmaps, and a zero-radius case that must clear nothing. It checks all
+four raw BGRA bytes per pixel before and after an in-memory PNG round-trip: 3,180 exterior
+pixels are zero and 15,023 interior pixels are unchanged (72,886 checks). It also asserts
+that a 4 DIP (`DWMWCP_ROUNDSMALL`) radius clears fewer pixels than 8 DIP at every DPI, and
+that `DWMWCP_DONOTROUND` and a failed read select no masking. Running the same suite with
 `-CaptureScript` pointing to a copy whose helper body is disabled fails at the
 first exterior pattern pixel. No live window or desktop access is needed.
 

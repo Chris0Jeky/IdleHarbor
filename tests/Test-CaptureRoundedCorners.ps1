@@ -29,17 +29,20 @@ $definition = $ast.Find({ param($node)
 Assert-True ($null -ne $definition) 'Missing production corner helper.'
 . ([scriptblock]::Create($definition.Extent.Text))
 
-# DWM square corners (unsupported attribute, DWMWCP_DONOTROUND) must skip masking.
+# DWM's corner preference selects the radius in DIPs; 0 means no masking.
 $decision = $ast.Find({ param($node)
-    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-CaptureCornersRounded'
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-CaptureCornerRadiusDip'
 }, $true)
-Assert-True ($null -ne $decision) 'Missing production corner-decision helper.'
+Assert-True ($null -ne $decision) 'Missing production corner-radius helper.'
 . ([scriptblock]::Create($decision.Extent.Text))
-foreach ($preference in 0, 2, 3) {
-    Assert-True (Test-CaptureCornersRounded -Result 0 -Preference $preference) "DWM preference $preference must keep rounded masking."
+Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 3) -eq 4) 'DWMWCP_ROUNDSMALL must use a 4 DIP radius.'
+foreach ($preference in 0, 2) {
+    Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference $preference) -eq 8) "DWM preference $preference must use an 8 DIP radius."
 }
-Assert-True (-not (Test-CaptureCornersRounded -Result 0 -Preference 1)) 'DWMWCP_DONOTROUND must skip masking.'
-Assert-True (-not (Test-CaptureCornersRounded -Result ([int]0x80070057) -Preference 0)) 'An unsupported attribute (Windows 10) must skip masking.'
+# DWMWCP_DONOTROUND and an unsupported attribute (Windows 10) must skip masking.
+Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 1) -eq 0) 'DWMWCP_DONOTROUND must skip masking.'
+Assert-True ((Get-CaptureCornerRadiusDip -Result ([int]0x80070057) -Preference 0) -eq 0) 'An unsupported attribute (Windows 10) must skip masking.'
+Assert-True ((Get-CaptureCornerRadiusDip -Result ([int]0x80070057) -Preference 3) -eq 0) 'A failed read must skip masking even when the preference would round.'
 
 # Protect the save seam and both call sites without touching a live desktop.
 foreach ($name in @('Save-ScreenRectangle', 'Save-WindowCapture', 'Save-TrayMenuCapture')) {
@@ -51,17 +54,17 @@ foreach ($name in @('Save-ScreenRectangle', 'Save-WindowCapture', 'Save-TrayMenu
     if ($name -eq 'Save-ScreenRectangle') {
         Assert-True ($body -match 'Format32bppArgb') 'Captures must retain a writable alpha channel.'
         $copy = $body.IndexOf('$graphics.CopyFromScreen(', [StringComparison]::Ordinal)
-        $mask = $body.IndexOf('Clear-CaptureRoundedCorners -Bitmap $bitmap -Surface $Surface -Dpi $Dpi', [StringComparison]::Ordinal)
+        $mask = $body.IndexOf('Clear-CaptureRoundedCorners -Bitmap $bitmap -RadiusDip $RadiusDip -Dpi $Dpi', [StringComparison]::Ordinal)
         $save = $body.IndexOf('$bitmap.Save(', [StringComparison]::Ordinal)
         Assert-True ($copy -ge 0 -and $mask -gt $copy -and $save -gt $mask) 'Every screen bitmap must be sanitized between copy and save.'
-        Assert-True ($body -match 'if \(\$Rounded\) \{\s+Clear-CaptureRoundedCorners') 'Masking must be gated on the DWM corner decision.'
+        Assert-True ($body -match 'if \(\$RadiusDip -gt 0\) \{\s+Clear-CaptureRoundedCorners') 'Masking must be gated on the DWM corner radius.'
     }
     else {
         $surface = if ($name -eq 'Save-WindowCapture') { 'Window' } else { 'Popup' }
         $handle = if ($surface -eq 'Window') { '$Window' } else { '$menu' }
-        Assert-True ($body -match ('Save-ScreenRectangle[^\r\n]+-Surface ' + $surface + ' -Dpi')) "Missing $surface sanitization at the capture call site."
+        Assert-True ($body -match 'Save-ScreenRectangle[^\r\n]+-RadiusDip \(Read-CaptureCornerRadiusDip ') "Missing $surface sanitization at the capture call site."
         Assert-True ($body.Contains("::GetDpiForWindow($handle)")) "$surface radius must use its own physical DPI."
-        Assert-True ($body.Contains("-Rounded (Get-CaptureCornersRounded $handle)")) "$surface must ask DWM whether its corners are rounded."
+        Assert-True ($body.Contains("-RadiusDip (Read-CaptureCornerRadiusDip $handle)")) "$surface must ask DWM for its corner radius."
     }
 }
 
@@ -78,17 +81,21 @@ function Read-BitmapBytes([Drawing.Bitmap]$Bitmap) {
     finally { $Bitmap.UnlockBits($data) }
 }
 
-$cases = @(foreach ($surface in @('Window', 'Popup')) {
+$cases = @(foreach ($radiusDip in @(4, 8)) {
     foreach ($dpi in @(96, 120, 144, 168, 192, 480)) {
-        $radius = if ($surface -eq 'Window') { 8 * $dpi / 96 } else { 4 * $dpi / 96 }
-        @{ Surface = $surface; Dpi = $dpi; Width = 2 * $radius + 11; Height = 2 * $radius + 7; Radius = $radius }
+        $radius = $radiusDip * $dpi / 96
+        @{ RadiusDip = $radiusDip; Dpi = $dpi; Width = 2 * $radius + 11; Height = 2 * $radius + 7; Radius = $radius; Keyed = $true }
     }
 }) + @(
-    @{ Surface = 'Window'; Dpi = 192; Width = 3; Height = 5; Radius = 1 },
-    @{ Surface = 'Popup'; Dpi = 192; Width = 1; Height = 1; Radius = 0 }
+    @{ RadiusDip = 8; Dpi = 192; Width = 3; Height = 5; Radius = 1 },
+    @{ RadiusDip = 4; Dpi = 192; Width = 1; Height = 1; Radius = 0 },
+    # DONOTROUND and failed reads select radius 0: nothing may be cleared.
+    @{ RadiusDip = 0; Dpi = 192; Width = 9; Height = 7; Radius = 0; Keyed = $true }
 )
+$clearedByCase = @{}
 
 foreach ($case in $cases) {
+    $caseCleared = 0
     $bitmap = New-Object Drawing.Bitmap($case.Width, $case.Height, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $stream = New-Object IO.MemoryStream
     $decoded = $null
@@ -102,7 +109,7 @@ foreach ($case in $cases) {
             }
         }
         $before = Read-BitmapBytes $bitmap
-        Clear-CaptureRoundedCorners -Bitmap $bitmap -Surface $case.Surface -Dpi $case.Dpi
+        Clear-CaptureRoundedCorners -Bitmap $bitmap -RadiusDip $case.RadiusDip -Dpi $case.Dpi
         $after = Read-BitmapBytes $bitmap
         $bitmap.Save($stream, [Drawing.Imaging.ImageFormat]::Png)
         $stream.Position = 0
@@ -119,11 +126,12 @@ foreach ($case in $cases) {
                 for ($channel = 0; $channel -lt 4; $channel++) {
                     $index = $offset + $channel
                     $expected = if ($outside) { 0 } else { $before[$index] }
-                    Assert-True ($after[$index] -eq $expected -and $saved[$index] -eq $expected) "Corner bytes differ at $($case.Surface)/$($case.Dpi) DPI ($x,$y), BGRA channel $channel (outside=$outside)."
+                    Assert-True ($after[$index] -eq $expected -and $saved[$index] -eq $expected) "Corner bytes differ at $($case.RadiusDip) DIP/$($case.Dpi) DPI ($x,$y), BGRA channel $channel (outside=$outside)."
                 }
-                if ($outside) { $clearedPixels++ } else { $preservedPixels++ }
+                if ($outside) { $clearedPixels++; $caseCleared++ } else { $preservedPixels++ }
             }
         }
+        if ($case.ContainsKey('Keyed')) { $clearedByCase["$($case.RadiusDip)@$($case.Dpi)"] = $caseCleared }
     }
     finally {
         if ($null -ne $decoded) { $decoded.Dispose() }
@@ -132,4 +140,11 @@ foreach ($case in $cases) {
     }
 }
 Assert-True ($clearedPixels -gt 0 -and $preservedPixels -gt 0) 'Exercise both cleared and unchanged pixels.'
+Assert-True ($clearedByCase['0@192'] -eq 0) 'A zero radius (DONOTROUND or failed read) must clear no pixels.'
+# A ROUNDSMALL (4 DIP) window must clear strictly fewer corner pixels than the 8 DIP case.
+foreach ($dpi in @(96, 120, 144, 168, 192, 480)) {
+    $roundSmall = $clearedByCase["4@$dpi"]
+    $roundDefault = $clearedByCase["8@$dpi"]
+    Assert-True ($roundSmall -gt 0 -and $roundSmall -lt $roundDefault) "A 4 DIP radius must clear fewer pixels than 8 DIP at $dpi DPI ($roundSmall vs $roundDefault)."
+}
 Write-Host "Capture rounded corners passed ($($cases.Count) cases, $checks checks; $clearedPixels cleared / $preservedPixels byte-identical interior pixels, including PNG round-trip)."
