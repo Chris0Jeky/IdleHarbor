@@ -141,6 +141,13 @@ namespace IdleHarbor.Capture
             out RECT value,
             uint valueSize);
 
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(
+            IntPtr window,
+            uint attribute,
+            out int value,
+            uint valueSize);
+
         [DllImport("user32.dll")]
         public static extern bool SetWindowPos(
             IntPtr window,
@@ -434,9 +441,64 @@ function Wait-Status([IntPtr]$StatusControl, [string]$Pattern, [int]$Seconds = 5
     throw "Status did not match '$Pattern'; last value was '$text'."
 }
 
+function Clear-CaptureRoundedCorners {
+    param(
+        [Parameter(Mandatory)]
+        [Drawing.Bitmap]$Bitmap,
+        [Parameter(Mandatory)]
+        [ValidateSet('Window', 'Popup')]
+        [string]$Surface,
+        [Parameter(Mandatory)]
+        [ValidateRange(96, 480)]
+        [int]$Dpi
+    )
+
+    if ($Bitmap.PixelFormat -ne [Drawing.Imaging.PixelFormat]::Format32bppArgb) {
+        throw 'Rounded capture sanitization requires Format32bppArgb.'
+    }
+    # Windows 11 capture radii: 8 DIPs for rounded windows, 4 for small popups.
+    # Work in physical pixels, matching CopyFromScreen and the capture bounds.
+    $radiusDip = if ($Surface -eq 'Window') { 8 } else { 4 }
+    $radius = [Math]::Min([Math]::Ceiling($radiusDip * $Dpi / 96.0),
+        [Math]::Floor([Math]::Min($Bitmap.Width, $Bitmap.Height) / 2.0))
+    $clear = [Drawing.Color]::FromArgb(0, 0, 0, 0)
+    for ($y = 0; $y -lt $radius; $y++) {
+        for ($x = 0; $x -lt $radius; $x++) {
+            $dx = $radius - $x
+            $dy = $radius - $y
+            # Keep a pixel only when its whole square is inside the arc. Clear
+            # partially covered edge pixels too: their RGB can contain desktop.
+            if ($dx * $dx + $dy * $dy -gt $radius * $radius) {
+                $Bitmap.SetPixel($x, $y, $clear)
+                $Bitmap.SetPixel($Bitmap.Width - 1 - $x, $y, $clear)
+                $Bitmap.SetPixel($x, $Bitmap.Height - 1 - $y, $clear)
+                $Bitmap.SetPixel($Bitmap.Width - 1 - $x, $Bitmap.Height - 1 - $y, $clear)
+            }
+        }
+    }
+}
+
+# DWM keeps square corners when the attribute is unsupported (Windows 10, build
+# < 22000: the call fails) or the preference is DWMWCP_DONOTROUND (1). Capture
+# restores and positions its own windows, so maximized/snapped squares do not arise.
+function Test-CaptureCornersRounded {
+    param([int]$Result, [int]$Preference)
+    return ($Result -eq 0 -and $Preference -ne 1)
+}
+
+function Get-CaptureCornersRounded([IntPtr]$Window) {
+    [int]$preference = 0
+    # 33 = DWMWA_WINDOW_CORNER_PREFERENCE.
+    $result = [IdleHarbor.Capture.Native]::DwmGetWindowAttribute($Window, 33, [ref]$preference, 4)
+    return (Test-CaptureCornersRounded -Result $result -Preference $preference)
+}
+
 function Save-ScreenRectangle(
     [IdleHarbor.Capture.Native+RECT]$Rectangle,
-    [string]$Path) {
+    [string]$Path,
+    [string]$Surface,
+    [int]$Dpi,
+    [bool]$Rounded) {
     $width = $Rectangle.Right - $Rectangle.Left
     $height = $Rectangle.Bottom - $Rectangle.Top
     if ($width -le 0 -or $height -le 0) {
@@ -445,7 +507,7 @@ function Save-ScreenRectangle(
     if (Test-Path -LiteralPath $Path) {
         [IO.File]::Delete($Path)
     }
-    $bitmap = New-Object Drawing.Bitmap($width, $height)
+    $bitmap = New-Object Drawing.Bitmap($width, $height, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
     try {
         $graphics = [Drawing.Graphics]::FromImage($bitmap)
         try {
@@ -453,6 +515,9 @@ function Save-ScreenRectangle(
         }
         finally {
             $graphics.Dispose()
+        }
+        if ($Rounded) {
+            Clear-CaptureRoundedCorners -Bitmap $bitmap -Surface $Surface -Dpi $Dpi
         }
         $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
     }
@@ -479,7 +544,7 @@ function Save-WindowCapture([IntPtr]$Window, [string]$Path) {
     if ($frameBoundsResult -ne 0) {
         throw "Could not read the visible capture frame bounds (HRESULT 0x$('{0:X8}' -f ([uint32]$frameBoundsResult)))."
     }
-    Save-ScreenRectangle $rectangle $Path
+    Save-ScreenRectangle $rectangle $Path -Surface Window -Dpi ([int][IdleHarbor.Capture.Native]::GetDpiForWindow($Window)) -Rounded (Get-CaptureCornersRounded $Window)
     if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
         [IO.File]::Delete($Path)
         throw 'Foreground changed during capture; discarded the image.'
@@ -541,7 +606,7 @@ function Save-TrayMenuCapture([IntPtr]$Window, [string]$Path) {
         if (-not [IdleHarbor.Capture.Native]::GetWindowRect($menu, [ref]$menuRectangle)) {
             throw 'Could not read the notification-area menu rectangle.'
         }
-        Save-ScreenRectangle $menuRectangle $Path
+        Save-ScreenRectangle $menuRectangle $Path -Surface Popup -Dpi ([int][IdleHarbor.Capture.Native]::GetDpiForWindow($menu)) -Rounded (Get-CaptureCornersRounded $menu)
         if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
             [IO.File]::Delete($Path)
             throw 'Foreground changed during tray-menu capture; discarded the image.'
