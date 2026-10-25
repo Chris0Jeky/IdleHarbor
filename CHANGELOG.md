@@ -11,6 +11,11 @@ where practical.
 - Documentation captures clear alpha and RGB outside rounded window and notification-area
   popup corners before saving. Existing screenshot assets and manifest hashes are unchanged;
   the next real capture applies the sanitization.
+- Per-user update and uninstall validate install-time Programs boundary and shortcut
+  bytes before removing a launcher after Start Menu known-folder relocation. Changed,
+  foreign, unsafe and hard-linked paths are preserved; legacy markers remain limited
+  to the current Programs path. Ownership is rechecked after confirmation, and
+  deletion compares file identity and bytes before removing the validated file by handle.
 - The Chocolatey x64 guard uses the machine-wide native architecture registry value,
   refusing ARM64/Prism and unreadable or unknown native values before downloading.
   Process architecture variables cannot override the decision; hardware validation remains pending.

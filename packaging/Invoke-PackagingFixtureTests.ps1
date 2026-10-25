@@ -223,9 +223,23 @@ function Assert-StartMenuLifecycle(
     $emptySnapshot = Get-StartMenuSnapshot -Link $link
     Assert-True ($null -eq $emptySnapshot) 'Missing Start Menu shortcut produced a non-empty snapshot.'
     $null = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
-    Restore-StartMenuSnapshot -Bytes $emptySnapshot -Executable $Executable -Link $link
+    $writtenBytes = Get-StartMenuSnapshot -Link $link
+    Restore-StartMenuSnapshot -Bytes $emptySnapshot -ExpectedBytes $writtenBytes -Executable $Executable -Link $link
     Assert-True (-not (Test-Path -LiteralPath $link)) `
         'Fresh-install rollback retained a newly created Start Menu shortcut.'
+
+    $null = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
+    $writtenBytes = Get-StartMenuSnapshot -Link $link
+    $changed = $shell.CreateShortcut($link)
+    $changed.Hotkey = 'CTRL+ALT+I'
+    $changed.Save()
+    $changedBytes = [IO.File]::ReadAllBytes($link)
+    $rollbackRejected = $false
+    try { Restore-StartMenuSnapshot -Bytes $null -ExpectedBytes $writtenBytes -Executable $Executable -Link $link }
+    catch { $rollbackRejected = $_.Exception.Message -like '*changed or foreign Start Menu*' }
+    Assert-True $rollbackRejected 'Rollback deleted a shortcut with changed bytes but identical launcher properties.'
+    Assert-True (Test-ByteArraysEqual $changedBytes ([IO.File]::ReadAllBytes($link))) 'Rollback changed a customized shortcut.'
+    Remove-Item -LiteralPath $link -Force
 
     $null = Set-StartMenu -Executable $Executable -Mode Create -PreviouslyOwned:$false -Link $link
     $changed = $shell.CreateShortcut($link)
@@ -313,6 +327,7 @@ function Assert-StartMenuLifecycle(
 }
 
 $packagingRoot = $PSScriptRoot
+. (Join-Path (Split-Path -Parent $packagingRoot) 'tests\Get-IsolatedPackagingScript.ps1')
 foreach ($script in Get-ChildItem -LiteralPath $packagingRoot -Filter '*.ps1' -File) {
     $tokens = $null
     $errors = $null
@@ -337,6 +352,8 @@ $sourceRoot = Join-Path $tempRoot 'source'
 $buildRoot = Join-Path $tempRoot 'build'
 $outputRoot = Join-Path $tempRoot 'dist'
 $installRoot = Join-Path $tempRoot 'IdleHarbor'
+$isolatedInstall = Get-IsolatedPackagingScript (Join-Path $packagingRoot 'install.ps1') $tempRoot (Join-Path $tempRoot 'Programs')
+$isolatedUninstall = Get-IsolatedPackagingScript (Join-Path $packagingRoot 'uninstall.ps1') $tempRoot (Join-Path $tempRoot 'Programs')
 $purgeInstallRoot = Join-Path $tempRoot 'PurgeInstall\IdleHarbor'
 $retainedTransactionPaths = @()
 $packagingTestMutex = $null
@@ -385,11 +402,11 @@ try {
     $fakeExecutable = Join-Path $buildRoot 'IdleHarbor.exe'
     [IO.File]::WriteAllBytes($fakeExecutable, [byte[]](0x4d, 0x5a, 0x00, 0x01, 0x02, 0x03))
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch -WhatIf | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer -WhatIf created files.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -StartMenu None -NoLaunch -WhatIf | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup RunKey -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer startup-mode -WhatIf created files.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -StartMenu None -NoLaunch -WhatIf | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup TaskScheduler -StartMenu None -NoLaunch -WhatIf | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Installer Task Scheduler -WhatIf created files.'
     # Windows PowerShell 5.1 replaces a same-named global function when the
     # ScheduledTasks module auto-loads above. Reinstall the deterministic shim
@@ -405,7 +422,7 @@ try {
     }
     $taskPreflightRejected = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -WhatIf | Out-Null
+        & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -WhatIf | Out-Null
     }
     catch {
         $taskPreflightRejected = $_.Exception.Message -like '*different scheduled task already owns*'
@@ -426,7 +443,7 @@ try {
     Set-Content -LiteralPath $sameSourceUnrelated -Value 'do not change' -Encoding ASCII
     $sameSourceFailureMessage = $null
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $sameSourceRoot -InstallRoot $sameSourceRoot -Startup None -StartMenu None -NoLaunch | Out-Null
+        & $isolatedInstall -SourcePath $sameSourceRoot -InstallRoot $sameSourceRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     }
     catch { $sameSourceFailureMessage = $_.Exception.Message }
     Assert-True ($sameSourceFailureMessage -like '*no valid IdleHarbor ownership marker*') `
@@ -445,7 +462,7 @@ try {
     Set-Content -LiteralPath $transactionSentinel -Value 'preserve'
     $transactionFailed = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') `
+        & $isolatedInstall `
             -SourcePath $buildRoot `
             -InstallRoot $transactionRoot `
             -Startup None `
@@ -464,7 +481,7 @@ try {
     New-Item -ItemType Directory -Path $preexistingTransactionRoot -Force | Out-Null
     $preexistingFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
+        & $isolatedInstall -SourcePath $buildRoot -InstallRoot $preexistingTransactionRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterCopy | Out-Null
     }
     catch { $preexistingFailure = $true }
     Assert-True $preexistingFailure 'Injected failure in a pre-existing empty root did not fail.'
@@ -474,7 +491,7 @@ try {
         'Rollback left managed residue in a pre-existing empty install root.'
 
     $successfulCommitTransactions = @(Get-TransactionDirectories)
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -StartMenu None -NoLaunch | Out-Null
     Assert-NoNewTransactionDirectories $successfulCommitTransactions `
         'Successful commit left transaction backup material behind.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot '.idleharbor-managed.json')) 'Installer did not write its ownership marker.'
@@ -497,7 +514,7 @@ try {
     $completeRollbackTransactions = @(Get-TransactionDirectories)
     $updateFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+        & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
     }
     catch { $updateFailure = $true }
     Assert-True $updateFailure 'Injected update failure did not fail.'
@@ -515,7 +532,7 @@ try {
     $priorRollbackBytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
     $fileRestoreFailureMessage = $null
     try {
-        & (Join-Path $packagingRoot 'install.ps1') `
+        & $isolatedInstall `
             -SourcePath $buildRoot `
             -InstallRoot $installRoot `
             -Startup None `
@@ -542,7 +559,7 @@ try {
     $startupRollbackBytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable))
     $startupRestoreFailureMessage = $null
     try {
-        & (Join-Path $packagingRoot 'install.ps1') `
+        & $isolatedInstall `
             -SourcePath $buildRoot `
             -InstallRoot $installRoot `
             -Startup None `
@@ -560,7 +577,7 @@ try {
     Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -ceq $startupRollbackBytes) `
         'Startup-only rollback failure did not preserve the restored executable bytes.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True ([Convert]::ToBase64String([IO.File]::ReadAllBytes($installedExecutable)) -cne $originalExecutable) `
         'Successful update did not install the new executable.'
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'README.md') -PathType Leaf) `
@@ -571,43 +588,43 @@ try {
     $sameDirectoryMarker = Get-Content -Raw -LiteralPath $installedMarker
     $sameDirectoryFailure = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
+        & $isolatedInstall -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch -InjectFailureAt AfterMarker | Out-Null
     }
     catch { $sameDirectoryFailure = $true }
     Assert-True $sameDirectoryFailure 'Injected same-directory marker failure did not fail.'
     Assert-True ((Get-Content -Raw -LiteralPath $installedMarker) -ceq $sameDirectoryMarker) `
         'Same-directory rollback did not restore the ownership marker.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $installRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Same-directory reinstall removed the executable.'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $installRoot -Startup None -StartMenu None -NoLaunch | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $installRoot 'IdleHarbor.exe')) 'Managed reinstall removed the executable.'
     Remove-Item -LiteralPath $unexpectedFile -Force
-    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $installRoot | Out-Null
+    & $isolatedUninstall -InstallRoot $installRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $installRoot)) 'Uninstaller left an empty install root.'
 
     $hardlinkRoot = Join-Path $tempRoot 'hardlink-boundary\IdleHarbor'
     $hardlinkSentinel = Join-Path $tempRoot 'hardlink-boundary-sentinel.bin'
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
     $hardlinkExecutable = Join-Path $hardlinkRoot 'IdleHarbor.exe'
     Remove-Item -LiteralPath $hardlinkExecutable -Force
     [IO.File]::WriteAllBytes($hardlinkSentinel, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
     New-Item -ItemType HardLink -Path $hardlinkExecutable -Target $hardlinkSentinel | Out-Null
     $hardlinkRejected = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
+        & $isolatedInstall -SourcePath $buildRoot -InstallRoot $hardlinkRoot -StartMenu None -NoLaunch | Out-Null
     }
     catch { $hardlinkRejected = $_.Exception.Message -like '*hard links*' }
     Assert-True $hardlinkRejected 'Installer accepted a multiply linked managed destination file.'
     Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
         'Installer overwrote data outside its boundary through a managed hard link.'
-    & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $hardlinkRoot | Out-Null
+    & $isolatedUninstall -InstallRoot $hardlinkRoot | Out-Null
     Assert-True (-not (Test-Path -LiteralPath $hardlinkRoot)) `
         'Uninstaller did not remove the in-root hard link without touching its external peer.'
     Assert-True (([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($hardlinkSentinel))) -ceq 'foreign') `
         'Uninstaller changed the external peer of an in-root hard link.'
 
-    & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -StartMenu None -NoLaunch | Out-Null
+    & $isolatedInstall -SourcePath $buildRoot -InstallRoot $purgeInstallRoot -StartMenu None -NoLaunch | Out-Null
     $savedAppData = $env:APPDATA
     $savedLocalAppData = $env:LOCALAPPDATA
     $testAppData = Join-Path $tempRoot 'appdata'
@@ -621,7 +638,7 @@ try {
     $env:APPDATA = $testAppData
     $env:LOCALAPPDATA = $testLocalAppData
     try {
-        & (Join-Path $packagingRoot 'uninstall.ps1') -InstallRoot $purgeInstallRoot -PurgeData | Out-Null
+        & $isolatedUninstall -InstallRoot $purgeInstallRoot -PurgeData | Out-Null
     }
     finally {
         $env:APPDATA = $savedAppData
@@ -636,7 +653,7 @@ try {
     [IO.File]::WriteAllBytes($foreignExecutable, [byte[]](0x66, 0x6f, 0x72, 0x65, 0x69, 0x67, 0x6e))
     $foreignRejected = $false
     try {
-        & (Join-Path $packagingRoot 'install.ps1') -SourcePath $buildRoot -InstallRoot $foreignRoot -StartMenu None -NoLaunch | Out-Null
+        & $isolatedInstall -SourcePath $buildRoot -InstallRoot $foreignRoot -StartMenu None -NoLaunch | Out-Null
     }
     catch { $foreignRejected = $true }
     Assert-True $foreignRejected 'Installer accepted a non-empty destination without an ownership marker.'

@@ -24,6 +24,49 @@ Committed PNG assets and `docs/assets/capture-manifest.json` remain unchanged;
 the next real capture applies the helper. Existing owner-account actions in
 `HUMAN_TODO.md` remain open.
 
+## Start Menu known-folder relocation (issue #37)
+
+Per-user markers now retain the install-time Programs directory and SHA-256 of
+the launcher bytes written. Update/uninstall accept the former path only when it
+is exactly `IdleHarbor.lnk` in that recorded boundary, bytes and launcher properties
+match, the leaf has one hard link and no path component is a reparse point.
+Changed, foreign or unsafe entries are reported and preserved. Legacy markers
+remain owned only at the current Programs path. Migration cleanup is the last
+transaction step, after the current launcher and marker commit; earlier failures
+leave the old launcher intact and restore the current path. Rollback refuses to
+overwrite byte changes made after the installer wrote its launcher.
+
+PR #146's confirmation race is repaired in both marker-removal functions: full
+ownership validation now repeats after approval under a read handle that denies
+writes and leaf replacement. Deletion reopens with DELETE access, compares the
+volume/file ID, single-link/regular-file properties and bytes, and marks that
+same handle for deletion. Sharing/access failures preserve the leaf with a warning.
+Ancestor directories are not locked; identity comparison rejects redirection to
+a different file during the reopen gap, and handle deletion cannot follow a later
+path redirect. Crafted-marker behavior is unchanged.
+
+Six fixture races replace a shortcut or swap its Programs ancestor for a junction
+at the true return from ShouldProcess during update, update-without-launcher and
+uninstall. Before the repair they fail 18 preservation assertions. Separate checks
+exercise write/rename denial and rejection of a different file ID with identical bytes.
+Windows PowerShell 5.1.26100.9711 passes all 226 relocation assertions, all 13
+registered regression suites, and both packaging entry points. Disabling only the
+new post-confirmation revalidation (retaining native identity-bound deletion)
+reproduces all 18 failures across the six races. The public packaging check's
+first concurrent run detects another suite's temporary transaction directory;
+rerunning with its own worktree-local temp root passes. No production scripts
+are modified for this mutation check, and no commit or push is performed.
+
+The initial Windows PowerShell 5.1 relocation regression failed both intact
+update/uninstall removal assertions while current-path creation passed. The
+expanded lifecycle regression and packaging fixtures exercise real temporary
+shortcut bytes, hashes, hard links and junctions through injected known folders.
+All registered script regressions and the public packaging suite pass on Windows
+PowerShell 5.1.
+No installed app, actual Start Menu, Run entry or scheduled task is changed.
+PowerShell 7, hosted CI and real profile redirection are not verified locally.
+No commit, push or issue closure is performed; `HUMAN_TODO.md` owner gates remain unchanged.
+
 ## Chocolatey native architecture guard (PR #144 / issue #51)
 
 The x64-only package now reads the machine-wide `PROCESSOR_ARCHITECTURE` value from
@@ -403,7 +446,7 @@ message from an earlier session, so Stop then Start does not pause the replaceme
 unless that session receives its own genuine input. The hidden fixture does not
 install low-level hooks.
 
-#37 concerns ownership across known-folder relocation. #49/#50/#59 concern
+#37's known-folder relocation repair is described above. #49/#50/#59 concern
 capture quoting, corner privacy and harness cleanup. The two native scripts now
 remove their temp directory through `tests/Remove-IdleHarborScopedTemp.ps1`.
 The helper refuses paths outside the user temp directory or with the wrong leaf,
