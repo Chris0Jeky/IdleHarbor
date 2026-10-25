@@ -38,6 +38,13 @@ pixels or leave recoverable RGB under transparent alpha. Pixels wholly inside
 the region remain byte-identical. Only the four corner squares are examined;
 window content, image dimensions and the rounded silhouette are retained.
 
+Masking applies only when DWM actually rounds the captured surface. Before each save the
+tool reads `DWMWA_WINDOW_CORNER_PREFERENCE` for the window or popup menu; a failed read
+(attribute unsupported, so Windows 10 or older) or `DWMWCP_DONOTROUND` keeps the square
+corner pixels untouched. Capture restores and positions its own window, so maximized or
+snapped square corners do not arise. The pure decision `Test-CaptureCornersRounded` is
+covered offline; the live DWM read is not.
+
 Run the offline regression in Windows PowerShell 5.1:
 
 ```powershell

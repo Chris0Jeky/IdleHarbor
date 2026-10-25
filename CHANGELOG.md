@@ -9,8 +9,9 @@ where practical.
 ### Fixed
 
 - Documentation captures clear alpha and RGB outside rounded window and notification-area
-  popup corners before saving. Existing screenshot assets and manifest hashes are unchanged;
-  the next real capture applies the sanitization.
+  popup corners before saving, unless DWM keeps square corners (Windows 10, or a
+  DWMWCP_DONOTROUND preference), when the genuine corner pixels are kept. Existing
+  screenshot assets and manifest hashes are unchanged; the next real capture applies it.
 - Per-user update and uninstall validate install-time Programs boundary and shortcut
   bytes before removing a launcher after Start Menu known-folder relocation. Changed,
   foreign, unsafe and hard-linked paths are preserved; legacy markers remain limited

@@ -29,6 +29,18 @@ $definition = $ast.Find({ param($node)
 Assert-True ($null -ne $definition) 'Missing production corner helper.'
 . ([scriptblock]::Create($definition.Extent.Text))
 
+# DWM square corners (unsupported attribute, DWMWCP_DONOTROUND) must skip masking.
+$decision = $ast.Find({ param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-CaptureCornersRounded'
+}, $true)
+Assert-True ($null -ne $decision) 'Missing production corner-decision helper.'
+. ([scriptblock]::Create($decision.Extent.Text))
+foreach ($preference in 0, 2, 3) {
+    Assert-True (Test-CaptureCornersRounded -Result 0 -Preference $preference) "DWM preference $preference must keep rounded masking."
+}
+Assert-True (-not (Test-CaptureCornersRounded -Result 0 -Preference 1)) 'DWMWCP_DONOTROUND must skip masking.'
+Assert-True (-not (Test-CaptureCornersRounded -Result ([int]0x80070057) -Preference 0)) 'An unsupported attribute (Windows 10) must skip masking.'
+
 # Protect the save seam and both call sites without touching a live desktop.
 foreach ($name in @('Save-ScreenRectangle', 'Save-WindowCapture', 'Save-TrayMenuCapture')) {
     $function = $ast.Find({ param($node)
@@ -42,12 +54,14 @@ foreach ($name in @('Save-ScreenRectangle', 'Save-WindowCapture', 'Save-TrayMenu
         $mask = $body.IndexOf('Clear-CaptureRoundedCorners -Bitmap $bitmap -Surface $Surface -Dpi $Dpi', [StringComparison]::Ordinal)
         $save = $body.IndexOf('$bitmap.Save(', [StringComparison]::Ordinal)
         Assert-True ($copy -ge 0 -and $mask -gt $copy -and $save -gt $mask) 'Every screen bitmap must be sanitized between copy and save.'
+        Assert-True ($body -match 'if \(\$Rounded\) \{\s+Clear-CaptureRoundedCorners') 'Masking must be gated on the DWM corner decision.'
     }
     else {
         $surface = if ($name -eq 'Save-WindowCapture') { 'Window' } else { 'Popup' }
         $handle = if ($surface -eq 'Window') { '$Window' } else { '$menu' }
         Assert-True ($body -match ('Save-ScreenRectangle[^\r\n]+-Surface ' + $surface + ' -Dpi')) "Missing $surface sanitization at the capture call site."
         Assert-True ($body.Contains("::GetDpiForWindow($handle)")) "$surface radius must use its own physical DPI."
+        Assert-True ($body.Contains("-Rounded (Get-CaptureCornersRounded $handle)")) "$surface must ask DWM whether its corners are rounded."
     }
 }
 
