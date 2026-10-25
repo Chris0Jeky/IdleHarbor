@@ -39,6 +39,10 @@ Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 3) -eq 4) 'DWMWCP
 foreach ($preference in 0, 2) {
     Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference $preference) -eq 8) "DWM preference $preference must use an 8 DIP radius."
 }
+# DWMWCP_DEFAULT leaves the radius to the surface: popup menus round at 4 DIPs. An explicit preference wins.
+Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 0 -DefaultDip 4) -eq 4) 'DWMWCP_DEFAULT on a popup menu must use its 4 DIP default.'
+Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 2 -DefaultDip 4) -eq 8) 'DWMWCP_ROUND must use 8 DIPs even on a popup surface.'
+Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 1 -DefaultDip 4) -eq 0) 'DWMWCP_DONOTROUND must skip masking on a popup surface.'
 # DWMWCP_DONOTROUND and an unsupported attribute (Windows 10) must skip masking.
 Assert-True ((Get-CaptureCornerRadiusDip -Result 0 -Preference 1) -eq 0) 'DWMWCP_DONOTROUND must skip masking.'
 Assert-True ((Get-CaptureCornerRadiusDip -Result ([int]0x80070057) -Preference 0) -eq 0) 'An unsupported attribute (Windows 10) must skip masking.'
@@ -62,9 +66,11 @@ foreach ($name in @('Save-ScreenRectangle', 'Save-WindowCapture', 'Save-TrayMenu
     else {
         $surface = if ($name -eq 'Save-WindowCapture') { 'Window' } else { 'Popup' }
         $handle = if ($surface -eq 'Window') { '$Window' } else { '$menu' }
+        # A popup passes its 4 DIP system default for DWMWCP_DEFAULT; a window keeps the 8 DIP default.
+        $read = if ($surface -eq 'Window') { "Read-CaptureCornerRadiusDip $handle)" } else { "Read-CaptureCornerRadiusDip $handle -DefaultDip 4)" }
         Assert-True ($body -match 'Save-ScreenRectangle[^\r\n]+-RadiusDip \(Read-CaptureCornerRadiusDip ') "Missing $surface sanitization at the capture call site."
         Assert-True ($body.Contains("::GetDpiForWindow($handle)")) "$surface radius must use its own physical DPI."
-        Assert-True ($body.Contains("-RadiusDip (Read-CaptureCornerRadiusDip $handle)")) "$surface must ask DWM for its corner radius."
+        Assert-True ($body.Contains("-RadiusDip ($read")) "$surface must ask DWM for its corner radius."
     }
 }
 

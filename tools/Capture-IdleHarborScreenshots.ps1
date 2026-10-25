@@ -480,24 +480,29 @@ function Clear-CaptureRoundedCorners {
 # Returns the corner radius in DIPs that DWM actually applies, or 0 for no masking.
 # DWM keeps square corners when the attribute is unsupported (Windows 10, build
 # < 22000: the call fails) or the preference is DWMWCP_DONOTROUND (1). DWMWCP_ROUNDSMALL
-# (3) is 4 DIPs; DWMWCP_DEFAULT (0) and DWMWCP_ROUND (2) are 8 DIPs. Capture
-# restores and positions its own windows, so maximized/snapped squares do not arise.
+# (3) is 4 DIPs and DWMWCP_ROUND (2) is 8 DIPs. DWMWCP_DEFAULT (0) leaves the choice to
+# the system, which rounds top-level windows at 8 DIPs and popup menus at 4, so the
+# caller passes that surface default. Capture restores and positions its own windows,
+# so maximized/snapped squares do not arise.
 function Get-CaptureCornerRadiusDip {
-    param([int]$Result, [int]$Preference)
+    param([int]$Result, [int]$Preference, [int]$DefaultDip = 8)
     if ($Result -ne 0 -or $Preference -eq 1) {
         return 0
     }
     if ($Preference -eq 3) {
         return 4
     }
-    return 8
+    if ($Preference -eq 2) {
+        return 8
+    }
+    return $DefaultDip
 }
 
-function Read-CaptureCornerRadiusDip([IntPtr]$Window) {
+function Read-CaptureCornerRadiusDip([IntPtr]$Window, [int]$DefaultDip = 8) {
     [int]$preference = 0
     # 33 = DWMWA_WINDOW_CORNER_PREFERENCE.
     $result = [IdleHarbor.Capture.Native]::DwmGetWindowAttribute($Window, 33, [ref]$preference, 4)
-    return (Get-CaptureCornerRadiusDip -Result $result -Preference $preference)
+    return (Get-CaptureCornerRadiusDip -Result $result -Preference $preference -DefaultDip $DefaultDip)
 }
 
 function Save-ScreenRectangle(
@@ -612,7 +617,7 @@ function Save-TrayMenuCapture([IntPtr]$Window, [string]$Path) {
         if (-not [IdleHarbor.Capture.Native]::GetWindowRect($menu, [ref]$menuRectangle)) {
             throw 'Could not read the notification-area menu rectangle.'
         }
-        Save-ScreenRectangle $menuRectangle $Path -Dpi ([int][IdleHarbor.Capture.Native]::GetDpiForWindow($menu)) -RadiusDip (Read-CaptureCornerRadiusDip $menu)
+        Save-ScreenRectangle $menuRectangle $Path -Dpi ([int][IdleHarbor.Capture.Native]::GetDpiForWindow($menu)) -RadiusDip (Read-CaptureCornerRadiusDip $menu -DefaultDip 4)
         if ([IdleHarbor.Capture.Native]::GetForegroundWindow() -ne $Window) {
             [IO.File]::Delete($Path)
             throw 'Foreground changed during tray-menu capture; discarded the image.'

@@ -28,8 +28,9 @@ remain separately tracked under #49 and #59; corner sanitization is described be
 Every full-window and notification-area popup bitmap passes through the pure
 `Clear-CaptureRoundedCorners` helper after `CopyFromScreen` and before PNG save.
 Capture uses explicit 32-bit ARGB bitmaps. The radius follows DWM's corner preference
-for the captured window or popup menu: `DWMWCP_ROUNDSMALL` (3) is 4 DIPs, while
-`DWMWCP_DEFAULT` (0) and `DWMWCP_ROUND` (2) are 8 DIPs. Each DIP radius is scaled to
+for the captured window or popup menu: `DWMWCP_ROUNDSMALL` (3) is 4 DIPs and
+`DWMWCP_ROUND` (2) is 8 DIPs, while `DWMWCP_DEFAULT` (0) takes the system default for the
+surface (8 DIPs for a window, 4 for a popup menu). Each DIP radius is scaled to
 physical pixels using that window's DPI (8 and 16 pixels respectively at the default
 192 DPI). Radii round up to whole pixels and clamp to half the shorter bitmap dimension.
 
