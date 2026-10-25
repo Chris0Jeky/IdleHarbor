@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Settings focus sent outside the main message loop reveals its target instead of
+  inheriting an earlier pointer classification. Child input dispatched by a nested
+  loop distinguishes keyboard reveal from pointer focus without viewport movement.
 - Per-user update and uninstall remove unchanged installer-owned Start Menu shortcuts
   even when read-only. Cleanup failures now retain the original ownership marker for
   retry: update rolls back, and uninstall stops before deleting installed files.

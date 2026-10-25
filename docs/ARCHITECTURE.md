@@ -109,10 +109,15 @@ visual layout, including the fixed footer's Start, Stop, Save order. It reveals 
 and also re-reveals the still-focused body control after resize/DPI layout changes; pointer and
 scrollbar scrolling with unchanged focus remains stable.
 
-Reveal is classified by how focus was reached. Each queued message is tagged as keyboard or pointer
-input before it is dispatched, so a control clicked with the mouse is never scrolled out from under
-the pointer; only keyboard focus moves and layout changes reveal. A suppressed reveal does not consume
-the focus change, so driving that same control from the keyboard still reveals it.
+Reveal is classified by how focus was reached. The main loop tags keyboard and pointer input for
+its current dispatch, then resets the classification before waiting for another message. Child
+subclasses also classify input for the duration of their handler, including dispatch from a nested
+modal loop. Returning from nested input clears its cause instead of restoring an older one.
+Pointer focus leaves the viewport stable; keyboard input reveals a clipped target.
+Sent focus outside an input dispatch uses the layout/programmatic reveal policy, so accessibility
+focus does not inherit an earlier pointer classification. A suppressed reveal does not consume the
+focus change, so driving that same control from the keyboard still reveals it. Ordinary queued
+messages do not retry a suppressed pointer reveal. Open combo lists still suppress every reveal.
 
 A combo list is a popup anchored to a control the layout would otherwise move, so while one is open
 the body does not scroll and its repaints are queued rather than forced: the same descendants are

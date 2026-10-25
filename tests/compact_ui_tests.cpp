@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <dwmapi.h>
 #include <cstring>
+#include <thread>
 
 namespace {
 bool nonzero_glass_margins = false;
@@ -13,6 +14,9 @@ HWND measured_hover = nullptr;
 int hover_invalidations = 0;
 HWND measured_fixed = nullptr;
 int fixed_positions = 0;
+constexpr UINT kSentFocus = WM_APP + 77;
+constexpr UINT kNestedInput = WM_APP + 78;
+constexpr UINT kFocusComplete = WM_APP + 79;
 BOOL WINAPI RecordPosition(HWND window, HWND after, int x, int y, int width, int height, UINT flags) {
     if (window == measured_fixed) ++fixed_positions;
     return ::SetWindowPos(window, after, x, y, width, height, flags);
@@ -93,6 +97,81 @@ bool Capture(HWND window, const std::filesystem::path& path) {
 }
 
 struct ApplicationStatusTestAccess {
+    static void CheckFocusOrigins(Application& app, HWND window) {
+        const bool was_visible = IsWindowVisible(window) != FALSE;
+        const bool high_contrast = app.high_contrast_;
+        ShowWindow(window, SW_SHOWNOACTIVATE);
+        const auto dispatch = [&](HWND target, UINT message, WPARAM key = 0) {
+            MSG input{}; input.hwnd = target; input.message = message; input.wParam = key;
+            app.NoteInputTrigger(input);
+            DispatchMessageW(&input);
+            app.MaintainFocusedControlVisibility();
+        };
+        const auto reset = [&] {
+            SetFocus(app.duration_preset_);
+            app.ScrollTo(0);
+            app.last_focus_ = app.duration_preset_;
+        };
+        const auto revealed = [&](HWND control) {
+            RECT field{}, viewport{};
+            GetWindowRect(control, &field); GetWindowRect(app.settings_viewport_, &viewport);
+            return GetFocus() == control && field.top >= viewport.top && field.bottom <= viewport.bottom;
+        };
+        for (const bool native_colors : {false, true}) {
+            app.high_contrast_ = native_colors;
+            reset();
+            dispatch(app.interval_, WM_LBUTTONDOWN);
+            SendMessageW(app.interval_, WM_CANCELMODE, 0, 0);
+            Check(GetFocus() == app.interval_ && app.scroll_position_ == 0,
+                  "queued pointer focus does not move the settings viewport");
+            // GetMessage delivers a cross-thread sent request before returning queued input.
+            std::thread sender{[&] {
+                SendMessageW(window, kSentFocus, 0, reinterpret_cast<LPARAM>(app.emergency_hotkey_));
+                PostMessageW(window, kFocusComplete, 0, 0);
+            }};
+            MSG sent{};
+            const bool received = GetMessageW(&sent, window, kFocusComplete, kFocusComplete) > 0;
+            sender.join();
+            Check(received, "GetMessage returns after delivering the sent focus request");
+            Check(revealed(app.emergency_hotkey_), "sent focus after pointer input reveals its new target");
+            dispatch(app.emergency_hotkey_, WM_MOUSEMOVE);
+            Check(revealed(app.emergency_hotkey_), "unrelated queued messages preserve the revealed position");
+
+            reset();
+            dispatch(app.interval_, WM_LBUTTONDOWN);
+            SendMessageW(app.interval_, WM_CANCELMODE, 0, 0);
+            dispatch(app.interval_, WM_MOUSEMOVE);
+            Check(app.scroll_position_ == 0, "unrelated queued messages do not reveal pointer-focused fields");
+            dispatch(app.interval_, WM_KEYDOWN, VK_RIGHT);
+            Check(revealed(app.interval_), "keyboard use reveals the same pointer-focused clipped field");
+
+            reset();
+            MSG outer{}; outer.message = WM_KEYDOWN;
+            app.NoteInputTrigger(outer);
+            // A nested modal loop dispatches input without calling NoteInputTrigger.
+            PostMessageW(app.emergency_hotkey_, WM_LBUTTONDOWN, 0, 0);
+            Check(SendMessageW(window, kNestedInput, WM_LBUTTONDOWN,
+                              reinterpret_cast<LPARAM>(app.emergency_hotkey_)) == WM_LBUTTONDOWN,
+                  "nested loop retrieves its own native input message");
+            SendMessageW(app.emergency_hotkey_, WM_CANCELMODE, 0, 0);
+            Check(GetFocus() == app.emergency_hotkey_ && app.scroll_position_ == 0,
+                  "nested-loop pointer focus does not inherit the earlier keyboard trigger");
+            app.MaintainFocusedControlVisibility();
+            Check(app.scroll_position_ == 0, "returning from a nested pointer dispatch does not revive an outer keyboard trigger");
+            reset();
+            dispatch(app.emergency_hotkey_, WM_LBUTTONDOWN);
+            SendMessageW(app.emergency_hotkey_, WM_CANCELMODE, 0, 0);
+            PostMessageW(app.emergency_hotkey_, WM_KEYDOWN, VK_RIGHT, 0);
+            Check(SendMessageW(window, kNestedInput, WM_KEYDOWN,
+                              reinterpret_cast<LPARAM>(app.emergency_hotkey_)) == WM_KEYDOWN,
+                  "nested loop retrieves its own keyboard message");
+            Check(revealed(app.emergency_hotkey_), "nested-loop keyboard input reveals the clipped focused control");
+        }
+        app.high_contrast_ = high_contrast;
+        reset();
+        if (!was_visible) ShowWindow(window, SW_HIDE);
+    }
+
     static COLORREF PaintPixel(HWND control, int x, int y, bool erase = false) {
         RECT bounds{}; GetClientRect(control, &bounds);
         HDC source = GetDC(control), memory = CreateCompatibleDC(source);
@@ -373,6 +452,7 @@ struct ApplicationStatusTestAccess {
         Check(AppSettingsEqual(settings, app.settings_), "disclosure does not alter preferences");
         Check(ControlText(app.section_buttons_[0]).find(L'\n') != std::wstring::npos,
               "expanded native names retain the settings summary");
+        CheckFocusOrigins(app, window);
         if (capture) {
             SetFocus(app.interval_);
             app.ToggleSection(0);
@@ -532,6 +612,14 @@ int main(int argc, char**) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     WNDCLASSW cls{};
     cls.lpfnWndProc = [](HWND window, UINT message, WPARAM w_param, LPARAM l_param) -> LRESULT {
+        if (message == kSentFocus) { SetFocus(reinterpret_cast<HWND>(l_param)); return 0; }
+        if (message == kNestedInput) {
+            MSG input{};
+            if (GetMessageW(&input, reinterpret_cast<HWND>(l_param), static_cast<UINT>(w_param),
+                            static_cast<UINT>(w_param)) <= 0) return 0;
+            DispatchMessageW(&input);
+            return input.message;
+        }
         // Emulate a small work area without changing the user's display or app minimum.
         if (message == WM_GETMINMAXINFO) return DefWindowProcW(window, message, w_param, l_param);
         return Application::WindowProc(window, message, w_param, l_param);

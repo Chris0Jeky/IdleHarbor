@@ -210,7 +210,6 @@ Open follow-ups, from the issue tracker:
 
 - [#123](https://github.com/Chris0Jeky/IdleHarbor/issues/123) — do not treat an unreadable existing settings file as a first run.
 - [#122](https://github.com/Chris0Jeky/IdleHarbor/issues/122) — reject stale genuine-input messages from an earlier process.
-- [#55](https://github.com/Chris0Jeky/IdleHarbor/issues/55) — focus changes that bypass the message loop.
 - [#51](https://github.com/Chris0Jeky/IdleHarbor/issues/51) — Chocolatey install, upgrade, and uninstall on a real isolated Windows machine.
 - [#49](https://github.com/Chris0Jeky/IdleHarbor/issues/49), [#50](https://github.com/Chris0Jeky/IdleHarbor/issues/50), [#59](https://github.com/Chris0Jeky/IdleHarbor/issues/59) — capture portability, screenshot corners, and shared native-test setup.
 - [#37](https://github.com/Chris0Jeky/IdleHarbor/issues/37) — Start Menu known-folder relocation.
