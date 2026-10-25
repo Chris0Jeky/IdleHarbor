@@ -19,10 +19,11 @@ regressions passed." The separate offline capture-manifest/evidence suites and
 the 30-check capture portability suite also pass in Windows PowerShell 5.1.
 Test temp/profile paths are confined to this worktree.
 
-Masking is skipped when DWM keeps square corners: the capture tool reads
-`DWMWA_WINDOW_CORNER_PREFERENCE` for the window or popup menu, and a failed read (Windows 10)
-or `DWMWCP_DONOTROUND` leaves the corners unmasked (Codex P2 on PR #148). The pure decision
-is tested offline; the live DWM read is not exercised.
+The radius follows `DWMWA_WINDOW_CORNER_PREFERENCE` for the window or popup menu
+(`Get-CaptureCornerRadiusDip`): a failed read (Windows 10) or `DWMWCP_DONOTROUND` leaves the
+corners unmasked (Codex P2 on PR #148), `DWMWCP_ROUNDSMALL` masks 4 DIPs (#149),
+`DWMWCP_ROUND` 8 DIPs, and `DWMWCP_DEFAULT` the surface default above (8 for windows, 4 for
+popups). The pure decision is tested offline; the live DWM read is not exercised.
 
 No live desktop capture or visual inspection is performed for this change.
 Committed PNG assets and `docs/assets/capture-manifest.json` remain unchanged;
