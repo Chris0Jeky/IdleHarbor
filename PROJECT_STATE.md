@@ -1,6 +1,34 @@
 # Project state
 
-Last updated: 2026-10-22
+Last updated: 2026-10-25
+
+## Read-only Start Menu cleanup and retry evidence (#147)
+
+Update and uninstall now clear ReadOnly through the deletion handle only after
+matching the shortcut's file identity and bytes. Other attributes remain intact;
+if native deletion fails, the helper attempts to restore the original attributes.
+Cleanup errors now terminate: update rolls back its new launcher, executable and
+marker, while uninstall stops before deleting installed files or the marker.
+The retained marker allows cleanup to be retried after a sharing/access failure.
+
+On base `ae474ca`, all seventeen x64 Release CTests pass after configuring with
+Visual Studio 17 2022 and building with `--config Release --parallel 2`.
+Windows PowerShell 5.1 passes all 267 assertions in the expanded
+`tests/Test-StartMenuRelocation.ps1`: read-only and read-only/hidden shortcuts,
+real sharing failures, exact marker/executable rollback, retries, replacement
+with identical bytes during the actual native reopen gap, and attribute recovery
+after a forced native disposition failure. Install/uninstall native helpers are
+also checked for parity. Against the original scripts extracted using read-only
+`git show HEAD:packaging/<name>.ps1`, the same tests fail 16 assertions.
+The isolated baseline copy and logs remain under ignored `build/` directories.
+All fourteen suites in `tests/Test-RegressionScripts.ps1` and the public
+`packaging/Test-Packaging.ps1` gate pass in Windows PowerShell 5.1 with temp/profile
+fixtures confined to this worktree.
+
+No installed app, actual Start Menu, registry or scheduled task is changed.
+PowerShell 7, Windows 10/ARM64 and hosted CI are not verified for this repair.
+No commit, push or PR publication is performed under this task's no-write Git
+constraint; owner-account actions in `HUMAN_TODO.md` remain open.
 
 ## Rounded documentation capture corners (#50)
 

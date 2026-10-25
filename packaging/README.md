@@ -91,7 +91,11 @@ the leaf or any ancestor. Modified, unsafe or out-of-boundary paths are preserve
 Removal repeats these checks after confirmation while a read handle denies writes and leaf
 replacement. To obtain DELETE access, it reopens the file, checks the volume/file ID and bytes
 against the validated handle, and deletes through that same new handle. A changed identity or
-content, or a sharing/access failure, preserves the leaf with a warning. Ancestors are not locked:
+  content preserves the leaf. Once identity and bytes match, a read-only attribute is cleared
+  through that same handle before deletion, retaining other attributes; a failed deletion
+  attempts to restore the original attributes. Sharing/access or deletion failures warn and terminate:
+  update rolls back the new launcher and marker, and uninstall stops before removing installed
+  files or the marker, retaining ownership evidence for a later retry. Ancestors are not locked:
 a concurrent redirect to a different file is rejected by the identity comparison, and a redirect
 after the final open cannot redirect handle-based deletion to another file.
 Markers without either new evidence field retain current-known-folder-only ownership; partially
