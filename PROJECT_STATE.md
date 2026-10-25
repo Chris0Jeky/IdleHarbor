@@ -6,17 +6,58 @@ Last updated: 2026-10-25
 
 Both desktop scripts use `tests/IdleHarborTestHost.psm1` for the single-instance
 precondition, temp/config setup, quoted owner launch, visible-window discovery and
-bounded teardown. Exit-command and owner hangs are killed before scoped cleanup;
+bounded teardown. Owner, exit-command and earlier forwarded-command hangs are killed
+before scoped cleanup;
 cleanup errors are returned so the original test failure survives. The repaint
 fixture also attaches to the foreground input queue during activation: the baseline
 failed its foreground assertion, while the repair passes the unchanged drag checks.
 All seventeen x64 Release CTests, fifteen registered script suites and the packaging
-gate pass. Windows PowerShell 5.1 passes 31 process-fixture checks; omitting either
-kill or config quoting makes them fail. Both native scripts pass twice in one runspace
+gate pass. Windows PowerShell 5.1 passes 40 process-fixture checks; omitting owner,
+exit-command or earlier-command cleanup, or config quoting, makes them fail. Both
+native scripts pass twice in one runspace
 under a spaced temp path at 120 DPI (33 hover tools, six fitting hints, native drag/wheel
 and matching repaint hashes), leaving no owner or temp directory. This does not
 prove Windows 10/ARM64, PowerShell 7 or physical accessibility acceptance.
 Owner-account actions in `HUMAN_TODO.md` remain open.
+
+PR #153 integration retains main's simultaneous-policy-safeguard tests and state
+entry below. Fresh-context review found that repaint's earlier exit/override/start
+commands were outside shared teardown; their process handles are now passed to the
+host. The new hanging-command fixture fails against the previous helper and passes
+the repair without replacing the original assertion on failure. Its termination
+allowance is one second: 200 ms timed out although the following exit assertion
+succeeded. The production five-second wait is unchanged. One repeated native run
+failed the wheel-bottom assertion; two diagnostic repeats and two final direct
+repeats passed unchanged assertions, so the cause remains unconfirmed. No Git writes or network calls are
+performed; the resolved file remains unmerged in Git's index for coordinator staging.
+
+## Simultaneous policy safeguards (#145)
+
+Core tests now cover all 36 pairs among maximum duration, manual pause and the
+seven automatic safeguard reasons. Each condition is also checked alone, plus
+an all-clear Run control. Expectations use an explicit order independent of
+`reason_priority`, checking action, state, reason and cooldown as well as the
+engine's stored state/reason. Only the selected safeguards are enabled, so the
+on-battery input required by low-battery protection cannot mask another pair.
+Separate cases check exact-boundary expiry with every automatic safeguard active
+during both indefinite manual pause and snooze, and that expiry remains stopped.
+The current order is documented in `docs/ARCHITECTURE.md`; production behavior
+is unchanged.
+
+On base `bbaa0bd`, the Visual Studio 17 2022 x64 Release build and all seventeen
+CTests pass before and after the additions. The focused command is
+`ctest --test-dir build/x64 -C Release -R '^(core|core_contracts|session_controls)$' --output-on-failure`.
+A temporary mutation moves lock handling before manual pause in `evaluate`.
+The original core tests still pass; the expanded core tests fail on the
+manual-pause/lock pair and the all-safeguards pre-expiry assertion. Both source
+files are restored byte-for-byte to their intended versions in a `finally` block,
+then the complete build and CTest suite pass again. The mutation runner, original
+test copy and logs remain under ignored `build/` (`Test-PolicyPriorityMutation.ps1`,
+`core_tests.baseline.cpp`, `mutation-*-build.log`, `mutation-*-test.log`).
+
+Windows x86/ARM64, live desktop behavior and hosted CI are not verified for this
+test-only change. No Git writes or PR publication are performed; the coordinator
+owns those steps. `HUMAN_TODO.md` q-3 and q-4 remain open and unchanged.
 
 ## Read-only Start Menu cleanup and retry evidence (#147)
 

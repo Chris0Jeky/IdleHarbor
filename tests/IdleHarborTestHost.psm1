@@ -71,7 +71,8 @@ function Wait-IdleHarborTestWindow {
 
 function Stop-IdleHarborTestHost {
   param($TestHost, [Diagnostics.Process]$Process, [string]$LeafPattern, [string]$RefusalNoun,
-        [ValidateRange(1, 60000)][int]$WaitMilliseconds = 5000)
+        [ValidateRange(1, 60000)][int]$WaitMilliseconds = 5000,
+        [Diagnostics.Process[]]$Commands = @())
   # Return errors to be thrown after the caller's try/finally, preserving its original failure.
   $failures = @()
   if ($null -ne $Process) {
@@ -95,6 +96,17 @@ function Stop-IdleHarborTestHost {
     }
     catch { $failures += "Could not stop test owner: $($_.Exception.Message)" }
     finally { if ($null -ne $exitCommand) { $exitCommand.Dispose() } }
+  }
+  # Earlier forwarded commands can be stuck in their own error dialog after the owner exits.
+  foreach ($command in $Commands) {
+    if ($null -eq $command) { continue }
+    try {
+      if (-not $command.WaitForExit($WaitMilliseconds)) {
+        $command.Kill()
+        if (-not $command.WaitForExit($WaitMilliseconds)) { throw 'The earlier test command did not terminate.' }
+      }
+    }
+    catch { $failures += "Could not stop earlier test command: $($_.Exception.Message)" }
   }
   $cleanup = Remove-IdleHarborScopedTemp -Path $TestHost.TempRoot -LeafPattern $LeafPattern -RefusalNoun $RefusalNoun
   if ($cleanup) { $failures += $cleanup }

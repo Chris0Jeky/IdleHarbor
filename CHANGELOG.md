@@ -57,6 +57,9 @@ where practical.
 
 ### Added
 
+- Policy-priority regression tests cover all 36 simultaneous-condition pairs, including
+  manual pause, and expiry with every safeguard active during indefinite pause or snooze.
+
 - Compact native settings window with duration presets, exact custom seconds and
   expandable Motion & timing, Safety pauses and Window & notifications sections.
   Status and Start/Stop/Save remain fixed; the title shows the running version.

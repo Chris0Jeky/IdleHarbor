@@ -1,5 +1,6 @@
 #include "idleharbor/core.hpp"
 
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <limits>
@@ -281,6 +282,134 @@ bool test_policy_reason_priority_is_explicit() {
     return true;
 }
 
+bool enable_policy_condition(PolicyReason reason, Settings& settings, PolicyInput& input) {
+    switch (reason) {
+    case PolicyReason::MaxDuration:
+        settings.max_duration = input.now;
+        return true;
+    case PolicyReason::ManualPause:
+        return true;  // Applied to the engine after start, rather than to settings.
+    case PolicyReason::Locked:
+        settings.pause_when_locked = true;
+        input.locked = true;
+        return true;
+    case PolicyReason::Disconnected:
+        settings.pause_when_disconnected = true;
+        input.disconnected = true;
+        return true;
+    case PolicyReason::LowBattery:
+        settings.pause_on_low_battery = true;
+        input.on_battery = true;
+        input.battery_percent = 10;
+        return true;
+    case PolicyReason::OnBattery:
+        settings.pause_on_battery = true;
+        input.on_battery = true;
+        return true;
+    case PolicyReason::Fullscreen:
+        settings.pause_when_fullscreen = true;
+        input.fullscreen = true;
+        return true;
+    case PolicyReason::OutsideActiveHours:
+        settings.active_hours = ActiveHours{true, 9 * 60, 17 * 60};
+        input.minute_of_day = 2 * 60;
+        return true;
+    case PolicyReason::UserActivity:
+        settings.pause_on_user_activity = true;
+        input.user_activity = true;
+        return true;
+    case PolicyReason::None:
+        return true;
+    case PolicyReason::Manual:
+        return false;
+    }
+    return false;
+}
+
+bool check_policy_condition_pair(PolicyReason higher, PolicyReason lower) {
+    Settings settings{};
+    // Enable only the selected safeguards: LowBattery also requires on_battery.
+    settings.pause_on_user_activity = false;
+    settings.pause_when_locked = false;
+    settings.pause_when_disconnected = false;
+    settings.pause_on_low_battery = false;
+    PolicyInput input{30s};
+    CHECK(enable_policy_condition(higher, settings, input));
+    CHECK(enable_policy_condition(lower, settings, input));
+    CHECK(idleharbor::core::validate(settings).valid);
+    PolicyEngine policy(settings);
+    policy.start(0s);
+    if (higher == PolicyReason::ManualPause || lower == PolicyReason::ManualPause) {
+        CHECK(policy.pause(0s));
+    }
+
+    const auto decision = policy.evaluate(input);
+    if (decision.reason != higher) {
+        std::cerr << "Priority pair: " << idleharbor::core::policy_reason_name(higher)
+                  << " + " << idleharbor::core::policy_reason_name(lower) << '\n';
+    }
+    CHECK(decision.reason == higher);
+    CHECK(decision.action == (higher == PolicyReason::MaxDuration ? DecisionAction::Stop :
+                             higher == PolicyReason::None ? DecisionAction::Run : DecisionAction::Pause));
+    CHECK(decision.state == (higher == PolicyReason::MaxDuration ? EngineState::Stopped :
+                            higher == PolicyReason::None ? EngineState::Running : EngineState::Paused));
+    CHECK(policy.state() == decision.state);
+    CHECK(policy.reason() == decision.reason);
+    CHECK(decision.cooldown_remaining ==
+          (higher == PolicyReason::UserActivity ? settings.user_activity_cooldown : 0s));
+    return true;
+}
+
+bool test_policy_simultaneous_condition_pairs() {
+    // Independent oracle: never derive the expected winner from reason_priority().
+    constexpr std::array priority{
+        PolicyReason::MaxDuration, PolicyReason::ManualPause, PolicyReason::Locked,
+        PolicyReason::Disconnected, PolicyReason::LowBattery, PolicyReason::OnBattery,
+        PolicyReason::Fullscreen, PolicyReason::OutsideActiveHours, PolicyReason::UserActivity,
+    };
+    for (std::size_t higher = 0; higher < priority.size(); ++higher) {
+        CHECK(check_policy_condition_pair(priority[higher], priority[higher]));
+        for (std::size_t lower = higher + 1; lower < priority.size(); ++lower) {
+            CHECK(idleharbor::core::reason_priority(priority[higher]) >
+                  idleharbor::core::reason_priority(priority[lower]));
+            CHECK(check_policy_condition_pair(priority[higher], priority[lower]));
+        }
+    }
+    CHECK(check_policy_condition_pair(PolicyReason::None, PolicyReason::None));
+    return true;
+}
+
+bool test_policy_expiry_with_every_pause_condition() {
+    Settings settings{};
+    settings.max_duration = 30s;
+    settings.pause_on_battery = true;
+    settings.pause_when_fullscreen = true;
+    settings.active_hours = ActiveHours{true, 9 * 60, 17 * 60};
+    for (const auto pause_duration : {0s, 60s}) {
+        PolicyEngine policy(settings);
+        policy.start(0s);
+        CHECK(policy.pause(0s, pause_duration));
+        PolicyInput input{29s, true, true, true, true, 10, true, 2 * 60};
+        const auto before = policy.evaluate(input);
+        CHECK(before.reason == PolicyReason::ManualPause);
+        CHECK(before.action == DecisionAction::Pause);
+        CHECK(before.state == EngineState::Paused);
+
+        input.now = 30s;
+        const auto expired = policy.evaluate(input);
+        CHECK(expired.reason == PolicyReason::MaxDuration);
+        CHECK(expired.action == DecisionAction::Stop);
+        CHECK(expired.state == EngineState::Stopped);
+        CHECK(expired.cooldown_remaining == 0s);
+        CHECK(!policy.manually_paused());
+        const auto later = policy.evaluate(PolicyInput{100s});
+        CHECK(later.reason == PolicyReason::MaxDuration);
+        CHECK(later.action == DecisionAction::Stop);
+        CHECK(later.state == EngineState::Stopped);
+    }
+    return true;
+}
+
 bool test_optional_safeguards_are_opt_in() {
     Settings settings{};
     settings.pause_on_user_activity = false;
@@ -392,6 +521,8 @@ int main() {
         test_policy_starts_and_stops_explicitly(),
         test_user_activity_cooldown_resumes(),
         test_policy_reason_priority_is_explicit(),
+        test_policy_simultaneous_condition_pairs(),
+        test_policy_expiry_with_every_pause_condition(),
         test_optional_safeguards_are_opt_in(),
         test_unknown_battery_fails_closed_for_requested_safeguards(),
         test_max_duration_stops_and_remains_stopped(),

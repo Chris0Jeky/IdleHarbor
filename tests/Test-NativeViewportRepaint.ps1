@@ -350,6 +350,9 @@ $testHost = New-IdleHarborTestHost -Executable $Executable -LeafPrefix 'IdleHarb
 $executablePath = $testHost.Executable
 $tempRoot = $testHost.TempRoot
 $process = $null
+$exitCommand = $null
+$forwardedOverride = $null
+$startCommand = $null
 $window = [IntPtr]::Zero
 $cleanupRefusal = $null
 
@@ -600,7 +603,7 @@ finally {
             0,
             0x0001 -bor 0x0002 -bor 0x0040) | Out-Null
     }
-    $cleanupRefusal = Stop-IdleHarborTestHost -TestHost $testHost -Process $process -LeafPattern 'IdleHarbor-native-repaint-*' -RefusalNoun 'native-test directory'
+    $cleanupRefusal = Stop-IdleHarborTestHost -TestHost $testHost -Process $process -Commands @($exitCommand, $forwardedOverride, $startCommand) -LeafPattern 'IdleHarbor-native-repaint-*' -RefusalNoun 'native-test directory'
 }
 if ($cleanupRefusal) {
     throw $cleanupRefusal

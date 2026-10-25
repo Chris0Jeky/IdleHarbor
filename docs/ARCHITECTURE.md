@@ -61,6 +61,11 @@ notification to the application thread. The policy engine then applies the confi
 cooldown. Lock/disconnect messages, battery/fullscreen snapshots, active hours, and maximum duration
 are evaluated through the same policy boundary.
 
+For an active session, simultaneous conditions select the first applicable reason in this order:
+maximum duration, manual pause (including snooze), locked, disconnected, low battery, on battery,
+fullscreen, outside active hours, user activity. Expiry stops the session; the other reasons pause it.
+With no applicable condition the session runs. A stopped session stays stopped until Start.
+
 ## Motion and power boundaries
 
 Motion plans are generated as bounded relative paths and emitted through one Win32 input boundary.

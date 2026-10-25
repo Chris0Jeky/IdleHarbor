@@ -50,15 +50,17 @@ public static class NativeHostProbe {
   & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File $compiler -Output $probe
   Assert-True ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $probe)) 'The native process fixture must compile.'
 
-  foreach ($mode in @('graceful', 'hang-owner', 'hang-exit', 'launch-failure')) {
+  foreach ($mode in @('graceful', 'hang-owner', 'hang-exit', 'hang-command', 'launch-failure')) {
     $testHost = New-IdleHarborTestHost -Executable $probe -LeafPrefix 'IdleHarbor-help-tips-' -TestName 'host regression'
     $testHost.ConfigPath = Join-Path $testHost.TempRoot 'settings with spaces.ini'
     foreach ($flag in @('hang-owner', 'hang-exit')) {
-      if ($mode -eq $flag -or ($mode -eq 'launch-failure' -and $flag -eq 'hang-owner')) {
+      if ($mode -eq $flag -or ($mode -eq 'hang-command' -and $flag -eq 'hang-exit') -or
+          ($mode -eq 'launch-failure' -and $flag -eq 'hang-owner')) {
         Set-Content -LiteralPath ($probe + '.' + $flag) -Value ''
       } else { Remove-Item -LiteralPath ($probe + '.' + $flag) -ErrorAction SilentlyContinue }
     }
     $owner = $null
+    $command = $null
     try {
       $owner = Start-IdleHarborTestOwner $testHost -Arguments @('--motion', 'off')
       $deadline = [DateTime]::UtcNow.AddSeconds(5)
@@ -73,16 +75,23 @@ public static class NativeHostProbe {
       if ($mode -eq 'graceful') {
         Assert-True ((Wait-IdleHarborTestWindow $owner.Id -TimeoutSeconds 1) -eq [IntPtr]::Zero) 'Discovery must not return an unrelated window.'
       }
+      if ($mode -eq 'hang-command') {
+        $command = Start-Process -FilePath $probe -ArgumentList '--exit' -WindowStyle Hidden -PassThru
+        Assert-True (-not $command.WaitForExit(200)) 'The earlier command must still be running at teardown.'
+      }
       if ($mode -eq 'launch-failure') { $testHost.Executable = Join-Path $fixture 'missing.exe' }
       $caught = $null
       $shutdown = $null
       try {
         try { if ($mode -eq 'launch-failure') { throw 'original native assertion' } }
-        finally { $shutdown = Stop-IdleHarborTestHost $testHost $owner -LeafPattern 'IdleHarbor-help-tips-*' -RefusalNoun 'host regression directory' -WaitMilliseconds 200 }
+        finally { $shutdown = Stop-IdleHarborTestHost $testHost $owner -LeafPattern 'IdleHarbor-help-tips-*' -RefusalNoun 'host regression directory' -WaitMilliseconds 1000 -Commands @($command, $null) }
       } catch { $caught = $_.Exception.Message }
       Assert-True ($owner.WaitForExit(2000)) "$mode must terminate the owned process before cleanup."
       if ($mode -eq 'graceful') { Assert-True ($owner.ExitCode -eq 0) 'A cooperative owner must exit normally rather than be killed.' }
       Assert-True (-not (Test-Path -LiteralPath $testHost.TempRoot)) "$mode must remove the formerly locked settings directory."
+      if ($mode -eq 'hang-command') {
+        Assert-True ($null -eq (Get-Process -Id $command.Id -ErrorAction SilentlyContinue)) 'Teardown must reap an earlier hung command too.'
+      }
       if ($mode -eq 'launch-failure') {
         Assert-True ($caught -ceq 'original native assertion' -and $shutdown -like 'Could not forward test shutdown:*') 'A shutdown error must be returned without masking the original assertion.'
       } else {
@@ -91,6 +100,10 @@ public static class NativeHostProbe {
         Assert-True ($null -eq (Get-Process -Id $exitId -ErrorAction SilentlyContinue)) "$mode must reap the exit command too."
       }
     } finally {
+      if ($null -ne $command) {
+        if (-not $command.HasExited) { $command.Kill(); [void]$command.WaitForExit(5000) }
+        $command.Dispose()
+      }
       if ($null -ne $owner) {
         if (-not $owner.HasExited) { $owner.Kill(); [void]$owner.WaitForExit(5000) }
         $owner.Dispose()
