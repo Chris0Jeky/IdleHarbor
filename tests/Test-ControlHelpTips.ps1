@@ -6,11 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Remove-IdleHarborScopedTemp.ps1')
-
-if (@(Get-Process -Name IdleHarbor -ErrorAction SilentlyContinue).Count -ne 0) {
-    throw 'Close every running IdleHarbor instance before the control help test.'
-}
+Import-Module (Join-Path $PSScriptRoot 'IdleHarborTestHost.psm1')
 
 # Every control that must explain itself on hover. The tooltip stores one tool
 # per control, so the total is the sum of these groups. Both halves of a
@@ -38,7 +34,6 @@ $expectedHints = @(
     'Ends the session on its own after this long.'
 )
 
-$executablePath = (Resolve-Path -LiteralPath $Executable).Path
 
 if (-not ('IdleHarbor.ControlHelpTips' -as [type])) {
     Add-Type @'
@@ -58,9 +53,6 @@ public static class ControlHelpTips {
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassName(IntPtr window, StringBuilder buffer, int length);
-
-    [DllImport("user32.dll")]
-    public static extern bool IsWindowVisible(IntPtr window);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindow(IntPtr window, uint command);
@@ -163,25 +155,6 @@ public static class ControlHelpTips {
         return result;
     }
 
-    public static IntPtr FindMainWindow(uint targetProcessId) {
-        IntPtr result = IntPtr.Zero;
-        EnumWindows((window, data) => {
-            uint processId;
-            GetWindowThreadProcessId(window, out processId);
-            if (processId != targetProcessId) {
-                return true;
-            }
-            StringBuilder className = new StringBuilder(256);
-            GetClassName(window, className, className.Capacity);
-            if (className.ToString() == "IdleHarbor.MainWindow" && IsWindowVisible(window)) {
-                result = window;
-                return false;
-            }
-            return true;
-        }, IntPtr.Zero);
-        return result;
-    }
-
     // The tooltip is an owned pop-up of the main window, not a child, so it is
     // reached through the top-level list rather than a child enumeration. Match
     // on the owner as well as the class: a themed control may create a tooltip
@@ -240,21 +213,14 @@ function Get-BodyStatics([IntPtr]$Owner) {
 # sized for the window's DPI.
 [void][IdleHarbor.ControlHelpTips]::SetThreadDpiAwarenessContext([IntPtr](-4))
 
-$tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-help-tips-$([Guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $tempRoot | Out-Null
-$configPath = Join-Path $tempRoot 'settings.ini'
+$testHost = New-IdleHarborTestHost -Executable $Executable -LeafPrefix 'IdleHarbor-help-tips-' -TestName 'control help test'
 $process = $null
 $cleanupRefusal = $null
 
 try {
-    $process = Start-Process -FilePath $executablePath -ArgumentList @('--show', '--config', $configPath) -PassThru
+    $process = Start-IdleHarborTestOwner $testHost
 
-    $window = [IntPtr]::Zero
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 100
-        $window = [IdleHarbor.ControlHelpTips]::FindMainWindow([uint32]$process.Id)
-    } while ($window -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $deadline)
+    $window = Wait-IdleHarborTestWindow $process.Id
     if ($window -eq [IntPtr]::Zero) {
         throw 'IdleHarbor did not show its main window within 10 seconds.'
     }
@@ -327,19 +293,7 @@ try {
     Write-Output "Control help tips passed: $toolCount controls explain themselves on hover, $($expectedHints.Count) fields carry a printed explanation that fits its reserved space."
 }
 finally {
-    if ($null -ne $process) {
-        $process.Refresh()
-        if (-not $process.HasExited) {
-            Start-Process -FilePath $executablePath -ArgumentList '--exit' -WindowStyle Hidden -Wait
-            if (-not $process.WaitForExit(5000)) {
-                # Leaving a window on the user's desktop would also make the next
-                # run fail at the single-instance guard for an unrelated reason.
-                $process.Kill()
-                $process.WaitForExit(5000) | Out-Null
-            }
-        }
-    }
-    $cleanupRefusal = Remove-IdleHarborScopedTemp -Path $tempRoot -LeafPattern 'IdleHarbor-help-tips-*' -RefusalNoun 'help-tip test directory'
+    $cleanupRefusal = Stop-IdleHarborTestHost -TestHost $testHost -Process $process -LeafPattern 'IdleHarbor-help-tips-*' -RefusalNoun 'help-tip test directory'
 }
 if ($cleanupRefusal) {
     throw $cleanupRefusal

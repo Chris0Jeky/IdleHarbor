@@ -11,13 +11,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Remove-IdleHarborScopedTemp.ps1')
+Import-Module (Join-Path $PSScriptRoot 'IdleHarborTestHost.psm1')
 
-if (@(Get-Process -Name IdleHarbor -ErrorAction SilentlyContinue).Count -ne 0) {
-    throw 'Close every running IdleHarbor instance before the native repaint test.'
-}
-
-$executablePath = (Resolve-Path -LiteralPath $Executable).Path
 if (-not ('IdleHarbor.NativeViewportRepaint' -as [type])) {
     Add-Type -AssemblyName System.Drawing
     Add-Type @'
@@ -56,9 +51,6 @@ public static class NativeViewportRepaint {
     }
 
     [DllImport("user32.dll")]
-    public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
-
-    [DllImport("user32.dll")]
     public static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr data);
 
     [DllImport("user32.dll")]
@@ -81,9 +73,6 @@ public static class NativeViewportRepaint {
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr window);
-
-    [DllImport("user32.dll")]
-    public static extern bool IsWindowVisible(IntPtr window);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     public static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
@@ -137,7 +126,6 @@ public static class NativeViewportRepaint {
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
-
     [DllImport("user32.dll")]
     public static extern bool GetPhysicalCursorPos(out POINT point);
 
@@ -152,25 +140,6 @@ public static class NativeViewportRepaint {
 
     [DllImport("user32.dll")]
     public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
-
-    public static IntPtr FindMainWindow(uint targetProcessId) {
-        IntPtr result = IntPtr.Zero;
-        EnumWindows((window, data) => {
-            uint processId;
-            GetWindowThreadProcessId(window, out processId);
-            if (processId != targetProcessId) {
-                return true;
-            }
-            StringBuilder className = new StringBuilder(256);
-            GetClassName(window, className, className.Capacity);
-            if (className.ToString() == "IdleHarbor.MainWindow") {
-                result = window;
-                return false;
-            }
-            return true;
-        }, IntPtr.Zero);
-        return result;
-    }
 
     public static IntPtr FindSettingsViewport(IntPtr owner) {
         IntPtr result = IntPtr.Zero;
@@ -224,6 +193,10 @@ public static class NativeViewportRepaint {
         uint processId;
         uint targetThread = GetWindowThreadProcessId(window, out processId);
         uint currentThread = GetCurrentThreadId();
+        // Attach to the foreground queue as well: the target alone cannot grant activation.
+        uint foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out processId);
+        bool foregroundAttached = foregroundThread != 0 && foregroundThread != currentThread &&
+                                  AttachThreadInput(currentThread, foregroundThread, true);
         bool attached = targetThread != 0 && targetThread != currentThread &&
                         AttachThreadInput(currentThread, targetThread, true);
         try {
@@ -234,6 +207,7 @@ public static class NativeViewportRepaint {
             SetFocus(window);
         }
         finally {
+            if (foregroundAttached) { AttachThreadInput(currentThread, foregroundThread, false); }
             if (attached) {
                 AttachThreadInput(currentThread, targetThread, false);
             }
@@ -242,27 +216,6 @@ public static class NativeViewportRepaint {
 }
 }
 '@
-}
-
-function Wait-ForInitializedWindow([int]$ProcessId, [int]$TimeoutSeconds = 10) {
-    # The main window is findable from WM_CREATE, well before Initialize()
-    # refreshes the controls and publishes the initial status. Initialize()
-    # shows the window only after both, so visibility is the readiness signal
-    # for every assertion about the status card or the Save action. It is not a
-    # signal that every later command has been applied, and it never becomes
-    # true for an instance that started minimized -- pass a window-showing
-    # command to every caller.
-    $window = [IntPtr]::Zero
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        Start-Sleep -Milliseconds 100
-        $window = [IdleHarbor.NativeViewportRepaint]::FindMainWindow([uint32]$ProcessId)
-        if ($window -ne [IntPtr]::Zero -and
-            [IdleHarbor.NativeViewportRepaint]::IsWindowVisible($window)) {
-            return $window
-        }
-    } while ([DateTime]::UtcNow -lt $deadline)
-    return [IntPtr]::Zero
 }
 
 function Get-ViewportScrollInfo([IntPtr]$Viewport) {
@@ -393,29 +346,28 @@ function Save-ViewportCapture([IntPtr]$Viewport, [string]$Path) {
     Save-ClientCapture $Viewport $Path 'the settings viewport'
 }
 
-$tempRoot = Join-Path ([IO.Path]::GetTempPath()) "IdleHarbor-native-repaint-$([Guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $tempRoot | Out-Null
-$captureRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    $tempRoot
-}
-else {
-    New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Select-Object -ExpandProperty FullName
-}
-$configPath = Join-Path $tempRoot 'settings.ini'
+$testHost = New-IdleHarborTestHost -Executable $Executable -LeafPrefix 'IdleHarbor-native-repaint-' -TestName 'native repaint test'
+$executablePath = $testHost.Executable
+$tempRoot = $testHost.TempRoot
 $process = $null
 $window = [IntPtr]::Zero
 $cleanupRefusal = $null
 
 try {
+    $captureRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
+        $tempRoot
+    }
+    else {
+        New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Select-Object -ExpandProperty FullName
+    }
     [void][IdleHarbor.NativeViewportRepaint]::SetThreadDpiAwarenessContext([IntPtr](-4))
 
     # A first-owner runtime override must remain explicitly saveable instead
     # of being mistaken for persisted INI state. Prove that contract before
     # starting the clean repaint scenario below.
     $overrideConfigPath = Join-Path $tempRoot 'override-settings.ini'
-    $process = Start-Process -FilePath $executablePath -ArgumentList @(
-        '--show', '--config', $overrideConfigPath, '--motion', 'off') -PassThru
-    $window = Wait-ForInitializedWindow $process.Id
+    $process = Start-IdleHarborTestOwner $testHost -ConfigPath $overrideConfigPath -Arguments @('--motion', 'off')
+    $window = Wait-IdleHarborTestWindow $process.Id
     if ($window -eq [IntPtr]::Zero) {
         throw 'The runtime-override owner did not show its main window within 10 seconds.'
     }
@@ -438,9 +390,8 @@ try {
     $process = $null
     $window = [IntPtr]::Zero
 
-    $arguments = @('--show', '--config', $configPath)
-    $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -PassThru
-    $window = Wait-ForInitializedWindow $process.Id
+    $process = Start-IdleHarborTestOwner $testHost
+    $window = Wait-IdleHarborTestWindow $process.Id
     if ($window -eq [IntPtr]::Zero) {
         throw 'IdleHarbor did not show its main window within 10 seconds.'
     }
@@ -649,14 +600,7 @@ finally {
             0,
             0x0001 -bor 0x0002 -bor 0x0040) | Out-Null
     }
-    if ($null -ne $process) {
-        $process.Refresh()
-        if (-not $process.HasExited) {
-            Start-Process -FilePath $executablePath -ArgumentList '--exit' -WindowStyle Hidden -Wait
-            $process.WaitForExit(5000) | Out-Null
-        }
-    }
-    $cleanupRefusal = Remove-IdleHarborScopedTemp -Path $tempRoot -LeafPattern 'IdleHarbor-native-repaint-*' -RefusalNoun 'native-test directory'
+    $cleanupRefusal = Stop-IdleHarborTestHost -TestHost $testHost -Process $process -LeafPattern 'IdleHarbor-native-repaint-*' -RefusalNoun 'native-test directory'
 }
 if ($cleanupRefusal) {
     throw $cleanupRefusal

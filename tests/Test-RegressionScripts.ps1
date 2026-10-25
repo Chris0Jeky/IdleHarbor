@@ -20,7 +20,8 @@ foreach ($suite in @(
     'Test-CaptureManifestJson.ps1',
     'Test-CaptureEvidence.ps1',
     'Test-CaptureRoundedCorners.ps1',
-    'Test-ScopedTempCleanup.ps1'
+    'Test-ScopedTempCleanup.ps1',
+    'Test-NativeTestHost.ps1'
 )) {
     $path = Join-Path $PSScriptRoot $suite
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing registered regression suite: $suite" }

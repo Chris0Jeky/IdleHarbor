@@ -2,6 +2,22 @@
 
 Last updated: 2026-10-25
 
+## Shared native test host (#59)
+
+Both desktop scripts use `tests/IdleHarborTestHost.psm1` for the single-instance
+precondition, temp/config setup, quoted owner launch, visible-window discovery and
+bounded teardown. Exit-command and owner hangs are killed before scoped cleanup;
+cleanup errors are returned so the original test failure survives. The repaint
+fixture also attaches to the foreground input queue during activation: the baseline
+failed its foreground assertion, while the repair passes the unchanged drag checks.
+All seventeen x64 Release CTests, fifteen registered script suites and the packaging
+gate pass. Windows PowerShell 5.1 passes 31 process-fixture checks; omitting either
+kill or config quoting makes them fail. Both native scripts pass twice in one runspace
+under a spaced temp path at 120 DPI (33 hover tools, six fitting hints, native drag/wheel
+and matching repaint hashes), leaving no owner or temp directory. This does not
+prove Windows 10/ARM64, PowerShell 7 or physical accessibility acceptance.
+Owner-account actions in `HUMAN_TODO.md` remain open.
+
 ## Read-only Start Menu cleanup and retry evidence (#147)
 
 Update and uninstall now clear ReadOnly through the deletion handle only after
@@ -480,14 +496,13 @@ message from an earlier session, so Stop then Start does not pause the replaceme
 unless that session receives its own genuine input. The hidden fixture does not
 install low-level hooks.
 
-#37's known-folder relocation repair is described above. #49/#50/#59 concern
-capture quoting, corner privacy and harness cleanup. The two native scripts now
-remove their temp directory through `tests/Remove-IdleHarborScopedTemp.ps1`.
+#37's known-folder relocation repair is described above. #49/#50 concern
+capture quoting and corner privacy. The shared native test host described above
+removes temp directories through `tests/Remove-IdleHarborScopedTemp.ps1`.
 The helper refuses paths outside the user temp directory or with the wrong leaf,
 and it returns that refusal instead of throwing. Each script throws the refusal
 only after its `try` completes, so a failed test is no longer replaced by the
-path check or by a locked `settings.ini` removal error. Launch, `--exit`, and
-the help script's hung-process kill stay in each script.
+path check or by a locked `settings.ini` removal error.
 `tools/Capture-IdleHarborScreenshots.ps1` still has its own copy. The regression
 does not launch IdleHarbor. #70's serialization issue is
 addressed by #113, without claiming the other native capture gates are complete.
