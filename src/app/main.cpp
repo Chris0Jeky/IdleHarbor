@@ -592,20 +592,22 @@ class Application final {
     [[nodiscard]] HWND window() const noexcept { return window_; }
 
     void MaintainFocusedControlVisibility() {
-        ObserveFocusChange();
+        if (focus_trigger_ == FocusRevealTrigger::Keyboard) ObserveFocusChange();
+        // Sent focus delivered during the next GetMessage has no queued input cause.
+        focus_trigger_ = FocusRevealTrigger::Layout;
     }
 
     // Records how the user reached the control that is about to take focus.
     // Called for every queued message before it is dispatched, so a focus
     // change observed during dispatch already knows its own cause.
-    void NoteInputTrigger(const MSG& message) noexcept {
+    bool NoteInputTrigger(const MSG& message) noexcept {
         switch (message.message) {
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
         case WM_CHAR:
             CancelSmoothScroll();
             focus_trigger_ = FocusRevealTrigger::Keyboard;
-            break;
+            return true;
         case WM_LBUTTONDOWN:
         case WM_LBUTTONDBLCLK:
         case WM_RBUTTONDOWN:
@@ -613,11 +615,34 @@ class Application final {
         case WM_NCLBUTTONDOWN:
             CancelSmoothScroll();
             focus_trigger_ = FocusRevealTrigger::Pointer;
-            break;
+            return true;
         default:
-            break;
+            return false;
         }
     }
+
+    // Native modal loops dispatch child input without going through wWinMain.
+    class ChildInputScope final {
+      public:
+        ChildInputScope(Application* application, const UINT message) : application_(application) {
+            if (application_ == nullptr) return;
+            MSG input{}; input.message = message;
+            classified_ = application_->NoteInputTrigger(input);
+            if (classified_ && application_->focus_trigger_ == FocusRevealTrigger::Keyboard) {
+                application_->ObserveFocusChange();
+            }
+        }
+        ~ChildInputScope() {
+            // Nested input must not revive an older cause when its handler returns.
+            if (classified_) application_->focus_trigger_ = FocusRevealTrigger::Layout;
+        }
+        ChildInputScope(const ChildInputScope&) = delete;
+        ChildInputScope& operator=(const ChildInputScope&) = delete;
+
+      private:
+        Application* application_;
+        bool classified_ = false;
+    };
 
     void ObserveFocusChange() {
         const HWND focused = GetFocus();
@@ -727,8 +752,8 @@ class Application final {
         const UINT_PTR subclass_id,
         const DWORD_PTR reference_data) noexcept {
         auto* application = reinterpret_cast<Application*>(reference_data);
-        if (application != nullptr && (message == WM_LBUTTONDOWN || message == WM_KEYDOWN ||
-                                      (message == CB_SHOWDROPDOWN && w_param != FALSE))) {
+        const ChildInputScope input_scope{application, message};
+        if (application != nullptr && message == CB_SHOWDROPDOWN && w_param != FALSE) {
             application->CancelSmoothScroll();
         }
         if (application != nullptr && !application->high_contrast_ && application->IsNumericControl(window)) {

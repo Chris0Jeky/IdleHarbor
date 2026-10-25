@@ -2,6 +2,32 @@
 
 Last updated: 2026-10-25
 
+## Sent and nested-loop focus classification (#55)
+
+Input classification now lasts through the current queued dispatch. The main loop
+resets it before waiting again, allowing sent/programmatic focus to reveal its
+target after pointer input. Child subclasses scope their own input classification,
+so a nested message pump preserves pointer-focus stability and reveals keyboard
+targets, including a clipped control that already holds focus. Returning from
+nested input clears its cause instead of reviving an older one. Non-input messages
+do not retry pointer-suppressed reveals; the open-combo reveal guard is unchanged.
+
+On base `658bc7d`, the Visual Studio 17 2022 x64 Release build and all seventeen
+CTests pass. The expanded `compact_ui` fixture passes 596 checks. It sends a
+cross-thread focus request while GetMessage waits, then uses a window-procedure
+nested pump to dispatch posted keyboard and pointer messages without wWinMain.
+Both styled and native-color paths use real Win32 controls, focus and geometry;
+there is no injected desktop input. The same tests compile against the original
+main.cpp extracted by read-only `git show`, then fail ten assertions. Restoring
+the generated test include byte-for-byte and rebuilding returns them to green.
+The runner and logs remain in ignored `build/Test-FocusOriginsBaseline.ps1` and
+`build/focus-{baseline,fixed}-{build,test}.log`.
+
+Windows 10, x86/ARM64 execution, actual screen-reader/UI Automation clients and
+real MessageBox/TrackPopupMenu interaction are not verified by the synthetic nested
+pump. Hosted CI and publication belong to the coordinator; no Git writes are
+performed. `HUMAN_TODO.md` q-3 and q-4 remain open and unchanged.
+
 ## Simultaneous policy safeguards (#145)
 
 Core tests now cover all 36 pairs among maximum duration, manual pause and the
@@ -501,8 +527,8 @@ See [status contracts](docs/STATUS-SURFACES.md) for the native-control/API-doubl
 boundary. #118 supplies visible, retryable cleanup-failure presentation, allowing
 #86's original tracker claims to close. #56 is also closed: #118 commits pending
 combo selections before forwarded overrides and protects ordinary/early synchronous
-closeup ordering with hidden-native regression tests. #55's focus-origin edge case
-remains open and needs sent-focus/modal-loop interaction proof. A genuine-input
+closeup ordering with hidden-native regression tests. #55's sent-focus/nested-pump
+repair and its native acceptance limits are described above. A genuine-input
 notification carries the session generation that posted it. The window ignores a
 message from an earlier session, so Stop then Start does not pause the replacement
 unless that session receives its own genuine input. The hidden fixture does not
