@@ -84,10 +84,10 @@ try {
     @{ Mode = 'kill'; Fails = $false; Kills = 1 },
     @{ Mode = 'exit-race-invalid'; Fails = $false; Kills = 1 },
     @{ Mode = 'exit-race-win32'; Fails = $false; Kills = 1 },
-    @{ Mode = 'kill-denied'; Fails = $true; Kills = 1 },
-    @{ Mode = 'kill-invalid'; Fails = $true; Kills = 1 },
-    @{ Mode = 'kill-timeout'; Fails = $true; Kills = 1 },
-    @{ Mode = 'refresh-failure'; Fails = $true; Kills = 1 }
+    @{ Mode = 'kill-denied'; Fails = $true; Kills = 1; Error = 'simulated kill denied' },
+    @{ Mode = 'kill-invalid'; Fails = $true; Kills = 1; Error = 'process is still running' },
+    @{ Mode = 'kill-timeout'; Fails = $true; Kills = 1; Error = 'did not terminate' },
+    @{ Mode = 'refresh-failure'; Fails = $true; Kills = 1; Error = 'cannot confirm process exit' }
   )
   foreach ($role in @('owner', 'exit', 'earlier')) {
     foreach ($case in $cases) {
@@ -107,9 +107,7 @@ try {
         -LeafPattern 'fixture-never-created-*' -RefusalNoun 'exit-race fixture'
       if ($case.Fails) {
         Assert-True (-not [string]::IsNullOrEmpty($failure)) "$role/$($case.Mode) must retain a genuine teardown failure."
-        if ($case.Mode -eq 'kill-timeout') {
-          Assert-True ($failure -like '*did not terminate*') "$role must retain the bounded post-kill timeout."
-        }
+        Assert-True ($failure -like "*$($case.Error)*") "$role/$($case.Mode) must preserve the genuine failure diagnostic: $failure"
       } else {
         Assert-True ([string]::IsNullOrEmpty($failure)) "$role/$($case.Mode) must not report a false teardown failure: $failure"
       }

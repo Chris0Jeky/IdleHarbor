@@ -69,6 +69,19 @@ function Wait-IdleHarborTestWindow {
   return [IntPtr]::Zero
 }
 
+function Stop-IdleHarborTestProcess {
+  param([Diagnostics.Process]$Process, [int]$WaitMilliseconds, [string]$FailureMessage)
+  if ($Process.WaitForExit($WaitMilliseconds)) { return }
+  try { $Process.Kill() }
+  catch {
+    # A timed-out process may exit naturally before Kill reaches it. Only
+    # suppress that error when a fresh process status confirms shutdown.
+    $Process.Refresh()
+    if (-not $Process.HasExited) { throw }
+  }
+  if (-not $Process.WaitForExit($WaitMilliseconds)) { throw $FailureMessage }
+}
+
 function Stop-IdleHarborTestHost {
   param($TestHost, [Diagnostics.Process]$Process, [string]$LeafPattern, [string]$RefusalNoun,
         [ValidateRange(1, 60000)][int]$WaitMilliseconds = 5000,
@@ -82,16 +95,10 @@ function Stop-IdleHarborTestHost {
       if (-not $Process.HasExited) {
         try {
           $exitCommand = Start-Process -FilePath $TestHost.Executable -ArgumentList '--exit' -WindowStyle Hidden -PassThru
-          if (-not $exitCommand.WaitForExit($WaitMilliseconds)) {
-            $exitCommand.Kill()
-            if (-not $exitCommand.WaitForExit($WaitMilliseconds)) { throw 'The test exit command did not terminate.' }
-          }
+          Stop-IdleHarborTestProcess $exitCommand $WaitMilliseconds 'The test exit command did not terminate.'
         }
         catch { $failures += "Could not forward test shutdown: $($_.Exception.Message)" }
-        if (-not $Process.WaitForExit($WaitMilliseconds)) {
-          $Process.Kill()
-          if (-not $Process.WaitForExit($WaitMilliseconds)) { throw 'The test owner did not terminate.' }
-        }
+        Stop-IdleHarborTestProcess $Process $WaitMilliseconds 'The test owner did not terminate.'
       }
     }
     catch { $failures += "Could not stop test owner: $($_.Exception.Message)" }
@@ -101,10 +108,7 @@ function Stop-IdleHarborTestHost {
   foreach ($command in $Commands) {
     if ($null -eq $command) { continue }
     try {
-      if (-not $command.WaitForExit($WaitMilliseconds)) {
-        $command.Kill()
-        if (-not $command.WaitForExit($WaitMilliseconds)) { throw 'The earlier test command did not terminate.' }
-      }
+      Stop-IdleHarborTestProcess $command $WaitMilliseconds 'The earlier test command did not terminate.'
     }
     catch { $failures += "Could not stop earlier test command: $($_.Exception.Message)" }
   }

@@ -2,6 +2,22 @@
 
 Last updated: 2026-10-29
 
+## Native test-host wait/kill exit race (child of #153)
+
+The test-first exit-race fixture fails against unchanged helper head `5a832d5` in
+both hosted Windows PowerShell and PowerShell 7: a process exits between its timed
+wait and kill, but teardown reports an owner failure. The helper now refreshes
+status after a kill exception and accepts it only when exit is confirmed; the
+post-kill wait remains bounded. The owner, forwarded exit command and earlier
+commands share that private path. Live-process errors and unknown status remain
+failures rather than being silently ignored.
+
+The registered regression models nine outcomes for each of those three roles
+without starting an app, moving input or touching files. Earlier PowerShell
+execution and Windows SDK registry denials were not retried or bypassed locally.
+The final head's hosted result belongs to the child PR receipt, not the historical
+native-application passes below. q-3/q-4 and native desktop acceptance remain open.
+
 ## PR #153 conflict-resolution checkpoint (2026-10-29)
 
 The candidate merges main `fba20fd` into PR head `5b6e63a`, preserving both main's
