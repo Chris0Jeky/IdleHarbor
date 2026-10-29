@@ -112,6 +112,9 @@ try {
         Assert-True ([string]::IsNullOrEmpty($failure)) "$role/$($case.Mode) must not report a false teardown failure: $failure"
       }
       Assert-True ($subject.KillCalls -eq $case.Kills) "$role/$($case.Mode) must only kill after the bounded wait expires."
+      if ($case.Mode -in @('exit-race-invalid', 'exit-race-win32')) {
+        Assert-True ($subject.WaitCalls -eq 2) "$role/$($case.Mode) must retain the bounded post-kill confirmation wait."
+      }
       Assert-True ($state.Cleanups -eq 1) "$role/$($case.Mode) must still reach scoped cleanup."
       if ($role -ne 'earlier' -and -not ($role -eq 'owner' -and $case.Mode -eq 'already-exited')) {
         Assert-True ($state.Launches -eq 1 -and $state.Exit.Disposed) "$role/$($case.Mode) must reap the forwarded command handle."
