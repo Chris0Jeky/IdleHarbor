@@ -97,7 +97,7 @@ foreach ($suite in @(
     [void][Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$parseErrors)
     Assert-True ($parseErrors.Count -eq 0) "$($suite.Name) must still parse."
     $text = Get-Content -LiteralPath $path -Raw
-    Assert-True ($text.Contains(". (Join-Path `$PSScriptRoot 'Remove-IdleHarborScopedTemp.ps1')")) "$($suite.Name) must load the shared temp helper."
+    Assert-True ($text.Contains("Import-Module (Join-Path `$PSScriptRoot 'IdleHarborTestHost.psm1')")) "$($suite.Name) must load the shared native host."
     Assert-True ($text.Contains("-LeafPattern '$($suite.Pattern)'")) "$($suite.Name) must keep its own temp leaf."
     Assert-True ($text.Contains("-RefusalNoun '$($suite.Noun)'")) "$($suite.Name) must keep its own refusal noun."
     Assert-True ($text -notmatch 'throw "Refusing to remove an unexpected') "$($suite.Name) must not throw the path refusal from finally."

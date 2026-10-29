@@ -1,6 +1,23 @@
 # Project state
 
-Last updated: 2026-10-25
+Last updated: 2026-10-29
+
+## PR #153 conflict-resolution checkpoint (2026-10-29)
+
+The candidate merges main `fba20fd` into PR head `5b6e63a`, preserving both main's
+sent/nested-loop focus repair and the shared native test host. The only manual
+merge resolution is this state document; the helper and its existing tests are
+unchanged. Entries below retain their original evidence scope. Current candidate
+validation is recorded in the PR description; earlier native passes do not close
+the known WaitForExit/Kill teardown race or owner acceptance gates.
+
+The conflict-resolution audit preserves main's focus implementation/tests and all
+seven PR helper/documentation paths byte-for-byte. Seventeen website release
+tests pass locally. Windows PowerShell refused the regression script before
+execution; CMake configuration stopped when Windows SDK discovery was denied
+registry access. No local build, CTest or fresh native desktop acceptance is
+claimed, and neither denial was retried or bypassed. Hosted results belong to
+the exact-head PR receipt.
 
 ## Sent and nested-loop focus classification (#55)
 
@@ -27,6 +44,38 @@ Windows 10, x86/ARM64 execution, actual screen-reader/UI Automation clients and
 real MessageBox/TrackPopupMenu interaction are not verified by the synthetic nested
 pump. Hosted CI and publication belong to the coordinator; no Git writes are
 performed. `HUMAN_TODO.md` q-3 and q-4 remain open and unchanged.
+
+## Shared native test host (#59)
+
+Historical implementation/integration record from `8890528` and `5b6e63a`
+(2026-10-25); the independent review covered `8890528` only.
+
+Both desktop scripts use `tests/IdleHarborTestHost.psm1` for the single-instance
+precondition, temp/config setup, quoted owner launch, visible-window discovery and
+bounded teardown. Owner, exit-command and earlier forwarded-command hangs are killed
+before scoped cleanup;
+cleanup errors are returned so the original test failure survives. The repaint
+fixture also attaches to the foreground input queue during activation: the baseline
+failed its foreground assertion, while the repair passes the unchanged drag checks.
+The earlier implementation receipt records all seventeen x64 Release CTests,
+fifteen registered script suites and the packaging gate passing. Windows PowerShell 5.1 passes 40 process-fixture checks; omitting owner,
+exit-command or earlier-command cleanup, or config quoting, makes them fail. Both
+native scripts pass twice in one runspace
+under a spaced temp path at 120 DPI (33 hover tools, six fitting hints, native drag/wheel
+and matching repaint hashes), leaving no owner or temp directory. This does not
+prove Windows 10/ARM64, PowerShell 7 or physical accessibility acceptance.
+Owner-account actions in `HUMAN_TODO.md` remain open.
+
+PR #153 integration retains main's simultaneous-policy-safeguard tests and state
+entry below. Fresh-context review found that repaint's earlier exit/override/start
+commands were outside shared teardown; their process handles are now passed to the
+host. The new hanging-command fixture fails against the previous helper and passes
+the repair without replacing the original assertion on failure. Its termination
+allowance is one second: 200 ms timed out although the following exit assertion
+succeeded. The production five-second wait is unchanged. One repeated native run
+failed the wheel-bottom assertion; two diagnostic repeats and two final direct
+repeats passed unchanged assertions, so the cause remains unconfirmed. These are historical observations on the earlier PR tree, not a fresh
+qualification of the October 29 merge candidate.
 
 ## Simultaneous policy safeguards (#145)
 
@@ -534,14 +583,13 @@ message from an earlier session, so Stop then Start does not pause the replaceme
 unless that session receives its own genuine input. The hidden fixture does not
 install low-level hooks.
 
-#37's known-folder relocation repair is described above. #49/#50/#59 concern
-capture quoting, corner privacy and harness cleanup. The two native scripts now
-remove their temp directory through `tests/Remove-IdleHarborScopedTemp.ps1`.
+#37's known-folder relocation repair is described above. #49/#50 concern
+capture quoting and corner privacy. The shared native test host described above
+removes temp directories through `tests/Remove-IdleHarborScopedTemp.ps1`.
 The helper refuses paths outside the user temp directory or with the wrong leaf,
 and it returns that refusal instead of throwing. Each script throws the refusal
 only after its `try` completes, so a failed test is no longer replaced by the
-path check or by a locked `settings.ini` removal error. Launch, `--exit`, and
-the help script's hung-process kill stay in each script.
+path check or by a locked `settings.ini` removal error.
 `tools/Capture-IdleHarborScreenshots.ps1` still has its own copy. The regression
 does not launch IdleHarbor. #70's serialization issue is
 addressed by #113, without claiming the other native capture gates are complete.

@@ -22,7 +22,12 @@ run with no other IdleHarbor instance open:
 
 ```powershell
 .\tests\Test-NativeViewportRepaint.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
+.\tests\Test-ControlHelpTips.ps1 -Executable .\build\x64\Release\IdleHarbor.exe
 ```
+
+Both scripts use `tests/IdleHarborTestHost.psm1` for isolated config paths, visible-window
+readiness and bounded shutdown. `tests/Test-NativeTestHost.ps1` exercises graceful and
+hung fixture processes without moving the pointer; the registered script gate includes it.
 
 The project is Windows-only. CI additionally builds ARM64 and Win32; release packaging currently
 targets x64 and ARM64.

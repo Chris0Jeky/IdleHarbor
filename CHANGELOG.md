@@ -36,6 +36,8 @@ where practical.
 
 ### Changed
 
+- Native desktop tests share owner setup, visible-window discovery and bounded teardown.
+  Hung owners/exit commands are reaped; spaced config paths and foreground acquisition are tested.
 - Settings scrolling responds proportionally to small wheel movements; wheel notches
   settle with a short, interruptible transition that respects reduced motion.
   A slim themed scrollbar retains native dragging and accessibility behavior.
