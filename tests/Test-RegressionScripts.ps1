@@ -21,6 +21,7 @@ foreach ($suite in @(
     'Test-CaptureEvidence.ps1',
     'Test-CaptureRoundedCorners.ps1',
     'Test-ScopedTempCleanup.ps1',
+    'Test-NativeTestHostExitRace.ps1',
     'Test-NativeTestHost.ps1'
 )) {
     $path = Join-Path $PSScriptRoot $suite

@@ -28,6 +28,10 @@ run with no other IdleHarbor instance open:
 Both scripts use `tests/IdleHarborTestHost.psm1` for isolated config paths, visible-window
 readiness and bounded shutdown. `tests/Test-NativeTestHost.ps1` exercises graceful and
 hung fixture processes without moving the pointer; the registered script gate includes it.
+`Test-NativeTestHostExitRace.ps1` drives the teardown with typed process doubles and
+starts no app. If a process exits between the bounded wait and `Kill`, a refreshed
+exit status can confirm success. Kill failures while it remains alive, unreadable
+status and post-kill timeouts still return teardown errors.
 
 The project is Windows-only. CI additionally builds ARM64 and Win32; release packaging currently
 targets x64 and ARM64.

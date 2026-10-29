@@ -8,6 +8,9 @@ where practical.
 
 ### Fixed
 
+- Native test-host teardown accepts a process that exits between its bounded wait
+  and kill only after refreshing and confirming exit. Genuine kill failures,
+  unreadable status and post-kill timeouts remain errors for all three owned roles.
 - Settings focus sent outside the main message loop reveals its target instead of
   inheriting an earlier pointer classification. Child input dispatched by a nested
   loop distinguishes keyboard reveal from pointer focus without viewport movement.
